@@ -1,0 +1,90 @@
+{
+  "$comment": "Starter design tokens SLJ — nilai awal, sesuaikan lewat proses desain (Impeccable Style checklist) sebelum dipakai final. Sumber tunggal untuk web, mobile (React Native), dan email template.",
+  "color": {
+    "primary": { "value": "#0F1E3D", "$comment": "biru navy — dari brand BinaJourney" },
+    "secondary": { "value": "#4B5563" },
+    "accent": { "value": "#C79A3C", "$comment": "emas — dipakai hemat, bukan dominan, agar tidak terasa seperti aplikasi finansial" },
+    "background": { "value": "#FAF8F4", "$comment": "bukan putih murni — lebih hangat, cocok tema refleksi" },
+    "surface": { "value": "#FFFFFF" },
+    "text-primary": { "value": "#111827" },
+    "text-secondary": { "value": "#6B7280" },
+    "success": { "value": "#2F855A", "$comment": "status On Track" },
+    "warning": { "value": "#C05621", "$comment": "status Need Support" },
+    "danger": { "value": "#B91C1C", "$comment": "error/delete" },
+    "info": { "value": "#2563EB" },
+    "border": { "value": "#E5E7EB" }
+  },
+  "opacity": {
+    "disabled": { "value": 0.4 },
+    "hover": { "value": 0.08 },
+    "pressed": { "value": 0.16 }
+  },
+  "z-index": {
+    "header": { "value": 100 },
+    "popover": { "value": 200 },
+    "modal": { "value": 300 },
+    "toast": { "value": 400 }
+  },
+  "breakpoint": {
+    "sm": { "value": "640px" },
+    "md": { "value": "768px" },
+    "lg": { "value": "1024px" },
+    "xl": { "value": "1280px" }
+  },
+  "icon-size": {
+    "sm": { "value": "16px" },
+    "md": { "value": "20px" },
+    "lg": { "value": "24px" },
+    "xl": { "value": "32px" }
+  },
+  "container-width": {
+    "landing-page": { "value": "1200px" },
+    "dashboard": { "value": "1440px" },
+    "wizard": { "value": "680px", "$comment": "sengaja sempit — satu fokus per langkah onboarding" }
+  },
+  "typography": {
+    "font-family-base": { "value": "Inter, system-ui, sans-serif" },
+    "font-size-xs": { "value": "12px" },
+    "font-size-sm": { "value": "14px" },
+    "font-size-base": { "value": "16px" },
+    "font-size-lg": { "value": "20px" },
+    "font-size-xl": { "value": "28px" },
+    "font-size-2xl": { "value": "36px" },
+    "font-weight-regular": { "value": 400 },
+    "font-weight-medium": { "value": 500 },
+    "font-weight-bold": { "value": 700 },
+    "line-height-base": { "value": 1.5 }
+  },
+  "spacing": {
+    "xs": { "value": "4px" },
+    "sm": { "value": "8px" },
+    "md": { "value": "16px" },
+    "lg": { "value": "24px" },
+    "xl": { "value": "32px" },
+    "2xl": { "value": "48px" }
+  },
+  "radius": {
+    "sm": { "value": "6px" },
+    "md": { "value": "12px" },
+    "lg": { "value": "20px" },
+    "full": { "value": "9999px" }
+  },
+  "elevation": {
+    "shadow-sm": { "value": "0 1px 2px rgba(15, 30, 61, 0.06)" },
+    "shadow-md": { "value": "0 4px 12px rgba(15, 30, 61, 0.08)" },
+    "shadow-lg": { "value": "0 12px 32px rgba(15, 30, 61, 0.10)" }
+  },
+  "animation": {
+    "duration-fast": { "value": "120ms" },
+    "duration-base": { "value": "200ms" },
+    "duration-slow": { "value": "400ms" },
+    "easing-standard": { "value": "cubic-bezier(0.4, 0, 0.2, 1)" },
+    "easing-ease-out": { "value": "cubic-bezier(0, 0, 0.2, 1)" },
+    "easing-spring": { "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "$comment": "dipakai hemat — untuk micro-interaction seperti checklist habit selesai" },
+    "easing-bounce": { "value": "cubic-bezier(0.68, -0.55, 0.265, 1.55)", "$comment": "dipakai sangat jarang, hindari terasa playful berlebihan" }
+  },
+  "blur": {
+    "sm": { "value": "4px" },
+    "md": { "value": "12px" }
+  }
+}

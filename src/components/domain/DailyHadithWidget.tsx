@@ -1,0 +1,184 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BookMarked, Quote, CheckCircle2 } from "lucide-react";
+
+interface DailyHadithWidgetProps {
+  userId: string;
+}
+
+const HADITHS = [
+  {
+    matn: "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى",
+    translation: "Sesungguhnya setiap amalan tergantung pada niatnya, dan sesungguhnya setiap orang akan mendapatkan sesuai dengan apa yang ia niatkan.",
+    narrator: "HR. Bukhari no. 1 & Muslim no. 1907 (dari Umar bin Khattab RA)",
+  },
+  {
+    matn: "خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ",
+    translation: "Sebaik-baik kalian adalah orang yang mempelajari Al-Qur'an dan mengajarkannya.",
+    narrator: "HR. Bukhari no. 5027 (dari Utsman bin Affan RA)",
+  },
+  {
+    matn: "مَنْ سَلَكَ طَرِيقًا يَلْتَمِسُ فِيهِ عِلْمًا سَهَّلَ اللَّهُ لَهُ بِهِ طَرِيقًا إِلَى الْجَنَّةِ",
+    translation: "Barangsiapa menempuh jalan untuk menuntut ilmu, maka Allah akan mempermudah baginya jalan menuju surga.",
+    narrator: "HR. Muslim no. 2699 (dari Abu Hurairah RA)",
+  },
+  {
+    matn: "احْفَظِ اللَّهَ يَحْفَظْكَ، احْفَظِ اللَّهَ تَجِدْهُ تُجَاهَكَ",
+    translation: "Jagalah Allah, niscaya Allah akan menjagamu. Jagalah Allah, niscaya engkau akan mendapati-Nya di hadapanmu.",
+    narrator: "HR. Tirmidzi no. 2516 (dari Ibnu Abbas RA)",
+  },
+  {
+    matn: "طَهُورُ شَطْرُ الإِيمَانِ، وَالْحَمْدُ لِلَّهِ تَمْلأُ الْمِيزَانَ",
+    translation: "Bersuci adalah setengah dari iman, dan ucapan 'Alhamdulillah' memenuhi timbangan pahala.",
+    narrator: "HR. Muslim no. 223 (dari Abu Malik Al-Asy'ari RA)",
+  },
+  {
+    matn: "لاَ يَقُودُ الرَّجُلُ أَخَاهُ إِلاَّ إِلَى خَيْرٍ، وَقَالَ المُؤْمِنُ المِرْآةُ لِلْمُؤْمِنِ",
+    translation: "Seorang mukmin adalah cermin bagi mukmin yang lainnya; ia saling menjaga dan menasihati dalam kebaikan.",
+    narrator: "HR. Abu Daud no. 4918 (dari Abu Hurairah RA)",
+  },
+];
+
+export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
+  const supabase = createClient();
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
+  );
+  const hadith = HADITHS[dayOfYear % HADITHS.length];
+
+  const [isRead, setIsRead] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadHadithLog() {
+      if (!userId) return;
+      try {
+        const { data } = await supabase
+          .from("hadith_logs")
+          .select("is_read")
+          .eq("user_id", userId)
+          .eq("date", todayStr)
+          .maybeSingle();
+
+        if (data) {
+          setIsRead(data.is_read || false);
+        }
+      } catch (err) {
+        console.error("Gagal memuat log hadits:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadHadithLog();
+  }, [userId, todayStr]);
+
+  const syncHabitLog = async (habitTitle: string, completed: boolean) => {
+    try {
+      const { data: habit } = await supabase
+        .from("habits")
+        .select("id")
+        .eq("user_id", userId)
+        .ilike("title", habitTitle)
+        .eq("is_archived", false)
+        .maybeSingle();
+
+      if (!habit) return;
+
+      if (completed) {
+        await supabase.from("habit_logs").upsert(
+          { habit_id: habit.id, user_id: userId, date: todayStr, completed: true },
+          { onConflict: "habit_id,date" }
+        );
+      } else {
+        await supabase
+          .from("habit_logs")
+          .delete()
+          .eq("habit_id", habit.id)
+          .eq("user_id", userId)
+          .eq("date", todayStr);
+      }
+    } catch (err) {
+      console.error("syncHabitLog (DailyHadithWidget):", err);
+    }
+  };
+
+  const toggleHadithRead = async (checked: boolean) => {
+    setIsRead(checked);
+    try {
+      if (checked) {
+        await supabase.from("hadith_logs").upsert(
+          {
+            user_id: userId,
+            date: todayStr,
+            is_read: true,
+          },
+          { onConflict: "user_id,date" }
+        );
+      } else {
+        await supabase
+          .from("hadith_logs")
+          .delete()
+          .eq("user_id", userId)
+          .eq("date", todayStr);
+      }
+
+      // Sync matching PTP habits
+      await syncHabitLog("Membaca Hadits Harian", checked);
+    } catch (err) {
+      console.error("Gagal update status baca hadits:", err);
+      setIsRead(!checked);
+    }
+  };
+
+  return (
+    <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between relative overflow-hidden h-full">
+      <div className="flex items-center justify-between border-b border-warm-border/60 pb-3 z-10 relative">
+        <div className="flex items-center space-x-2">
+          <div className="h-7 w-7 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xs">
+            <BookMarked className="h-4 w-4 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="font-bold text-xs sm:text-sm text-navy-900">Hadits Hari Ini</h3>
+            <p className="text-[11px] text-gray-500">Refleksi Hadits Shahih Pilihan</p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 bg-amber-50/70 px-3 py-1.5 rounded-full border border-amber-200">
+          <Checkbox
+            checked={isRead}
+            onCheckedChange={(c) => toggleHadithRead(!!c)}
+            className="h-4 w-4 rounded-md border-amber-400 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white"
+          />
+          <span className="text-xs font-bold text-amber-900">
+            {isRead ? "Sudah Dibaca ✓" : "Tandai Dibaca"}
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-3 z-10 relative flex-1 flex flex-col justify-between">
+        <p className="text-right font-serif text-lg text-navy-900 leading-loose tracking-wide dir-rtl font-bold bg-amber-50/30 p-3 rounded-xl border border-amber-100/50">
+          {hadith.matn}
+        </p>
+
+        <p className="text-xs text-slate-700 italic font-serif leading-relaxed">
+          &ldquo;{hadith.translation}&rdquo;
+        </p>
+
+        <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold pt-2 border-t border-slate-100">
+          <span className="text-amber-800 font-bold">{hadith.narrator}</span>
+          {isRead && (
+            <span className="flex items-center gap-1 text-emerald-700 font-bold text-[10px]">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Dibaca & Direfleksikan
+            </span>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
