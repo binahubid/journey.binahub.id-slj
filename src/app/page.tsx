@@ -176,7 +176,7 @@ export default function LandingPage() {
           <div className="flex items-center space-x-4">
             <Link href={isLoggedIn ? "/dashboard" : "/register"}>
               <button className="inline-flex items-center justify-center gap-2 rounded-[9px] bg-[#0F1E3D] hover:bg-[#07132B] text-white text-[10px] md:text-[11px] font-extrabold uppercase tracking-[0.14em] px-6 py-2.5 shadow-[0_18px_42px_-20px_rgba(15,30,61,0.8)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95">
-                {isLoggedIn ? "Dashboard" : "Mulai Journey Saya"}
+                {isLoggedIn ? "Dashboard" : "Mulai Journey"}
               </button>
             </Link>
           </div>
@@ -235,7 +235,7 @@ export default function LandingPage() {
               <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                 <Link href={isLoggedIn ? "/dashboard" : "/register"}>
                   <button className="inline-flex h-11 md:h-12 items-center justify-center gap-2 rounded-[9px] bg-[#0F1E3D] px-6 sm:px-7 text-[10px] md:text-[12px] font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_22px_56px_-30px_rgba(15,30,61,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#07132B] active:scale-95 w-full sm:w-auto">
-                    {isLoggedIn ? "Ke Dashboard" : "Mulai Journey Saya"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
+                    {isLoggedIn ? "Ke Dashboard" : "Mulai Journey"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
                   </button>
                 </Link>
                 <a href="https://wa.me/628118494545" target="_blank" rel="noopener noreferrer">
@@ -725,7 +725,7 @@ export default function LandingPage() {
                 <div className="pt-2 sm:pt-4">
                   <a href="https://wa.me/628118494545" target="_blank" rel="noopener noreferrer">
                     <button className="inline-flex items-center justify-center gap-2 rounded-[9px] bg-[#0F1E3D] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider px-5 sm:px-6 py-3 shadow-md hover:bg-[#07132B] transition-all w-full sm:w-auto">
-                      Konsultasi Bersama Coach <ChevronRight className="w-4 h-4 text-[#C79A3C]" />
+                      Konsultasi Bersama Tim Kami <ChevronRight className="w-4 h-4 text-[#C79A3C]" />
                     </button>
                   </a>
                 </div>
@@ -1141,7 +1141,7 @@ export default function LandingPage() {
             <div className="pt-3 sm:pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
               <Link href={isLoggedIn ? "/dashboard" : "/register"}>
                 <button className="bg-[#0F1E3D] hover:bg-[#07132B] text-white text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] px-7 py-3.5 sm:px-8 sm:py-4 rounded-full shadow-xl transition-all duration-300 hover:-translate-y-0.5 active:scale-95 inline-flex items-center justify-center gap-2 w-full sm:w-auto">
-                  {isLoggedIn ? "Ke Dashboard" : "Daftar Cohort Berikutnya"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
+                  {isLoggedIn ? "Ke Dashboard" : "Mulai Transformasi Sekarang"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
                 </button>
               </Link>
               <a href="https://wa.me/628118494545" target="_blank" rel="noopener noreferrer">
