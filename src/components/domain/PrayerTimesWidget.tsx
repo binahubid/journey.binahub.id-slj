@@ -6,6 +6,7 @@ import { Clock, MapPin, ChevronRight, Sun, Moon, Sunrise, Sunset } from "lucide-
 
 interface PrayerTimes {
   Fajr: string;
+  Sunrise: string;
   Dhuhr: string;
   Asr: string;
   Maghrib: string;
@@ -56,6 +57,7 @@ function getNextPrayerInfo(timings: PrayerTimes): { name: string; time: string; 
 export function PrayerTimesWidget({ location = "Jakarta", onViewAll }: PrayerTimesWidgetProps) {
   const [timings, setTimings] = useState<PrayerTimes>({
     Fajr: "--:--",
+    Sunrise: "--:--",
     Dhuhr: "--:--",
     Asr: "--:--",
     Maghrib: "--:--",
@@ -78,6 +80,7 @@ export function PrayerTimesWidget({ location = "Jakarta", onViewAll }: PrayerTim
         if (data?.data?.timings) {
           const fetched: PrayerTimes = {
             Fajr: data.data.timings.Fajr?.replace(/\s*\(.*\)/, "") || "--:--",
+            Sunrise: data.data.timings.Sunrise?.replace(/\s*\(.*\)/, "") || "--:--",
             Dhuhr: data.data.timings.Dhuhr?.replace(/\s*\(.*\)/, "") || "--:--",
             Asr: data.data.timings.Asr?.replace(/\s*\(.*\)/, "") || "--:--",
             Maghrib: data.data.timings.Maghrib?.replace(/\s*\(.*\)/, "") || "--:--",
@@ -106,6 +109,7 @@ export function PrayerTimesWidget({ location = "Jakarta", onViewAll }: PrayerTim
 
   const prayers = [
     { name: "Subuh", time: timings.Fajr, icon: Sunrise },
+    { name: "Syuruq", time: timings.Sunrise, icon: Sun, isInfo: true },
     { name: "Dzuhur", time: timings.Dhuhr, icon: Sun },
     { name: "Ashar", time: timings.Asr, icon: Sun },
     { name: "Maghrib", time: timings.Maghrib, icon: Sunset },
@@ -151,21 +155,25 @@ export function PrayerTimesWidget({ location = "Jakarta", onViewAll }: PrayerTim
         <div className="space-y-1.5 pt-1">
           {prayers.map((p, idx) => {
             const isNext = p.name === nextPrayer.name;
+            const isInfoOnly = (p as any).isInfo;
             const Icon = p.icon;
             return (
               <div
                 key={idx}
                 className={`flex items-center justify-between py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
-                  isNext
+                  isInfoOnly
+                    ? "text-rose-600 bg-rose-50/60 border border-rose-100/80"
+                    : isNext
                     ? "bg-amber-50/80 text-navy-900 border border-amber-200/80 font-bold"
                     : "text-slate-600 hover:bg-warm-bg/70"
                 }`}
               >
                 <div className="flex items-center space-x-2">
-                  <Icon className={`h-3.5 w-3.5 ${isNext ? "text-amber-600" : "text-slate-400"}`} />
+                  <Icon className={`h-3.5 w-3.5 ${isInfoOnly ? "text-rose-500" : isNext ? "text-amber-600" : "text-slate-400"}`} />
                   <span>{p.name}</span>
+                  {isInfoOnly && <span className="text-[9px] font-bold bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full">Terbit</span>}
                 </div>
-                <span className={isNext ? "text-navy-900 font-bold" : "text-slate-500"}>
+                <span className={isInfoOnly ? "text-rose-600 font-bold" : isNext ? "text-navy-900 font-bold" : "text-slate-500"}>
                   {loading ? "--:--" : p.time}
                 </span>
               </div>

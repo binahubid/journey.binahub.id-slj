@@ -29,6 +29,7 @@ Basis komponen: Shadcn UI (lihat ADR-006), dikustomisasi memakai `design-tokens.
 | **Coach Card** | Card + Avatar | Menampilkan info coach & catatan singkat di dashboard peserta |
 | **Notification Card** | Card + icon | Item di daftar notifikasi in-app |
 | **Checkpoint Card** | Card + Badge + Textarea | Kartu Bulan 1/2/3 di Monitoring Progress, dengan status On Track/Need Support |
+| **Motivation Decline Chart** | Line/area chart minim (tanpa gradient/drop shadow) | Grafik penurunan semangat Hari 1-90 di landing page section "Masalah yang Kami Pecahkan" — warna navy/gold, label checkpoint di sumbu X |
 
 ## Props & Variant — aturan umum
 

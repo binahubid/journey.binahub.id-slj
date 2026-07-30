@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, MapPin, Calendar } from "lucide-react";
+import { ArrowLeft, User, MapPin, Calendar, Building2, Layers } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 
@@ -15,7 +15,8 @@ interface UserProfileData {
   location: string;
   startDate: string;
   endDate: string;
-  coachName: string;
+  companyName: string;
+  batchName: string;
   status: string;
   areaTransformasi: string[];
 }
@@ -29,7 +30,8 @@ export default function ProfilePage() {
     location: "Jakarta",
     startDate: "-",
     endDate: "-",
-    coachName: "Ditunjuk oleh Admin",
+    companyName: "Perusahaan Mitra",
+    batchName: "Batch Executive 2027",
     status: "ONBOARDING",
     areaTransformasi: [],
   });
@@ -56,15 +58,21 @@ export default function ProfilePage() {
           .limit(1)
           .maybeSingle();
 
-        // 3. Fetch Coach
-        let coachName = "Ditunjuk oleh Admin";
-        if (journey) {
-          const { data: team } = await supabase
-            .from("support_team")
-            .select("coach_name")
-            .eq("journey_id", journey.id)
+        // 3. Fetch Batch & Company info
+        let companyName = userProfile?.company_name || "Corporate Mitra";
+        let batchName = userProfile?.program_code || "Batch 1";
+
+        if (userProfile?.program_code) {
+          const { data: batchData } = await supabase
+            .from("batches")
+            .select("name, company_name")
+            .eq("access_code", userProfile.program_code)
             .maybeSingle();
-          if (team?.coach_name) coachName = team.coach_name;
+
+          if (batchData) {
+            batchName = batchData.name;
+            if (batchData.company_name) companyName = batchData.company_name;
+          }
         }
 
         const fullName = userProfile?.full_name || user.email?.split("@")[0] || "Peserta SLJ";
@@ -90,7 +98,8 @@ export default function ProfilePage() {
           location: userProfile?.location || "Jakarta",
           startDate: formatDate(userProfile?.start_date),
           endDate: formatDate(userProfile?.end_date),
-          coachName,
+          companyName,
+          batchName,
           status: journey?.status || "ONBOARDING",
           areaTransformasi: Array.isArray(journey?.area_transformasi) ? journey.area_transformasi : [],
         });
@@ -149,9 +158,16 @@ export default function ProfilePage() {
 
             <div className="flex items-center justify-between py-2 border-b border-warm-border">
               <span className="text-gray-500 flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-400" /> Personal Coach
+                <Building2 className="h-4 w-4 text-gray-400" /> Perusahaan (Company)
               </span>
-              <span className="font-semibold">{profile.coachName}</span>
+              <span className="font-semibold text-[#071A33]">{profile.companyName}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-warm-border">
+              <span className="text-gray-500 flex items-center gap-2">
+                <Layers className="h-4 w-4 text-gray-400" /> Batch Rombongan
+              </span>
+              <span className="font-semibold text-[#0B2C6B]">{profile.batchName}</span>
             </div>
 
             <div className="py-2 space-y-2">

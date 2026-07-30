@@ -15,6 +15,8 @@ import {
   Lock,
   ShieldCheck,
   CheckCircle2,
+  Clock,
+  CalendarClock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -42,6 +44,12 @@ export default function BatchesPage() {
   const [lockingBatch, setLockingBatch] = useState(false);
   const [lockSuccessMsg, setLockSuccessMsg] = useState<string | null>(null);
 
+  // Auto-lock modal state
+  const [showAutoLockModal, setShowAutoLockModal] = useState(false);
+  const [autoLockBatch, setAutoLockBatch] = useState<Batch | null>(null);
+  const [autoLockAt, setAutoLockAt] = useState("");
+  const [savingAutoLock, setSavingAutoLock] = useState(false);
+
   // Form states
   const [batchName, setBatchName] = useState("");
   const [companyId, setCompanyId] = useState("");
@@ -49,6 +57,7 @@ export default function BatchesPage() {
   const [startDate, setStartDate] = useState("2027-02-01");
   const [endDate, setEndDate] = useState("2027-05-01");
   const [generatedCode, setGeneratedCode] = useState("");
+  const [formAutoLockAt, setFormAutoLockAt] = useState("");
 
   const handleExecuteMassLock = async () => {
     if (!selectedLockBatch) return;
@@ -87,13 +96,34 @@ export default function BatchesPage() {
           .eq("ptp_status", "EDITABLE");
       }
 
-      setLockSuccessMsg(`Seluruh Dokumen PTP pada Batch "${selectedLockBatch.name}" berhasil dikunci (LOCKED)!`);
+      setLockSuccessMsg(`Seluruh Dokumen PTP pada Batch "${selectedLockBatch.name}" berhasil dikunci!`);
       setTimeout(() => setLockSuccessMsg(null), 4000);
       setSelectedLockBatch(null);
     } catch (err) {
-      console.error("Gagal melakukan Mass-Lock:", err);
+      console.error("Gagal melakukan Lock PTP:", err);
     } finally {
       setLockingBatch(false);
+    }
+  };
+
+  const handleSaveAutoLock = async () => {
+    if (!autoLockBatch || !autoLockAt) return;
+    setSavingAutoLock(true);
+    try {
+      const supabase = createClient();
+      await supabase
+        .from("batches")
+        .update({ auto_lock_at: new Date(autoLockAt).toISOString() })
+        .eq("id", autoLockBatch.id);
+      setLockSuccessMsg(`Auto-Lock PTP batch "${autoLockBatch.name}" dijadwalkan pada ${new Date(autoLockAt).toLocaleString("id-ID")}`);
+      setTimeout(() => setLockSuccessMsg(null), 5000);
+      setShowAutoLockModal(false);
+      setAutoLockBatch(null);
+      setAutoLockAt("");
+    } catch (err) {
+      console.error("Gagal menyimpan auto-lock:", err);
+    } finally {
+      setSavingAutoLock(false);
     }
   };
 
@@ -239,10 +269,11 @@ export default function BatchesPage() {
               <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
                 <th className="p-4 font-semibold">Perusahaan (Company)</th>
                 <th className="p-4 font-semibold">Nama Batch</th>
-                <th className="p-4 font-semibold">Access Code (Kode Akses)</th>
-                <th className="p-4 font-semibold">Coach Pendamping</th>
+                <th className="p-4 font-semibold">Access Code</th>
+                <th className="p-4 font-semibold">Associate</th>
                 <th className="p-4 font-semibold">Peserta</th>
                 <th className="p-4 font-semibold">Status</th>
+                <th className="p-4 font-semibold">Auto-Lock PTP</th>
                 <th className="p-4 font-semibold text-right">Aksi</th>
               </tr>
             </thead>
@@ -282,6 +313,16 @@ export default function BatchesPage() {
                       {b.status}
                     </span>
                   </td>
+                  <td className="p-4">
+                    <button
+                      onClick={() => { setAutoLockBatch(b); setShowAutoLockModal(true); }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-[11px] font-bold transition-all"
+                      title="Atur jadwal auto-lock PTP"
+                    >
+                      <CalendarClock className="h-3 w-3 text-purple-600" />
+                      <span>Atur Jadwal</span>
+                    </button>
+                  </td>
                   <td className="p-4 text-right space-x-2">
                     <button
                       onClick={() => handleCopyCode(b.accessCode)}
@@ -303,10 +344,10 @@ export default function BatchesPage() {
                     <button
                       onClick={() => setSelectedLockBatch(b)}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold transition-all"
-                      title="Kunci seluruh PTP peserta pada batch ini"
+                      title="Kunci seluruh PTP peserta pada batch ini sekarang"
                     >
                       <Lock className="h-3.5 w-3.5 text-amber-600" />
-                      <span>Lock PTP Batch</span>
+                      <span>Lock PTP</span>
                     </button>
                   </td>
                 </tr>
@@ -385,7 +426,7 @@ export default function BatchesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#071A33] mb-1">Alokasi Coach Otomatis</label>
+                <label className="block text-xs font-bold text-[#071A33] mb-1">Alokasi Associate</label>
                 <select
                   value={coachId}
                   onChange={(e) => setCoachId(e.target.value)}
@@ -397,6 +438,19 @@ export default function BatchesPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#071A33] mb-1">
+                  <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 text-purple-600" /> Auto-Lock PTP (opsional)</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formAutoLockAt}
+                  onChange={(e) => setFormAutoLockAt(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-purple-400"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Jika diisi, PTP peserta akan otomatis terkunci pada waktu yang ditentukan.</p>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-3">
@@ -435,7 +489,7 @@ export default function BatchesPage() {
                 <Lock className="h-5 w-5 text-amber-700" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-[#071A33]">Mass Lock Dokumen PTP Batch</h3>
+                <h3 className="text-base font-extrabold text-[#071A33]">Lock PTP</h3>
                 <p className="text-xs text-amber-800 font-medium">Batch: {selectedLockBatch.name}</p>
               </div>
             </div>
@@ -464,7 +518,59 @@ export default function BatchesPage() {
                 disabled={lockingBatch}
                 className="px-5 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md inline-flex items-center gap-1.5"
               >
-                {lockingBatch ? "Mengunci..." : "Ya, Kunci Seluruh PTP Batch Ini"}
+                {lockingBatch ? "Mengunci..." : "Ya, Lock PTP Batch Ini"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-Lock Schedule Modal */}
+      {showAutoLockModal && autoLockBatch && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-purple-200 p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+            <button onClick={() => { setShowAutoLockModal(false); setAutoLockBatch(null); }} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                <CalendarClock className="h-5 w-5 text-purple-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-[#071A33]">Atur Auto-Lock PTP</h3>
+                <p className="text-xs text-purple-800 font-medium">Batch: {autoLockBatch.name}</p>
+              </div>
+            </div>
+
+            <div className="bg-purple-50/80 border border-purple-200/80 p-3.5 rounded-xl space-y-2 text-xs text-purple-950 leading-relaxed">
+              <p className="font-semibold">📅 Tentukan tanggal & jam PTP akan otomatis terkunci</p>
+              <p className="text-[11px] text-purple-900/80">Setelah waktu yang ditentukan, peserta tidak dapat mengubah dokumen PTP mereka.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#071A33] mb-2">Tanggal & Jam Auto-Lock</label>
+              <input
+                type="datetime-local"
+                value={autoLockAt}
+                onChange={(e) => setAutoLockAt(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-purple-300 text-xs text-[#071A33] focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-3">
+              <button type="button" onClick={() => { setShowAutoLockModal(false); setAutoLockBatch(null); }} disabled={savingAutoLock} className="px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100">
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAutoLock}
+                disabled={savingAutoLock || !autoLockAt}
+                className="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                {savingAutoLock ? "Menyimpan..." : "Simpan Jadwal Auto-Lock"}
               </button>
             </div>
           </div>

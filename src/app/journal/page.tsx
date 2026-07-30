@@ -1,229 +1,766 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
-  Sparkles,
-  Search,
-  Calendar,
-  Edit3,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Flame,
+  ArrowLeft,
+  ChevronRight,
   Check,
   Lock,
+  Lightbulb,
+  Edit3,
+  Smile,
   BookOpen,
+  Target,
+  Send,
+  Heart,
+  MessageCircle,
+  Calendar,
+  Sparkles,
+  User,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 
-interface JournalEntry {
-  id: string;
-  date: string;
-  content: string;
-  isPrivate: boolean;
+// ── DAILY PROMPTS MAPPING (DAY 1 TO 90) ─────────────────────────────────────
+
+const DAILY_PROMPTS: Record<number, string> = {
+  1: "Apa niat terbaik yang ingin kamu jaga hari ini?",
+  2: "Apa rasa syukur pertama yang hadir saat kamu bangun tidur pagi ini?",
+  3: "Siapa orang yang ingin kamu beri kebaikan atau doa hari ini?",
+  4: "Bagaimana kondisimu saat melaksanakan ibadah hari ini?",
+  5: "Apa godaan atau gangguan terbesar yang kamu rasakan hari ini?",
+  7: "Apa perubahan kecil yang paling kamu rasakan dalam satu minggu pertama ini?",
+  10: "Ibadah mana yang terasa paling nikmat dan tenang kamu jalani hari ini?",
+  14: "Apa pelajaran dari kejadian yang membuatmu kurang nyaman hari ini?",
+  17: "Kapan hari ini kamu merasa paling dekat dengan Allah?",
+  21: "Kebiasaan baik apa yang mulai terasa lebih mudah dijalankan?",
+  24: "Kapan hari ini kamu merasa paling dekat dengan Allah?",
+  30: "Apa pelajaran terbesar tentang kesabaran yang Allah ajarkan bulan ini?",
+  37: "Barang siapa mengenal dirinya, maka ia akan mengenal Rabbnya. Apa yang kamu pelajari tentang dirimu hari ini?",
+  41: "Godaan terbesar hari ini apa, dan bagaimana kamu menghadapinya?",
+  50: "Jika kamu melihat dirimu di Hari ke-1, perubahan positif apa yang paling terlihat?",
+  60: "Bagaimana hubunganmu dengan keluarga dan orang-orang terdekatmu saat ini?",
+  75: "Bagaimana kamu menjaga istiqamah di saat rasa lelah datang?",
+  82: "Apa perubahan terbesar yang kamu rasakan mendekati akhir 90 hari ini?",
+  90: "Pesan dan komitmen apa yang ingin kamu sampaikan pada dirimu sendiri untuk masa depan?",
+};
+
+function getPromptForDay(day: number): string {
+  if (DAILY_PROMPTS[day]) return DAILY_PROMPTS[day];
+  const generic = [
+    "Kapan hari ini kamu merasa paling dekat dengan Allah?",
+    "Apa momen paling berharga atau hikmah yang Allah tunjukkan hari ini?",
+    "Bagaimana kondisi hatimu saat menjalani aktivitas dan ibadah hari ini?",
+    "Apa bentuk rasa syukur terkecil namun terasa paling hangat hari ini?",
+  ];
+  return generic[day % generic.length];
 }
 
-export default function JournalPage() {
+// ── 5 MOOD OPTIONS ─────────────────────────────────────────────────────────
+
+const MOOD_ITEMS = [
+  { label: "Tenang", emoji: "🙂", colorClass: "border-emerald-500 text-emerald-600 bg-emerald-50/60" },
+  { label: "Bersyukur", emoji: "😊", colorClass: "border-amber-500 text-amber-600 bg-amber-50/60" },
+  { label: "Bersemangat", emoji: "💪", colorClass: "border-blue-500 text-blue-600 bg-blue-50/60" },
+  { label: "Butuh Doa", emoji: "🤲", colorClass: "border-purple-500 text-purple-600 bg-purple-50/60" },
+  { label: "Berat", emoji: "😔", colorClass: "border-rose-500 text-rose-600 bg-rose-50/60" },
+];
+
+interface JournalPost {
+  id: string;
+  dayNumber: number;
+  dateStr: string;
+  timeStr: string;
+  userFullName: string;
+  userAvatar: string;
+  content: string;
+  pelajaran?: string;
+  perbaikanBesok?: string;
+  mood: string;
+  isLiked: boolean;
+  likeCount: number;
+}
+
+export default function RefactoredJournalPage() {
   const supabase = createClient();
-  const [journals, setJournals] = useState<JournalEntry[]>([]);
-  const [newContent, setNewContent] = useState("");
-  const [search, setSearch] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("Faisal");
+  const [dayCount, setDayCount] = useState(24);
+  const [dateFormatted, setDateFormatted] = useState("Rabu, 29 Juli 2026");
+  const [dailyPrompt, setDailyPrompt] = useState("");
+  const [streakCount, setStreakCount] = useState(18);
+
+  // Form Inputs
+  const [mainReflection, setMainReflection] = useState("");
+  const [selectedMood, setSelectedMood] = useState("Bersyukur");
+  const [pelajaran, setPelajaran] = useState("");
+  const [perbaikanBesok, setPerbaikanBesok] = useState("");
+
+  // Live Digital Clock & Adaptive Background
+  const [heroClockHH, setHeroClockHH] = useState<string>("18");
+  const [heroClockMM, setHeroClockMM] = useState<string>("50");
+  const [showColon, setShowColon] = useState<boolean>(true);
+  const [adaptiveJournalBg, setAdaptiveJournalBg] = useState<string>("/malam-journal.webp");
 
   useEffect(() => {
-    async function loadJournals() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+    const updateClock = () => {
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      setHeroClockHH(hh);
+      setHeroClockMM(mm);
+      setShowColon(d.getSeconds() % 2 === 0);
 
-        const { data } = await supabase
-          .from("journals")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (data && data.length > 0) {
-          setJournals(
-            data.map((j) => ({
-              id: j.id,
-              date: new Date(j.created_at || j.date).toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              }),
-              content: j.content,
-              isPrivate: j.is_private ?? true,
-            }))
-          );
-        } else {
-          setJournals([]);
-        }
-      } catch (err) {
-        console.error("Gagal memuat journal:", err);
-      } finally {
-        setLoading(false);
+      // Adaptive background based on time
+      const totalMins = d.getHours() * 60 + d.getMinutes();
+      if (totalMins >= 240 && totalMins < 360) {
+        setAdaptiveJournalBg("/fajar-journal.webp"); // 04:00 - 06:00
+      } else if (totalMins >= 360 && totalMins < 660) {
+        setAdaptiveJournalBg("/pagi-journal.webp"); // 06:00 - 11:00
+      } else if (totalMins >= 660 && totalMins < 900) {
+        setAdaptiveJournalBg("/siang-journal.webp"); // 11:00 - 15:00
+      } else if (totalMins >= 900 && totalMins < 1050) {
+        setAdaptiveJournalBg("/sore-journal.webp"); // 15:00 - 17:30
+      } else if (totalMins >= 1050 && totalMins < 1140) {
+        setAdaptiveJournalBg("/senja-journal.webp"); // 17:30 - 19:00
+      } else {
+        setAdaptiveJournalBg("/malam-journal.webp"); // 19:00 - 04:00
       }
-    }
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-    loadJournals();
+  const [saving, setSaving] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Instagram-style Posts for Right Column
+  const [posts, setPosts] = useState<JournalPost[]>([]);
+
+  // Selected Detail Modal Post
+  const [selectedPost, setSelectedPost] = useState<JournalPost | null>(null);
+
+  // ── LOAD DATA ─────────────────────────────────────────────────────────────
+
+  const loadData = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Profile
+      const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+      let currentDay = 24;
+      let fName = "Faisal";
+
+      if (profile) {
+        fName = profile.full_name || "Faisal";
+        setUserName(fName.split(" ")[0]);
+        if (profile.start_date) {
+          const startD = new Date(profile.start_date);
+          const diff = Math.floor((Date.now() - startD.getTime()) / 86400000);
+          currentDay = Math.max(1, diff + 1);
+        }
+      }
+
+      setDayCount(currentDay);
+      setDailyPrompt(getPromptForDay(currentDay));
+
+      const now = new Date();
+      setDateFormatted(
+        now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      );
+
+      // Load Journals
+      const { data: journals } = await supabase
+        .from("journals")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (journals && journals.length > 0) {
+        setStreakCount(journals.length);
+        setPosts(
+          journals.map((j: any, idx: number) => {
+            const d = new Date(j.created_at || j.date);
+            const dateStr = d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+            const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+
+            let mainTxt = j.content;
+            let pelTxt = "";
+            let perbTxt = "";
+
+            if (j.content.includes("--- Pelajaran: ---")) {
+              const parts = j.content.split("--- Pelajaran: ---");
+              mainTxt = parts[0].trim();
+              if (parts[1]?.includes("--- Perbaikan Besok: ---")) {
+                const subParts = parts[1].split("--- Perbaikan Besok: ---");
+                pelTxt = subParts[0].trim();
+                perbTxt = subParts[1].trim();
+              } else {
+                pelTxt = parts[1].trim();
+              }
+            }
+
+            return {
+              id: j.id,
+              dayNumber: Math.max(1, currentDay - idx),
+              dateStr,
+              timeStr,
+              userFullName: fName,
+              userAvatar: fName.charAt(0).toUpperCase(),
+              content: mainTxt,
+              pelajaran: pelTxt,
+              perbaikanBesok: perbTxt,
+              mood: j.mood || "Bersyukur",
+              isLiked: j.is_favorite || false,
+              likeCount: (j.is_favorite ? 1 : 0) + (idx % 3 === 0 ? 1 : 0),
+            };
+          })
+        );
+      } else {
+        // Fallback demo posts if DB empty
+        setPosts([
+          {
+            id: "demo-23",
+            dayNumber: 23,
+            dateStr: "28 Juli 2026",
+            timeStr: "20.15 WIB",
+            userFullName: fName,
+            userAvatar: fName.charAt(0).toUpperCase(),
+            content: "Hari ini saya merasa sangat bersyukur bisa menunaikan sholat Subuh berjamaah... Rasanya hati lebih tenang dan fokus menjalani aktivitas.",
+            pelajaran: "Konsistensi waktu Subuh membawa keberkahan seluruh aktivitas harian.",
+            perbaikanBesok: "Tidur lebih awal sebelum jam 22.00 malam.",
+            mood: "Bersyukur",
+            isLiked: true,
+            likeCount: 4,
+          },
+          {
+            id: "demo-22",
+            dayNumber: 22,
+            dateStr: "27 Juli 2026",
+            timeStr: "21.00 WIB",
+            userFullName: fName,
+            userAvatar: fName.charAt(0).toUpperCase(),
+            content: "Saya belajar untuk lebih sabar dalam menghadapi kondisi di kantor. Ternyata menahan emosi itu jauh lebih sulit dari yang saya kira.",
+            pelajaran: "Sabar bukan sekadar menahan, melainkan memilih respon yang paling diridhai Allah.",
+            perbaikanBesok: "Mengambil jeda wudhu saat emosi terasa memuncak.",
+            mood: "Tenang",
+            isLiked: false,
+            likeCount: 2,
+          },
+          {
+            id: "demo-21",
+            dayNumber: 21,
+            dateStr: "26 Juli 2026",
+            timeStr: "19.30 WIB",
+            userFullName: fName,
+            userAvatar: fName.charAt(0).toUpperCase(),
+            content: "Alhamdulillah hari ini bisa menyelesaikan target tilawah 2 halaman. Meski lelah, rasanya ada ketenangan tersendiri setelah membaca Al-Qur'an.",
+            pelajaran: "Al-Qur'an adalah penawar lelah jiwa terbaik.",
+            perbaikanBesok: "Menjaga jadwal tilawah secara konsisten pasca Maghrib.",
+            mood: "Bersemangat",
+            isLiked: true,
+            likeCount: 5,
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error("Gagal memuat jurnal:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [supabase]);
 
-  const handleSave = async (e: React.FormEvent) => {
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── SAVE REFLECTION ──────────────────────────────────────────────────────
+
+  const handleSaveReflection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newContent.trim()) return;
+    if (!mainReflection.trim()) return;
 
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+
+      let combinedContent = mainReflection.trim();
+      if (pelajaran.trim()) {
+        combinedContent += `\n\n--- Pelajaran: ---\n${pelajaran.trim()}`;
+      }
+      if (perbaikanBesok.trim()) {
+        combinedContent += `\n\n--- Perbaikan Besok: ---\n${perbaikanBesok.trim()}`;
+      }
 
       const { data, error } = await supabase.from("journals").insert({
         user_id: user.id,
         date: todayStr,
-        content: newContent,
+        content: combinedContent,
+        mood: selectedMood,
         is_private: true,
+        location: "Jakarta",
       }).select().single();
 
       if (!error && data) {
-        const formattedEntry: JournalEntry = {
+        const newPost: JournalPost = {
           id: data.id,
-          date: `Hari Ini, ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`,
-          content: newContent,
-          isPrivate: true,
+          dayNumber: dayCount,
+          dateStr: now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+          timeStr,
+          userFullName: userName,
+          userAvatar: userName.charAt(0).toUpperCase(),
+          content: mainReflection.trim(),
+          pelajaran: pelajaran.trim(),
+          perbaikanBesok: perbaikanBesok.trim(),
+          mood: selectedMood,
+          isLiked: false,
+          likeCount: 1,
         };
 
-        setJournals([formattedEntry, ...journals]);
-        setNewContent("");
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        setPosts([newPost, ...posts]);
+        setMainReflection("");
+        setPelajaran("");
+        setPerbaikanBesok("");
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
       }
     } catch (err) {
-      console.error("Gagal menyimpan journal:", err);
+      console.error("Gagal menyimpan refleksi:", err);
     } finally {
       setSaving(false);
     }
   };
 
-  const filteredJournals = journals.filter((j) =>
-    j.content.toLowerCase().includes(search.toLowerCase())
-  );
+  const toggleLikePost = async (id: string, currentLiked: boolean) => {
+    setPosts(prev =>
+      prev.map(p => {
+        if (p.id === id) {
+          return {
+            ...p,
+            isLiked: !currentLiked,
+            likeCount: currentLiked ? p.likeCount - 1 : p.likeCount + 1,
+          };
+        }
+        return p;
+      })
+    );
+    try {
+      await supabase.from("journals").update({ is_favorite: !currentLiked }).eq("id", id);
+    } catch {}
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-warm-bg flex items-center justify-center font-sans">
-        <div className="animate-spin h-8 w-8 border-4 border-amber-600 border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-[#FAF9F5] flex items-center justify-center font-sans">
+        <div className="animate-spin h-8 w-8 border-3 border-[#071A33] border-t-transparent rounded-full" />
       </div>
     );
   }
 
   return (
-    <ParticipantLayout activePath="/journal" pageTitle="Journal • Refleksi Harian">
-      <main className="max-w-4xl mx-auto space-y-6">
-        {/* Header Title Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-6 rounded-2xl border border-warm-border shadow-2xs">
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shrink-0">
-              <BookOpen className="h-5 w-5 text-amber-700" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-xl font-extrabold text-navy-900 leading-tight">
-                Refleksi & Journal Harian
-              </h1>
-              <p className="text-xs text-gray-500">
-                Catat muhasabah, hikmah, dan perasaan spiritual Anda sepanjang hari
-              </p>
-            </div>
-          </div>
-          <Badge variant="outline" className="text-xs font-semibold gap-1 self-start sm:self-auto border-warm-border text-navy-900 bg-warm-bg px-3 py-1">
-            <Lock className="h-3 w-3 text-emerald-600" /> Privat & Terenkripsi
-          </Badge>
-        </div>
+    <ParticipantLayout activePath="/journal" pageTitle="Refleksi Hari Ini">
+      <main className="w-full min-h-screen bg-[#FAF9F5] text-navy-950 font-sans pb-20">
 
-        {/* Write New Journal Box */}
-        <Card className="bg-white border-warm-border p-4 sm:p-6 rounded-2xl shadow-2xs space-y-4">
-          <h2 className="text-xs sm:text-sm font-bold text-navy-900 flex items-center gap-2">
-            <Edit3 className="h-4 w-4 text-amber-600" /> Tulis Refleksi Journal Hari Ini
-          </h2>
+        {/* ─── MAIN CONTENT WRAPPER (2-COLUMN: 75% LEFT / 25% RIGHT) ───────────── */}
+        <div className="w-full px-4 sm:px-8 pt-6 pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
 
-          <form onSubmit={handleSave} className="space-y-3">
-            <Textarea
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              placeholder="Bagaimana perjalanan spiritualmu hari ini? Tuliskan refleksi, rasa syukur, atau hal yang ingin dipelajari..."
-              className="text-xs min-h-[110px] bg-white border-warm-border"
-            />
-
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
-              <span className="text-[10px] sm:text-[11px] text-gray-400 font-medium">
-                🔒 Jurnal ini privat dan hanya bisa diakses oleh Anda.
-              </span>
-              <Button
-                type="submit"
-                disabled={saving || !newContent.trim()}
-                className="bg-navy-900 hover:bg-black text-amber-300 font-bold text-xs gap-1.5 px-5 h-9 rounded-xl w-full sm:w-auto"
+            {/* ─── LEFT COLUMN (75% / col-span-8 or col-span-9) ───────────────── */}
+            <div className="lg:col-span-8 xl:col-span-9 space-y-7 w-full">
+              
+              {/* 1. CLEAN HERO BANNER WITH FULL ADAPTIVE TIME BACKGROUND */}
+              <div
+                className="relative rounded-3xl p-6 sm:p-8 min-h-[260px] flex flex-col justify-between overflow-hidden shadow-lg border border-white/20 text-white bg-cover transition-all duration-700"
+                style={{
+                  backgroundImage: `url('${adaptiveJournalBg}')`,
+                  backgroundPosition: "center top",
+                }}
               >
-                {saving ? (
-                  "Menyimpan..."
-                ) : saved ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-400" /> Tersimpan
-                  </>
-                ) : (
-                  "Simpan Journal"
-                )}
-              </Button>
-            </div>
-          </form>
-        </Card>
+                {/* Dark Gradient Overlay for Optimal Readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/60 pointer-events-none" />
 
-        {/* Previous Journal History */}
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h3 className="font-extrabold text-navy-900 text-xs tracking-wider uppercase">
-              RIWAYAT JOURNAL SAYA ({filteredJournals.length})
-            </h3>
-            <div className="relative w-full sm:w-64">
-              <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-gray-400" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari refleksi journal..."
-                className="text-xs pl-8 h-8 bg-white border-warm-border"
-              />
-            </div>
-          </div>
+                <div className="relative z-10 flex flex-col justify-between h-full min-h-[220px] w-full space-y-6">
+                  
+                  {/* TOP ROW: Sisi Kiri Atas (Hari ke-X) & Sisi Kanan Atas (Jam WIB 18:50 dengan titik dua berkedip) */}
+                  <div className="flex items-start justify-between gap-4 w-full">
+                    {/* Sisi Kiri Atas: Hari ke-X */}
+                    <div>
+                      <span className="text-amber-300 font-extrabold bg-black/50 px-3.5 py-1 rounded-full border border-amber-300/30 text-xs sm:text-sm shadow-xs inline-block">
+                        Hari ke-{dayCount} Journey
+                      </span>
+                    </div>
 
-          <div className="space-y-3">
-            {filteredJournals.length === 0 ? (
-              <Card className="bg-white border-warm-border p-6 text-center text-xs text-gray-400 italic rounded-2xl">
-                Belum ada catatan refleksi journal. Mulailah menulis entri pertama Anda di atas.
-              </Card>
-            ) : (
-              filteredJournals.map((j) => (
-                <Card key={j.id} className="bg-white border-warm-border p-4 sm:p-5 rounded-2xl shadow-2xs space-y-2.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-amber-600" /> {j.date}
-                    </span>
-                    <Badge variant="outline" className="text-[10px] border-warm-border text-gray-500 gap-1">
-                      <Lock className="h-2.5 w-2.5" /> Privat
-                    </Badge>
+                    {/* Sisi Kanan Atas: Jam WIB 18:50 (WIB di kiri, titik dua berkedip) */}
+                    <div className="flex items-center gap-2 text-right">
+                      <span className="text-xs font-mono font-bold text-amber-900 bg-amber-400 px-2 py-0.5 rounded shadow-2xs">
+                        WIB
+                      </span>
+                      <div className="text-3xl sm:text-5xl font-black text-white font-mono tracking-tighter leading-none drop-shadow-lg flex items-center">
+                        <span>{heroClockHH}</span>
+                        <span className={`inline-block transition-opacity duration-200 ${showColon ? "opacity-100" : "opacity-20 text-amber-300"}`}>:</span>
+                        <span>{heroClockMM}</span>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-navy-900 font-serif leading-relaxed italic bg-warm-bg/40 p-3.5 rounded-xl border border-warm-border/60">
-                    &ldquo;{j.content}&rdquo;
-                  </p>
-                </Card>
-              ))
-            )}
+
+                  {/* BOTTOM ROW: Sisi Kiri Bawah (Refleksi Hari Ini & Quote) & Sisi Kanan Bawah (Tanggal) */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 w-full pt-2">
+                    {/* Sisi Kiri Bawah: Judul & Quote */}
+                    <div className="space-y-1 max-w-lg w-full text-left">
+                      <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
+                        Refleksi Hari Ini
+                      </h1>
+                      <p className="text-xs sm:text-sm text-slate-100 italic font-serif leading-relaxed drop-shadow-sm">
+                        &ldquo;Setiap langkah kecil yang ditulis akan lebih mudah menjadi kebiasaan.&rdquo;
+                      </p>
+                    </div>
+
+                    {/* Sisi Kanan Bawah: Tanggal */}
+                    <div className="text-left sm:text-right shrink-0">
+                      <p className="text-xs sm:text-sm font-semibold text-slate-200 drop-shadow-sm">
+                        📅 {dateFormatted}
+                      </p>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* 2. FORM REFLEKSI CARD */}
+              <Card className="w-full bg-white p-6 sm:p-8 rounded-3xl shadow-2xs space-y-6 border border-slate-200/80">
+                
+                {/* SECTION 1: PERTANYAAN HARI INI */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                      <Lightbulb className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
+                      Pertanyaan Hari Ini
+                    </h3>
+                  </div>
+
+                  <div className="bg-[#FFFDF3] p-4 rounded-2xl border border-amber-200/70 text-xs sm:text-sm font-bold text-[#071A33]">
+                    {dailyPrompt}
+                  </div>
+                </div>
+
+                {/* SECTION 2: CERITAKAN PERJALANANMU HARI INI */}
+                <div className="space-y-2 border-t border-slate-100 pt-5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                      <Edit3 className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
+                      Ceritakan perjalananmu hari ini
+                    </h3>
+                  </div>
+
+                  <div className="relative">
+                    <Textarea
+                      rows={4}
+                      maxLength={1000}
+                      value={mainReflection}
+                      onChange={e => setMainReflection(e.target.value)}
+                      placeholder="Tulis refleksi, rasa syukur, hikmah, atau hal yang ingin kamu pelajari..."
+                      className="text-xs sm:text-sm leading-relaxed border-slate-200 focus:border-amber-500 rounded-2xl p-4 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
+                    />
+                    <span className="absolute right-3.5 bottom-3 text-[10px] font-mono text-slate-400">
+                      {mainReflection.length}/1000
+                    </span>
+                  </div>
+                </div>
+
+                {/* SECTION 3: HARI INI SAYA MERASA (5 MOOD CARDS GRID) */}
+                <div className="space-y-3 border-t border-slate-100 pt-5">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                        <Smile className="h-4 w-4" />
+                      </div>
+                      <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
+                        Hari ini saya merasa
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 ml-9.5">
+                      Pilih satu yang paling menggambarkan perasaan Anda.
+                    </p>
+                  </div>
+
+                  {/* 5 Mood Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {MOOD_ITEMS.map((m) => {
+                      const isSelected = selectedMood === m.label;
+                      return (
+                        <button
+                          key={m.label}
+                          type="button"
+                          onClick={() => setSelectedMood(m.label)}
+                          className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1.5 ${
+                            isSelected
+                              ? "bg-[#FFFDF3] border-amber-400 text-amber-950 font-bold shadow-2xs scale-102"
+                              : "bg-white border-slate-100 hover:border-slate-200 text-slate-600 font-medium"
+                          }`}
+                        >
+                          <div className={`h-7 w-7 rounded-full border-2 flex items-center justify-center text-xs ${m.colorClass}`}>
+                            {m.emoji}
+                          </div>
+                          <span className="text-xs">{m.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* SECTION 4 & 5: PELAJARAN & PERBAIKAN BESOK */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 border-t border-slate-100 pt-5">
+                  
+                  <div className="space-y-2">
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                          <BookOpen className="h-4 w-4" />
+                        </div>
+                        <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
+                          Pelajaran hari ini
+                        </h3>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 ml-9.5">
+                        Apa yang bisa Anda ambil dari hari ini?
+                      </p>
+                    </div>
+
+                    <div className="relative">
+                      <Textarea
+                        rows={2}
+                        maxLength={500}
+                        value={pelajaran}
+                        onChange={e => setPelajaran(e.target.value)}
+                        placeholder="Tuliskan pelajaran atau hikmah..."
+                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3.5 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
+                      />
+                      <span className="absolute right-3.5 bottom-2.5 text-[10px] font-mono text-slate-400">
+                        {pelajaran.length}/500
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                          <Target className="h-4 w-4" />
+                        </div>
+                        <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
+                          Apa yang ingin diperbaiki besok?
+                        </h3>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 ml-9.5">
+                        Langkah kecil apa yang akan dilakukan?
+                      </p>
+                    </div>
+
+                    <div className="relative">
+                      <Textarea
+                        rows={2}
+                        maxLength={500}
+                        value={perbaikanBesok}
+                        onChange={e => setPerbaikanBesok(e.target.value)}
+                        placeholder="Tuliskan komitmen perbaikan..."
+                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3.5 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
+                      />
+                      <span className="absolute right-3.5 bottom-2.5 text-[10px] font-mono text-slate-400">
+                        {perbaikanBesok.length}/500
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* FOOTER BAR */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-5">
+                  <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5 text-slate-400" />
+                    Jurnal ini bersifat privat dan terenkripsi.
+                  </span>
+
+                  <Button
+                    onClick={handleSaveReflection}
+                    disabled={saving || !mainReflection.trim()}
+                    className="w-full sm:w-auto bg-[#071A33] hover:bg-slate-900 text-amber-300 font-extrabold text-xs rounded-xl h-11 px-8 shadow-xs flex items-center justify-center gap-2"
+                  >
+                    {saving ? (
+                      "Menyimpan..."
+                    ) : savedSuccess ? (
+                      <>
+                        <Check className="h-4 w-4 text-emerald-400" />
+                        Tersimpan!
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        Simpan Refleksi Hari Ini
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+              </Card>
+
+            </div>
+
+            {/* ─── RIGHT COLUMN (25% / col-span-4 or col-span-3) INSTAGRAM FEED 3-COLUMN GRID ─── */}
+            <div className="lg:col-span-4 xl:col-span-3 space-y-4 w-full">
+              
+              {/* Header Section */}
+              <div className="flex items-center gap-2.5 border-b border-slate-200/80 pb-3">
+                <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                  <Flame className="h-4 w-4 fill-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
+                    Riwayat Refleksi
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Instagram Feed Grid (3 Kolom)</p>
+                </div>
+              </div>
+
+              {/* Instagram Feed Grid (3-Columns of Square 1:1 Cards) */}
+              <div className="grid grid-cols-3 gap-2">
+                {posts.map((post) => (
+                  <button
+                    key={post.id}
+                    onClick={() => setSelectedPost(post)}
+                    className="aspect-square bg-white border border-slate-200/80 rounded-2xl p-2 flex flex-col justify-between hover:border-amber-400 hover:shadow-md transition-all text-left group relative overflow-hidden"
+                  >
+                    {/* Top: Day Tag */}
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-[9px] font-black text-[#071A33] leading-none">
+                        H-{post.dayNumber}
+                      </span>
+                      <span className="text-[10px]">
+                        {MOOD_ITEMS.find(m => m.label === post.mood)?.emoji || "😊"}
+                      </span>
+                    </div>
+
+                    {/* Middle Excerpt */}
+                    <p className="text-[9px] text-slate-600 italic font-serif line-clamp-2 leading-tight my-auto">
+                      &ldquo;{post.content}&rdquo;
+                    </p>
+
+                    {/* Bottom: Heart / Action */}
+                    <div className="flex items-center justify-between w-full text-[8px] text-slate-400 pt-0.5 border-t border-slate-100">
+                      <span className="flex items-center gap-0.5 text-rose-500 font-bold">
+                        <Heart className="h-2.5 w-2.5 fill-rose-500" />
+                        {post.likeCount}
+                      </span>
+                      <span className="font-extrabold text-amber-800 group-hover:underline">
+                        Lihat
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+            </div>
+
           </div>
         </div>
+
+        {/* ─── POST DETAIL MODAL (WHEN INSTAGRAM CARD IS CLICKED) ─────────── */}
+        {selectedPost && (
+          <Dialog open={!!selectedPost} onOpenChange={() => setSelectedPost(null)}>
+            <DialogContent className="sm:max-w-lg bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 space-y-4 font-sans">
+              
+              <DialogHeader className="border-b border-slate-100 pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-full bg-[#071A33] text-amber-300 font-bold text-xs flex items-center justify-center">
+                      {selectedPost.userAvatar}
+                    </div>
+                    <div>
+                      <DialogTitle className="text-sm font-black text-[#071A33]">
+                        Refleksi Hari ke-{selectedPost.dayNumber}
+                      </DialogTitle>
+                      <DialogDescription className="text-[11px] text-slate-400">
+                        {selectedPost.dateStr} • {selectedPost.timeStr}
+                      </DialogDescription>
+                    </div>
+                  </div>
+
+                  <Badge className="bg-amber-100 text-amber-900 border-amber-200 text-xs font-bold">
+                    {selectedPost.mood}
+                  </Badge>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 text-xs">
+                <div className="space-y-1">
+                  <span className="font-extrabold text-slate-400 uppercase tracking-wider text-[10px] block">
+                    Cerita Perjalanan:
+                  </span>
+                  <p className="text-slate-800 leading-relaxed font-serif italic bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    &ldquo;{selectedPost.content}&rdquo;
+                  </p>
+                </div>
+
+                {selectedPost.pelajaran && (
+                  <div className="space-y-1 bg-amber-50/60 p-3.5 rounded-2xl border border-amber-100">
+                    <span className="font-extrabold text-amber-900 text-[11px] block">
+                      📖 Pelajaran Hari Ini:
+                    </span>
+                    <p className="text-slate-700 italic font-serif leading-relaxed">
+                      {selectedPost.pelajaran}
+                    </p>
+                  </div>
+                )}
+
+                {selectedPost.perbaikanBesok && (
+                  <div className="space-y-1 bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100">
+                    <span className="font-extrabold text-emerald-900 text-[11px] block">
+                      🎯 Rencana Perbaikan Besok:
+                    </span>
+                    <p className="text-slate-700 italic font-serif leading-relaxed">
+                      {selectedPost.perbaikanBesok}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="border-t border-slate-100 pt-3">
+                <Button
+                  onClick={() => setSelectedPost(null)}
+                  className="bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 px-6 w-full"
+                >
+                  Tutup Refleksi
+                </Button>
+              </DialogFooter>
+
+            </DialogContent>
+          </Dialog>
+        )}
+
       </main>
     </ParticipantLayout>
   );

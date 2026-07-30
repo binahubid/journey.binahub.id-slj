@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ShieldCheck,
   ArrowLeft,
+  Brain,
 } from "lucide-react";
 
 interface ParticipantLayoutProps {
@@ -87,6 +88,7 @@ export function ParticipantLayout({
     { href: "/journey", label: "Journey (PTP)", icon: Compass },
     { href: "/monitoring", label: "Monitoring", icon: TrendingUp },
     { href: "/journal", label: "Journal", icon: BookOpen },
+    { href: "/baseline", label: "Baseline Self-Discovery", icon: Brain },
     { href: "/notifications", label: "Notifikasi", icon: Bell },
   ];
 
@@ -290,17 +292,7 @@ export function ParticipantLayout({
       <div className="flex-1 flex flex-col min-w-0">
         {/* Desktop Top Sub-header (Left: Back to Home, Right: Bell, Avatar, Full Name) */}
         <header className="hidden md:flex h-16 bg-white border-b border-warm-border px-8 items-center justify-between sticky top-0 z-20">
-          <div>
-            {!hideBackToHome && currentPath !== "/dashboard" && (
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center space-x-1.5 text-xs font-bold text-slate-700 hover:text-navy-900 bg-slate-50 border border-warm-border px-3.5 py-1.5 rounded-full shadow-2xs hover:bg-slate-100 transition-colors"
-              >
-                <ArrowLeft className="h-3.5 w-3.5 text-amber-600" />
-                <span>Kembali ke Home</span>
-              </Link>
-            )}
-          </div>
+          <div />
           <div className="flex items-center space-x-5">
             <Link
               href="/notifications"

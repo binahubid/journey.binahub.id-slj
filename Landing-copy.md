@@ -1,123 +1,225 @@
-# Landing Page Copy — Semua Section
+# Landing Page Copy — Semua Section (v2 — Reposisi "Executive Umrah-Based Transformation Program")
 
-Dokumen ini konsolidasi copy final untuk seluruh section landing page SLJ. Sumber utama: infografis resmi BinaHub "Spiritual Leadership Journey (SLJ)" (disetujui CEO) untuk konten program, plus draft baru untuk bagian yang tidak dicakup infografis (ditandai jelas di tiap section).
+> **Perubahan besar dari v1**: landing page direposisi mengikuti `Draft_Flyer_SLJ.png` (arahan CEO) — dari "program untuk siapa pun yang ingin bertumbuh" menjadi program transformasi kepemimpinan berbasis Umrah yang eksplisit menyasar level eksekutif/korporat. Review brand strategist (ChatGPT) diterapkan **sebagian**: poin 1, 2, 3, 9, 10, 11, 12 + saran kutipan emosional diterapkan. Poin 4, 5, 6, 7, 8 (Trust: kredensial BinaHub, profil Coach/Mentor, testimoni; Storytelling: timeline perjalanan peserta, kisah nyata alumni) **sengaja belum diterapkan** — belum ada aset nyata (foto, bio, testimoni, cerita alumni) untuk mengisinya secara jujur. Lihat §13 untuk daftar lengkap yang ditunda.
 
-Status per section: **[Wajib]** = teks resmi ada di infografis, **[Direkomendasikan]** = istilah resmi dipakai untuk memperkuat, bukan kutipan langsung — perlu persetujuan sebelum dipakai, **[Tidak berubah]** = infografis tidak membahas, dibiarkan seperti sekarang, **[Draft baru]** = ditulis dari nol berdasar fakta di PRD/infografis, bukan teks yang sudah disetujui — wajib direview sebelum publish (beda dari section lain yang sudah CEO-approved).
-
----
-
-## 1. Hero — [Tidak berubah]
-
-Headline dan subtext yang sudah ada tidak berubah (sudah sejalan dengan infografis, tidak ada konflik).
+**Hierarki sumber kalau ada konflik**: Draft Flyer SLJ (terbaru, arahan CEO langsung) > infografis 25 Juli (CEO-approved) > poster 23 Juli (lebih lama). Status per section sama seperti v1: **[Wajib]** (sumber resmi ada), **[Direkomendasikan]** (istilah resmi dipakai, bukan kutipan langsung), **[Tidak berubah]**, **[Draft baru]** (perlu direview sebelum publish).
 
 ---
 
-## 2. Quote / Filosofi Program — [Tidak berubah]
+## 0. Prinsip Urutan Section (dari brand strategist review)
 
-Infografis tidak memuat teks kutipan ini. Tidak ada dasar untuk mengubah.
+> "Jangan terlalu cepat menjual program. Jual dulu filosofinya."
 
----
-
-## 3. Timeline (Empat Tahapan) — [Wajib]
-
-| # | Kicker (kapan) | Judul | Subjudul | Deskripsi (Tujuan, verbatim dari infografis) |
-|---|---|---|---|---|
-| 01 | SEBELUM KEBERANGKATAN | Muhasabah | Mengenali Diri | Menyadari kondisi diri secara jujur dan mendalam sebagai titik awal perubahan. |
-| 02 | MENJELANG KEBERANGKATAN | Niyyah | Meluruskan Arah | Menemukan alasan dan tujuan hidup yang lurus karena Allah, lalu merencanakan perubahan yang jelas. |
-| 03 | DI MADINAH & MAKKAH | Mujahadah | Menjalani Perubahan | Mengalami ibadah Umrah secara bermakna, memperdalam hubungan dengan Allah, dan memperjuangkan perubahan diri. |
-| 04 | SETELAH PULANG KE RUMAH | Istiqamah | Menjaga Perubahan | Mengimplementasikan perubahan dalam kehidupan sehari-hari secara konsisten dan berkelanjutan. |
-
-Keputusan Output (tidak dimasukkan ke grid, dipindah ke halaman `/journey`) — lihat detail lengkap di `LANDING-PAGE-COPY-TIMELINE.md`.
-
-> **Resolusi konflik sumber (poster 23 Juli vs infografis 25 Juli)**: poster BinaHub yang lebih lama (23 Juli) punya teks deskripsi berbeda untuk keempat tahap ini. Keputusan final: **infografis 25 Juli (CEO-approved) tetap jadi acuan resmi**, teks di tabel atas tidak berubah.
+Urutan baru: **Hero → Masalah → Why This Program → Solusi (Filosofi) → Framework (4 Tahapan) → Mengapa Berbeda → Ekosistem (Highlights) → Key Benefits → Untuk Siapa → CTA berulang → FAQ → CTA Akhir**. Trust dan Storytelling (poin 4-8) akan disisipkan di antara "Mengapa Berbeda" dan "Ekosistem" nanti begitu asetnya tersedia — sudah dialokasikan tempatnya, belum diisi kontennya.
 
 ---
 
-## 4. Feature Row "Istiqamah Lebih Mudah Dibangun Bersama" — [Direkomendasikan]
+## 1. Hero — [Update signifikan, dari flyer + ChatGPT poin 1]
 
-Judul disarankan turun ke sentence case: **"Istiqamah lebih mudah dibangun bersama"** (bukan ALL CAPS, konsisten dengan section lain).
+- **Kicker**: "90 Hari Transformasi Diri" (tidak berubah dari v1, sudah dari infografis).
+- **Badge baru** (di atas/dekat kicker, dari flyer): "Executive Umrah-Based Transformation Program"
+- **Headline**: "Spiritual Leadership Journey" (tidak berubah)
+- **Tagline baru** (italic, gold — dari flyer, ditaruh persis di bawah headline): *"Leadership Beyond the Limit"*
+- **Body copy baru** [Draft baru, adaptasi ChatGPT poin 1]:
 
-> **Sebelum**: "Coach hadir bukan untuk menghakimi, melainkan mendengarkan, menguatkan, dan membantu Anda tetap melangkah ketika semangat mulai menurun."
->
-> **Sesudah**: "Setelah pulang ke rumah, Coach dan Sahabat Safar saling menjaga dan menguatkan agar Anda tetap istiqamah — bukan untuk menghakimi, tapi untuk mendampingi ketika semangat mulai menurun."
+  > Umrah bukan akhir perjalanan spiritual. Ia adalah awal transformasi hidup.
+  >
+  > Banyak orang pulang dari Umrah dengan hati yang tenang. Namun hanya sedikit yang berhasil mempertahankan perubahan itu ketika kembali pada rutinitas.
+  >
+  > Spiritual Leadership Journey adalah program pendampingan transformasi 90 hari yang membantu pengalaman Umrah menjadi perubahan nyata, berkelanjutan, dan berdampak — pada kehidupan pribadi, keluarga, serta kepemimpinan Anda.
 
-Sumber istilah "Sahabat Safar" dan konsep "saling menjaga dan menguatkan setelah pulang agar tetap istiqamah": kolom Ikatan/Keterhubungan infografis, tahap Istiqamah.
+- **CTA** [ChatGPT poin 9 — hindari "Get Started" generik]: primer **"Mulai Journey Saya"**, sekunder **"Jadwalkan Discovery Session"** (lebih pas untuk audiens korporat/eksekutif dibanding CTA self-serve biasa, konsisten dengan model enrollment B2B via Kode Program).
 
 ---
 
-## 5. "Apa yang Anda Dapatkan" — [Wajib, sumber: poster 23 Juli]
+## 2. Masalah yang Kami Pecahkan — [Section baru, adaptasi storytelling dari review kedua, Draft baru]
 
-Diganti total dari 4 item versi digital ke **5 item resmi** dari poster (keputusan final: pakai yang 5, karena ada sumber jelas).
+> Versi ini mengadopsi kerangka naratif dari review brand strategist kedua (Hook → Visual → Diagnosis → Bridge → CTA), **tapi eksekusi visualnya diadaptasi total** ke aturan yang sudah kita tetapkan — versi asli banyak pakai emoji dan timeline circle-connector, dua pola yang eksplisit dilarang di `ILLUSTRATION_GUIDE.md`. Solution preview 5-item di draf asli **dihapus** (keputusan final) karena tumpang tindih dengan "Ekosistem — Program Highlights" (7 item) di §7 — biar cuma ada satu daftar "yang kamu dapat" di seluruh halaman, bukan dua versi berbeda.
 
-| # | Judul (dari poster, verbatim) | Deskripsi |
+### 2.1 Hook
+
+**Headline**: "Setelah Umrah..."
+**Sub-headline**: "Semangat itu nyata. Tapi kenapa sering memudar?"
+
+### 2.2 Visual — Grafik Penurunan Semangat
+
+Chart garis/area sederhana (bukan bar chart kotak-kotak ala terminal) menurun dari Hari 1 ke Hari 90, warna navy/gold dari `design-tokens.json`, tanpa gradient/drop shadow — ikuti prinsip `data_viz` yang sama dengan grafik lain di produk (Grafik Progress Action Plan di Monitoring). Titik-titik checkpoint (Hari 1, 30, 60, 90) diberi label kecil di sumbu X.
+
+**Caption di bawah grafik**: "Tanpa sistem, semangat perlahan menurun."
+
+Komponen baru — tambahkan ke `COMPONENT_INVENTORY.md`: **Motivation Decline Chart** (line/area chart minim, dipakai khusus di section ini).
+
+### 2.3 Empat Penyebab — [Tipografis, BUKAN emoji/circle-connector]
+
+Sama persis pola yang sudah dipakai di Timeline 4 Tahapan (nomor tipografis besar, whitespace sebagai pemisah, tanpa ikon/garis penghubung) — bukan pola baru:
+
+| # | Judul | Deskripsi |
 |---|---|---|
-| 1 | Pendampingan Personal Coach | "Coach mendampingi dari *Coaching Debrief* sebelum berangkat hingga *Coaching & Mentoring* rutin setelah pulang, dengan ulasan berkala secara personal." |
-| 2 | Learning Community | *(draft)* "Ruang belajar bersama peserta lain dan Sahabat Safar untuk saling menguatkan dan berbagi refleksi sepanjang 90 hari." |
-| 3 | Monitoring & Reflection | "Evaluasi bulanan (Hari 30, 60, 90) dengan penanda On Track / Need Support tanpa rasa bersalah." *(tidak berubah, judul disesuaikan verbatim ke poster)* |
-| 4 | Coaching Bulanan | *(draft)* "Sesi coaching terjadwal setiap bulan untuk meninjau progres dan menyesuaikan rencana aksi Anda." |
-| 5 | Final Review & Action Plan | *(draft)* "Peninjauan akhir di hari ke-90 untuk merangkum perjalanan dan menyusun rencana aksi lanjutan setelah program selesai." |
+| 01 | Spirit Menurun | Bukan karena iman hilang, tapi karena rutinitas lama kembali mengambil alih. |
+| 02 | Target Menghilang | Niat tanpa rencana berubah menjadi harapan yang perlahan terlupakan. |
+| 03 | Kesibukan Mengambil Alih | Meeting, deadline, target pekerjaan — semua datang lebih cepat daripada kebiasaan baru terbentuk. |
+| 04 | Tidak Ada Accountability | Tidak ada coach, tidak ada partner, tidak ada yang mengingatkan ketika mulai turun. |
 
-> ⚠️ **Catatan penting untuk tim development**: PRD §24 (MVP Scope) mencantumkan "learning community" sebagai item yang **tidak termasuk MVP** aplikasi digital. Item #2 di atas kemungkinan besar merujuk ke aktivitas program (grup Sahabat Safar, sesi berbagi) yang **disampaikan secara manusiawi/offline** (mis. WhatsApp group), bukan fitur forum di dalam platform digital — sama seperti "Pendampingan Personal Coach" juga bukan murni fitur software. Landing page boleh tetap menjanjikan ini sebagai bagian dari pengalaman program, TAPI jangan dibaca sebagai requirement baru untuk membangun fitur community di MVP aplikasi. Perlu konfirmasi eksplisit ke CEO/tim produk kalau ternyata dimaksudkan sebagai fitur in-app.
+### 2.4 Bridge — Pull Quote
+
+Kartu pull-quote (pola sama dengan Filosofi Program di §4 — bukan banner kecil biru seperti draf asli):
+
+> **Kami Tidak Mengubah Orang.**
+> Kami membantu menjaga komitmen yang sudah Anda bangun di Tanah Suci.
+
+**Penutup section**: "Karena itu, kami membangun Spiritual Leadership Journey."
+
+### 2.5 Visual Pendukung (kanan/latar section)
+
+Draf asli mengusulkan ilustrasi kartun (jamaah berjalan ke jalan bercabang). **Diganti jadi foto asli** (bukan ilustrasi bebas) — jamaah berjalan keluar dari Masjid Nabawi, golden hour, gaya editorial dokumenter, konsisten dengan foto hero. Ilustrasi custom cuma boleh dipakai kalau strict monoline seperti pengecualian di Timeline (`ILLUSTRATION_GUIDE.md` § Pengecualian Ilustrasi) — bukan gaya bebas/kartun.
+
+### 2.6 CTA
+
+Tidak perlu CTA baru — pakai **"Jadwalkan Discovery Session"** yang sudah ditetapkan di §12 untuk section ini, supaya kosakata CTA di seluruh halaman tidak makin banyak variasi tak perlu.
+
+---
+
+## 3. "Why This Program?" — [Wajib, verbatim dari flyer]
+
+> Dunia kerja menuntut hasil. Namun kepemimpinan yang berkelanjutan membutuhkan sesuatu yang lebih dalam.
 >
-> Deskripsi item #2, #4, #5 ditandai *(draft)* karena poster cuma memberi label ikon, tidak ada kalimat deskripsi — sama seperti FAQ, wajib direview sebelum publish.
+> Banyak pemimpin berhasil mencapai target bisnis yang terus meningkat, tetapi menghadapi tantangan dalam menjaga keseimbangan kehidupan, kemampuan mengelola berbagai tekanan, ketenangan batin, dan pemahaman yang dalam atas makna amanah yang diemban.
+>
+> **Spiritual Leadership Journey membantu peserta memperkuat karakter kepemimpinan melalui perjalanan spiritual yang terarah, terukur, dan berdampak.**
 
 ---
 
-## 6. "Program Ini Untuk Anda" — [Tidak berubah, sumber terkonfirmasi]
+## 4. Filosofi Program (Quote) — [Tidak berubah]
 
-~~Infografis tidak membahas persona/target audiens.~~ **Koreksi**: poster 23 Juli ternyata sumber aslinya, dan isinya sudah cocok dengan yang dipakai landing page sekarang (Leader & Executive, Entrepreneur & Business Owner, Profesional, Pendidik, Pemimpin Komunitas, siapa pun yang ingin bertumbuh). Tidak ada perubahan diperlukan, statusnya sekarang terkonfirmasi bersumber, bukan tanpa sumber.
-
----
-
-## 7. FAQ — [Draft baru, perlu direview]
-
-> ⚠️ Beda dari section lain di dokumen ini — jawaban di bawah **ditulis dari nol**, bukan kutipan yang sudah disetujui CEO. Wajib direview sebelum publish. Ditulis berdasar fakta dari infografis dan `PRD-SLJ.md`, dengan nada mengikuti `UX_COPY_GUIDE.md` (reflektif, memotivasi, no guilt-based UX).
-
-**Apa itu Spiritual Leadership Journey (SLJ)?**
-SLJ adalah program pendampingan 90 hari dari BinaJourney yang mengubah pengalaman Umrah menjadi perjalanan transformasi kepemimpinan yang berkelanjutan — melalui empat tahap: Muhasabah, Niyyah, Mujahadah, dan Istiqamah — didampingi coach, Sahabat Safar, dan platform digital untuk mencatat progres harian.
-
-**Mengapa pendampingan berlangsung selama 90 hari?**
-90 hari adalah rentang yang cukup untuk mengubah niat menjadi kebiasaan yang bertahan — bukan sekadar euforia sesaat setelah pulang dari Tanah Suci. Program dibagi ke tiga checkpoint bulanan agar perubahan berjalan bertahap dan terukur, bukan sekaligus.
-
-**Apakah saya akan didampingi oleh coach?**
-Ya. Setiap peserta didampingi coach personal sejak sebelum keberangkatan (coaching debrief) hingga rutin setelah pulang (coaching & mentoring), memberikan ulasan dan dukungan secara personal di sepanjang 90 hari.
-
-**Bagaimana jika saya tertinggal atau melewatkan beberapa hari?**
-Tidak masalah — SLJ dirancang tanpa rasa bersalah saat ada hari yang terlewat. Sistem hanya menandai untuk membantu Anda dan coach tahu kapan perlu perhatian lebih, bukan untuk menghakimi. Anda bisa melanjutkan kapan saja.
-
-**Apakah saya harus membuka aplikasi setiap hari?**
-Tidak wajib, tapi disarankan — mengisi habit harian dan jurnal singkat membantu Anda tetap terhubung dengan niat awal. Coach dan Sahabat Safar juga akan menghubungi Anda jika progres perlu didampingi lebih intensif.
-
-**Mengapa perubahan sering tidak bertahan setelah umrah?**
-Karena semangat spiritual yang muncul di Tanah Suci sering tidak punya struktur pendampingan saat kembali ke rutinitas. SLJ hadir mengisi celah itu — lewat rencana aksi tertulis (PTP), coach, dan Sahabat Safar yang saling menjaga selama 90 hari setelah pulang.
-
-**Apakah SLJ hanya untuk jamaah umrah?**
-Program dirancang untuk peserta yang menjalani perjalanan Umrah bersama BinaJourney, karena tahap Muhasabah, Niyyah, dan Mujahadah terjadi di sepanjang persiapan dan pelaksanaan perjalanan tersebut. Tahap Istiqamah setelah pulang adalah inti dari pendampingan digitalnya.
-
-**Apa yang akan saya lakukan selama 90 hari?**
-Empat tahap: Muhasabah (mengenali diri sebelum berangkat), Niyyah (meluruskan arah dan menyusun Personal Transformation Project menjelang berangkat), Mujahadah (menjalani ibadah dan perubahan bermakna di Madinah & Makkah), dan Istiqamah (menjaga perubahan jadi kebiasaan setelah pulang ke rumah) — semuanya didampingi coach dan tercatat di platform digital.
-
-**Apakah data jurnal dan refleksi saya bersifat pribadi?**
-Ya, jurnal dan hasil Muhasabah Anda bersifat privat secara default. Anda yang memutuskan apakah ingin membagikannya ke coach untuk pendampingan lebih personal — tidak otomatis terbuka.
-
-**Apakah saya bisa mengubah Personal Transformation Project (PTP)?**
-PTP adalah komitmen yang Anda tulis sendiri di awal perjalanan, jadi perubahannya memang bisa diajukan — misalnya jika target awal ternyata kurang realistis — tapi melalui persetujuan coach, supaya PTP tetap menjadi kontrak perubahan yang serius, bukan berubah sepihak.
-
-**Bagaimana progres saya diukur?**
-Lewat kombinasi completion habit harian, jurnal, dan tiga checkpoint bulanan (Hari 30, 60, 90) dengan status On Track atau Need Support — bukan skor yang menghakimi, tapi penanda untuk tahu kapan Anda butuh dukungan lebih.
-
-**Bagaimana cara bergabung?**
-Daftar lewat halaman ini atau hubungi tim BinaHub untuk konsultasi program terlebih dahulu. Setelah terdaftar dan tanggal keberangkatan ditentukan, Anda akan diarahkan mengisi PTP secara bertahap sebelum program dimulai.
-
-**Apa yang membuat SLJ berbeda dari aplikasi habit tracker biasa?**
-SLJ bukan sekadar checklist ibadah — setiap kebiasaan harian terhubung langsung ke niat dan target 90 hari yang Anda tulis sendiri di PTP, didampingi coach dan Sahabat Safar nyata, bukan notifikasi otomatis semata.
+Tetap seperti v1 — quote "Perjalanan ke Baitullah mengubah cara kita memandang hidup..." tidak ada konflik dengan flyer, dipertahankan.
 
 ---
 
-## 8. CTA Akhir — [Tidak berubah]
+## 5. Framework — Empat Tahapan — [Wajib, diperkaya dari flyer]
 
-Tidak ada konten infografis yang relevan.
+Struktur inti (kicker/judul/deskripsi Tujuan) dari infografis 25 Juli **tidak berubah** — ditambah subtitle bahasa Inggris + 3 bullet aktivitas dari flyer sebagai enrichment (bukan pengganti):
 
-## 9. Footer — [Tidak berubah]
+| # | Kicker (kapan) | Judul | Subtitle (EN, dari flyer) | Deskripsi (Tujuan, tidak berubah) | Bullet aktivitas (dari flyer) |
+|---|---|---|---|---|---|
+| 01 | SEBELUM KEBERANGKATAN | Muhasabah | Discover Yourself | Menyadari kondisi diri secara jujur dan mendalam sebagai titik awal perubahan. | Baseline Self Discovery · Refleksi Diri · Ukhuwah |
+| 02 | MENJELANG KEBERANGKATAN | Niyyah | Align Your Purpose | Menemukan alasan dan tujuan hidup yang lurus karena Allah, lalu merencanakan perubahan yang jelas. | Meluruskan Tujuan · Amanah Kehidupan · Perencanaan Transformasi |
+| 03 | DI MADINAH & MAKKAH | Mujahadah | Experience the Transformation | Mengalami ibadah Umrah secara bermakna, memperdalam hubungan dengan Allah, dan memperjuangkan perubahan diri. | Meaningful Umrah · Reflection · Executive Coaching |
+| 04 | SETELAH PULANG KE RUMAH | Istiqamah | Sustain the Change | Mengimplementasikan perubahan dalam kehidupan sehari-hari secara konsisten dan berkelanjutan. | Habit Building · Project Implementation · Coaching |
 
-Tagline "People. Learning. Elevated." dan deskripsi ekosistem sudah sesuai brand, tidak ada konten infografis yang relevan untuk ditambahkan.
+---
+
+## 6. Mengapa BinaJourney Berbeda? — [Section baru, ChatGPT poin 3, Draft baru]
+
+**Headline**: "Mengapa BinaJourney Berbeda?"
+
+| Umrah Konvensional | BinaJourney |
+|---|---|
+| Fokus perjalanan | Fokus transformasi |
+| Berakhir saat pulang | Justru dimulai saat pulang |
+| Ibadah | Ibadah + perubahan hidup |
+| Itinerary | Roadmap transformasi |
+| Tour leader | Coach & accountability system |
+
+---
+
+## 7. Ekosistem — Program Highlights — [Wajib, ganti total dari 5-item v1]
+
+> ⚠️ Menggantikan section "Apa yang Anda Dapatkan" versi 5-item dari poster 23 Juli — flyer (sumber lebih baru, arahan CEO) sekarang jadi acuan dengan **7 item**.
+
+| # | Judul (dari flyer, verbatim) | Deskripsi (dari flyer, verbatim) |
+|---|---|---|
+| 1 | Baseline Self Discovery | Memahami kondisi diri sebagai titik awal transformasi. |
+| 2 | Executive Coaching | Pendampingan personal sebelum, selama, dan setelah Umrah untuk meningkatkan kesadaran, arah, dan kesiapan diri. |
+| 3 | Meaningful Umrah Experience | Menghidupkan setiap rangkaian ibadah menjadi proses pembelajaran dan refleksi yang bermakna. |
+| 4 | Ukhuwah Building | Membangun koneksi jamaah yang positif, saling mendukung, dan memberi inspirasi kebaikan. |
+| 5 | Personal Transformation Project | Merancang dan menjalankan perubahan nyata dalam kehidupan maupun pekerjaan. |
+| 6 | 90-Day Transformation Journey | Pendampingan agar perubahan menjadi kebiasaan dan memberi dampak berkelanjutan. |
+| 7 | Monitoring & Evaluation System *(lihat catatan)* | Monitoring perkembangan peserta secara terstruktur melalui dashboard dan evaluasi berkala — terus dikembangkan menuju insight berbasis AI. |
+
+> ⚠️ **Catatan penting soal item #7**: flyer menyebutnya **"AI-Powered Monitoring & Evaluation System"**. Keputusan: tampilkan sebagai **visi/roadmap, bukan janji fitur MVP** — karena `PRD-SLJ.md` eksplisit menaruh fitur AI (AI Polish, dst.) di Post-MVP. Judul di landing page sengaja ditulis **"Monitoring & Evaluation System"** (tanpa "AI-Powered" di depan) dengan deskripsi yang jujur soal kondisi MVP (dashboard + evaluasi berkala nyata ada, "insight berbasis AI" diframe sebagai arah pengembangan lanjutan — kalimat "terus dikembangkan menuju..."). Kalau tim marketing tetap ingin pakai judul persis "AI-Powered Monitoring & Evaluation System" dari flyer apa adanya, itu perlu dibarengi keputusan mengubah scope MVP di PRD supaya tidak jadi janji kosong — bukan keputusan yang saya ambil sepihak di sini.
+
+---
+
+## 8. Key Benefits — [Wajib, section baru dari flyer]
+
+6 item (dari flyer, verbatim, dwibahasa sesuai desain asli flyer):
+
+1. Stronger Leadership Character
+2. Spiritual Awareness
+3. Purpose-Driven Leadership
+4. Positive Habits
+5. Organizational Impact
+6. Sustainable Transformation
+
+---
+
+## 9. Kenapa 90 Hari? — [Draft baru, ChatGPT poin 11, perlu direview]
+
+> ⚠️ Ditulis dari nol, belum ada teks resmi dari CEO/flyer soal ini — wajib direview.
+
+**Draft copy**: "90 hari bukan angka acak. Riset kebiasaan menunjukkan perubahan butuh waktu untuk berpindah dari niat menjadi kebiasaan yang menetap — cukup singkat untuk tetap fokus, cukup panjang untuk benar-benar melekat. Program dibagi ke tiga checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur, bukan sekaligus."
+
+---
+
+## 10. Kutipan Emosional — [Draft baru, ChatGPT Prioritas 6, perlu direview]
+
+Dua kutipan tambahan dari brand strategist review, bisa disisipkan sebagai jeda visual di antara section (mis. sebelum "Key Benefits" atau sebelum CTA akhir) — bukan pengganti quote "Filosofi Program" yang sudah ada di §4:
+
+> "Perjalanan paling jauh bukan menuju Makkah, tetapi menuju hati yang kembali kepada Allah."
+
+> "Yang paling sulit bukan menangis di depan Ka'bah, tetapi menjaga air mata itu tetap hidup setelah kembali ke rumah."
+
+---
+
+## 11. "Who Should Attend?" / Program Ini Untuk Anda — [Wajib, ganti total, reposisi ke korporat]
+
+> ⚠️ **Perubahan positioning signifikan**: v1 punya 6 persona luas (termasuk "Pendidik & Akademisi", "Pemimpin Komunitas", "Siapa pun yang Ingin Bertumbuh"). Flyer mempersempit total ke audiens korporat/eksekutif — 8 item, semua berbasis jenjang jabatan perusahaan. Saya pakai daftar flyer apa adanya (bukan saran ChatGPT yang minta dipersempit jadi cuma 3 — dua sumber ini beda rekomendasi, dan saya ikuti flyer karena itu arahan CEO paling langsung):
+
+1. Executive
+2. Senior Leaders
+3. Manager
+4. Supervisor
+5. High Performing Employees
+6. Future Leaders
+7. Entrepreneurs
+8. Professionals
+
+Ini konsisten dengan keputusan enrollment wajib pakai Kode Program dari perusahaan (`PRD-SLJ.md` §7.1a) — program ini sekarang secara eksplisit B2B/korporat, bukan pendaftaran individu bebas.
+
+---
+
+## 12. CTA Berulang — [ChatGPT poin 9 & 10]
+
+Bukan satu CTA generik di akhir — variasikan teks CTA di tiap akhir section besar, dan pastikan CTA muncul setelah section besar (Hero, Ekosistem, Key Benefits, sebelum FAQ, CTA Akhir):
+
+- **"Mulai Journey Saya"** — CTA utama di hero.
+- **"Jadwalkan Discovery Session"** — setelah "Why This Program" / Masalah.
+- **"Konsultasi Bersama Coach"** — setelah Ekosistem/Highlights.
+- **"Daftar Cohort Berikutnya"** — CTA akhir, sebelum footer (cocok dengan istilah "Batch" yang sudah dipakai di sistem enrollment).
+
+---
+
+## 13. Ditunda — Poin 4, 5, 6, 7, 8 (Trust & Storytelling)
+
+Belum diterapkan, dicatat supaya tidak hilang saat asetnya sudah siap:
+
+- **Poin 4 — Trust "Powered by BinaHub"**: draft arah "Selama lebih dari 16 tahun membantu individu, tim, dan organisasi bertumbuh melalui pengembangan kepemimpinan dan transformasi SDM." — perlu verifikasi angka tahun & klaim ke tim BinaHub sebelum dipakai, jangan asal pakai angka dari ChatGPT.
+- **Poin 5 — Profil Coach & Mentor**: perlu foto, bio, kredensial nyata.
+- **Poin 6 — Testimoni**: perlu testimoni nyata (coaching/training/alumni umrah), walau dari pilot project kecil.
+- **Poin 7 — Timeline cerita peserta** (Hari 1 → Muhasabah → ... → Istiqamah, format visual storytelling): bisa jadi section terpisah dari Framework (§5), ditambahkan nanti.
+- **Poin 8 — Kisah nyata alumni** (mis. "Ahmad, direktur... sebelum/sesudah"): perlu cerita nyata, jangan dikarang.
+
+---
+
+## 14. Footer — [Wajib, update nama legal]
+
+Nama perusahaan di footer diupdate mengikuti flyer: **"PT Binahub Solusi Transformasi"** (sebelumnya cuma "BinaHub" generik). Tagline "People. Learning. Elevated." tetap dipertahankan sebagai identitas induk BinaHub.
+
+---
+
+## 15. FAQ — [Tambahan, tidak mengganti yang sudah ada]
+
+Semua 13 FAQ dari v1 (draft, lihat riwayat sebelumnya) tetap berlaku. Tambahan yang relevan dengan reposisi korporat:
+
+**Apakah program ini hanya untuk level eksekutif/manajer?**
+Program dirancang khusus untuk berbagai jenjang kepemimpinan di organisasi — mulai dari Executive dan Senior Leaders, Manager dan Supervisor, hingga High Performing Employees dan Future Leaders yang sedang disiapkan naik jenjang. Entrepreneurs dan Professionals juga bisa bergabung lewat perusahaan/mitra penyelenggara yang mendaftarkan mereka.

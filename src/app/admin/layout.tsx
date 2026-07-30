@@ -16,6 +16,7 @@ import {
   ExternalLink,
   LogOut,
   User,
+  BarChart3,
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -39,6 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/participants", label: "Participants", icon: Users },
     { href: "/admin/coaches", label: "Coaches", icon: UserCheck },
     { href: "/admin/monitoring", label: "Monitoring", icon: Activity },
+    { href: "/admin/report", label: "Impact Report", icon: BarChart3 },
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/admin/settings", label: "Settings", icon: Settings },
   ];
@@ -140,7 +142,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
-        <main className="flex-1 p-6 lg:p-8 max-w-7xl w-full mx-auto">{children}</main>
+        <main className="flex-1 p-6 lg:p-8 w-full">{children}</main>
       </div>
     </div>
   );

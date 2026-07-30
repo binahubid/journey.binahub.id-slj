@@ -40,6 +40,10 @@ import {
   Sunset,
   Search,
   ArrowUpRight,
+  Heart,
+  Maximize2,
+  Minimize2,
+  X,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -67,7 +71,7 @@ export default function DashboardPage() {
 
   // Habits
   const [habits, setHabits] = useState<
-    { id: string; title: string; completedToday: boolean; category: string }[]
+    { id: string; title: string; completedToday: boolean; completedCount: number; quantity: number; category: string; areaCategory: string }[]
   >([]);
   const [completedTodayCount, setCompletedTodayCount] = useState(0);
   const [habitPercentage, setHabitPercentage] = useState(0);
@@ -80,6 +84,18 @@ export default function DashboardPage() {
   const [allPrayerModalOpen, setAllPrayerModalOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [safarRemindedToday, setSafarRemindedToday] = useState(false);
+  const [isScreenSaver, setIsScreenSaver] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsScreenSaver(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Live Clock & Next Prayer
   const [heroClockMain, setHeroClockMain] = useState<string>("--:--");
@@ -90,10 +106,14 @@ export default function DashboardPage() {
     name: string;
     time: string;
     text: string;
+    isGracePeriod?: boolean;
+    graceMessage?: string;
   }>({
     name: "Subuh",
     time: "04:43",
     text: "Menghitung...",
+    isGracePeriod: false,
+    graceMessage: "",
   });
   const [nextPrayerProgress, setNextPrayerProgress] = useState(0);
   const [prayerTimingsData, setPrayerTimingsData] = useState<
@@ -160,36 +180,59 @@ export default function DashboardPage() {
         setAdaptiveHeroBgImage("/malam.webp"); // 19:30 - 04:00
       }
 
-      // Live Prayer Times & Circular Progress Calculation (ticks every second)
+      // Live Prayer Times & Circular Progress Calculation (with 3-minute grace period)
       if (prayerTimingsData && prayerTimingsData.length > 0) {
         const currSecs = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
         const list = prayerTimingsData;
 
         let found = false;
+
+        // Check if currently within 3-minute grace period (180s) after any prayer time
         for (let i = 0; i < list.length; i++) {
           const p = list[i];
-          if (p.secs > currSecs) {
-            const leftSecs = p.secs - currSecs;
-            const hrs = Math.floor(leftSecs / 3600);
-            const m = Math.floor((leftSecs % 3600) / 60);
-            const text = hrs > 0 ? `${hrs}j ${m}m` : `${m}m`;
-
-            // Prev prayer: if i == 0, prev prayer was Isya of previous day
-            const prevSecs = i > 0 ? list[i - 1].secs : list[4].secs - 24 * 3600;
-            const totalGap = p.secs - prevSecs;
-            const remainingPct =
-              totalGap > 0
-                ? Math.min(100, Math.max(0, Math.round((leftSecs / totalGap) * 100)))
-                : 0;
-
+          if (currSecs >= p.secs && currSecs < p.secs + 180) {
             setNextPrayerInfo({
               name: p.name,
               time: p.time,
-              text,
+              text: "Sholat",
+              isGracePeriod: true,
+              graceMessage: `Selamat menunaikan ibadah sholat ${p.name}`,
             });
-            setNextPrayerProgress(remainingPct);
+            setNextPrayerProgress(100);
             found = true;
             break;
+          }
+        }
+
+        // If not in 3-minute grace period, find next upcoming prayer
+        if (!found) {
+          for (let i = 0; i < list.length; i++) {
+            const p = list[i];
+            if (p.secs > currSecs) {
+              const leftSecs = p.secs - currSecs;
+              const hrs = Math.floor(leftSecs / 3600);
+              const m = Math.floor((leftSecs % 3600) / 60);
+              const text = hrs > 0 ? `${hrs}j ${m}m` : `${m}m`;
+
+              // Prev prayer: if i == 0, prev prayer was Isya of previous day
+              const prevSecs = i > 0 ? list[i - 1].secs : list[4].secs - 24 * 3600;
+              const totalGap = p.secs - prevSecs;
+              const remainingPct =
+                totalGap > 0
+                  ? Math.min(100, Math.max(0, Math.round((leftSecs / totalGap) * 100)))
+                  : 0;
+
+              setNextPrayerInfo({
+                name: p.name,
+                time: p.time,
+                text,
+                isGracePeriod: false,
+                graceMessage: "",
+              });
+              setNextPrayerProgress(remainingPct);
+              found = true;
+              break;
+            }
           }
         }
 
@@ -210,6 +253,8 @@ export default function DashboardPage() {
             name: "Subuh",
             time: list[0].time,
             text: `${hrs}j ${m}m`,
+            isGracePeriod: false,
+            graceMessage: "",
           });
           setNextPrayerProgress(remainingPct);
         }
@@ -289,6 +334,18 @@ export default function DashboardPage() {
           if (profile.location) setUserLocation(profile.location);
         }
 
+        // Check if reminded safar today
+        const safarTodayStr = new Date().toISOString().split("T")[0];
+        try {
+          const { data: safarData } = await supabase
+            .from("safar_reminders")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("date", safarTodayStr)
+            .maybeSingle();
+          if (safarData) setSafarRemindedToday(true);
+        } catch {}
+
         // 2. Journey
         let { data: journey } = await supabase
           .from("journeys")
@@ -332,13 +389,15 @@ export default function DashboardPage() {
         // Primary: Query action_plans table (what user directly enters in PTP Section 5)
         const { data: actionPlansData } = await supabase
           .from("action_plans")
-          .select("id, title, category, frequency")
+          .select("id, title, category, area_category, frequency, quantity")
           .eq("user_id", user.id);
 
         if (actionPlansData && actionPlansData.length > 0) {
           userHabits = actionPlansData.map((ap) => ({
             id: ap.id,
             title: ap.title,
+            quantity: ap.quantity || 1,
+            area_category: ap.area_category || ap.category || 'Spiritual Growth',
             is_archived: false,
             effective_from: null,
             effective_until: null,
@@ -349,13 +408,15 @@ export default function DashboardPage() {
         if (userHabits.length === 0 && journey?.id) {
           const { data: apByJourney } = await supabase
             .from("action_plans")
-            .select("id, title, category, frequency")
+            .select("id, title, category, area_category, frequency, quantity")
             .eq("journey_id", journey.id);
 
           if (apByJourney && apByJourney.length > 0) {
             userHabits = apByJourney.map((ap) => ({
               id: ap.id,
               title: ap.title,
+              quantity: ap.quantity || 1,
+              area_category: ap.area_category || ap.category || 'Spiritual Growth',
               is_archived: false,
               effective_from: null,
               effective_until: null,
@@ -427,29 +488,61 @@ export default function DashboardPage() {
         });
         setPrayerLogsMap(pMap);
 
-        let habitList: { id: string; title: string; completedToday: boolean; category: string }[] = [];
+        let habitList: { id: string; title: string; completedToday: boolean; completedCount: number; quantity: number; category: string; areaCategory: string }[] = [];
+
+        // Load completed_count from habit_logs for today (for quantity > 1 support)
+        const { data: habitLogsToday } = await supabase
+          .from("habit_logs")
+          .select("habit_id, completed, completed_count")
+          .eq("user_id", user.id)
+          .eq("date", todayStr);
+
+        const habitLogCountMap: Record<string, number> = {};
+        (habitLogsToday || []).forEach((hl: any) => {
+          habitLogCountMap[hl.habit_id] = hl.completed_count || (hl.completed ? 1 : 0);
+        });
 
         if (activeTodayHabits.length > 0) {
           habitList = activeTodayHabits.map((h: any) => {
             const cat = detectCategory(h.title);
+            const qty = h.quantity || 1;
+            let completedCount = habitLogCountMap[h.id] || 0;
             let completedToday = false;
+
             if (cat === "prayer") {
               const key = getPrayerKey(h.title);
-              completedToday = key ? completedPrayerKeys.has(key) : false;
+              const done = key ? completedPrayerKeys.has(key) : false;
+              completedToday = done;
+              completedCount = done ? qty : 0;
             } else if (cat === "quran") {
               completedToday = hasQuranToday;
+              completedCount = hasQuranToday ? qty : 0;
             } else if (cat === "hadith") {
               completedToday = hasHadithToday;
+              completedCount = hasHadithToday ? qty : 0;
+            } else {
+              completedCount = habitLogCountMap[h.id] || 0;
+              completedToday = completedCount >= qty;
             }
-            return { id: h.id, title: h.title, completedToday, category: cat };
+            return {
+              id: h.id,
+              title: h.title,
+              completedToday,
+              completedCount,
+              quantity: qty,
+              category: cat,
+              areaCategory: h.area_category || 'Spiritual Growth',
+            };
           });
         }
 
         setHabits(habitList);
+        // Proportional scoring: each habit contributes completedCount/quantity
+        const totalScore = habitList.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
         const done = habitList.filter((h) => h.completedToday).length;
         setCompletedTodayCount(done);
         setHabitPercentage(
-          habitList.length > 0 ? Math.round((done / habitList.length) * 100) : 0
+          habitList.length > 0 ? Math.round((totalScore / habitList.length) * 100) : 0
         );
 
         // 4. Load All Journals & Last Journal
@@ -623,14 +716,50 @@ export default function DashboardPage() {
           { user_id: userId, date: todayStr, is_read: newCompleted },
           { onConflict: "user_id,date" }
         );
+      } else {
+        // General habit — upsert habit_log with count = full quantity if completed, 0 if not
+        const newCount = newCompleted ? target.quantity : 0;
+        await supabase.from("habit_logs").upsert(
+          { habit_id: habitId, user_id: userId, date: todayStr, completed: newCompleted, completed_count: newCount },
+          { onConflict: "habit_id,date" }
+        );
       }
     } catch (err) {
       console.error("Gagal update habit:", err);
-      // Rollback optimistic update
       setHabits(habits);
       const prevDone = habits.filter((h) => h.completedToday).length;
       setCompletedTodayCount(prevDone);
-      setHabitPercentage(habits.length > 0 ? Math.round((prevDone / habits.length) * 100) : 0);
+      const prevScore = habits.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
+      setHabitPercentage(habits.length > 0 ? Math.round((prevScore / habits.length) * 100) : 0);
+    }
+  };
+
+  // Increment one sub-step for habits with quantity > 1
+  const incrementHabitCount = async (habitId: string) => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const target = habits.find((h) => h.id === habitId);
+    if (!target || target.category !== 'general') return;
+
+    const newCount = Math.min(target.quantity, (target.completedCount || 0) + 1);
+    const newCompleted = newCount >= target.quantity;
+
+    const updated = habits.map((h) =>
+      h.id === habitId ? { ...h, completedCount: newCount, completedToday: newCompleted } : h
+    );
+    setHabits(updated);
+
+    const totalScore = updated.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
+    const doneCount = updated.filter((h) => h.completedToday).length;
+    setCompletedTodayCount(doneCount);
+    setHabitPercentage(updated.length > 0 ? Math.round((totalScore / updated.length) * 100) : 0);
+
+    try {
+      await supabase.from("habit_logs").upsert(
+        { habit_id: habitId, user_id: userId, date: todayStr, completed: newCompleted, completed_count: newCount },
+        { onConflict: "habit_id,date" }
+      );
+    } catch (err) {
+      console.error("Gagal simpan sub-step:", err);
     }
   };
 
@@ -645,6 +774,42 @@ export default function DashboardPage() {
     setPinnedIds(nextPinned);
     if (userId) {
       localStorage.setItem(`slj_pinned_${userId}`, JSON.stringify(nextPinned));
+    }
+  };
+
+  const handleRemindSafar = async () => {
+    setSafarRemindedToday(true);
+    if (!userId) return;
+    const todayStr = new Date().toISOString().split("T")[0];
+    try {
+      // Find Sahabat Safar user_id from support_team
+      const { data: team } = await supabase
+        .from("support_team")
+        .select("sahabat_safar_user_id, sahabat_safar_name")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const targetId = team?.sahabat_safar_user_id;
+
+      await supabase.from("safar_reminders").insert({
+        user_id: userId,
+        sahabat_safar_user_id: targetId || null,
+        date: todayStr,
+        reminded_at: new Date().toISOString(),
+      });
+
+      // If target Sahabat Safar account exists, send notification to them
+      if (targetId) {
+        await supabase.from("notifications").insert({
+          user_id: targetId,
+          title: "💛 Pengingat dari Sahabat Safar",
+          message: `${userName} mengingatkan Anda untuk tetap konsisten dan semangat menjalankan PTP hari ini!`,
+          category: "reminder",
+          is_read: false,
+        });
+      }
+    } catch (err) {
+      console.log("Remind safar log:", err);
     }
   };
 
@@ -726,15 +891,41 @@ export default function DashboardPage() {
               <h1 className="text-xs sm:text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-md leading-tight truncate sm:whitespace-normal">
                 Assalamu&apos;alaikum, {userName.split(" ")[0]}!
               </h1>
-              <div className="flex items-center gap-1">
-                <span className="text-amber-900 font-extrabold bg-amber-400/90 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-xs shadow-2xs whitespace-nowrap">
-                  Day {dayCount} of 90
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-amber-900 font-extrabold bg-amber-400/90 px-2.5 py-0.5 rounded-full text-[9px] sm:text-xs shadow-2xs whitespace-nowrap">
+                  Hari ke-{dayCount} dari 90
                 </span>
+                <button
+                  type="button"
+                  onClick={handleRemindSafar}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all shadow-sm ${
+                    safarRemindedToday
+                      ? "bg-emerald-500/90 text-white border border-emerald-300"
+                      : "bg-white/20 hover:bg-white/30 text-amber-200 border border-white/30 backdrop-blur-md"
+                  }`}
+                >
+                  <Heart className={`h-3 w-3 ${safarRemindedToday ? "fill-white text-white" : "text-amber-300"}`} />
+                  <span>{safarRemindedToday ? "✓ Ingatkan Sahabat Safar (Terkirim)" : "Ingatkan Sahabat Safar"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsScreenSaver(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all shadow-sm bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-md cursor-pointer"
+                  title="Aktifkan Mode Fullscreen / Screen Saver"
+                >
+                  <Maximize2 className="h-3 w-3 text-amber-300" />
+                  <span>Screen Saver</span>
+                </button>
               </div>
             </div>
 
             {/* Right: Next Prayer Card */}
-            <div className="bg-black/20 border border-white/15 p-2 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md flex items-center gap-2 sm:gap-3 shrink-0 shadow-md w-36 sm:min-w-[220px] md:min-w-[240px] sm:max-w-[260px]">
+            <div className={`p-2 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md flex items-center gap-2 sm:gap-3 shrink-0 shadow-md transition-all duration-500 w-44 sm:min-w-[240px] md:min-w-[260px] sm:max-w-[280px] ${
+              nextPrayerInfo.isGracePeriod
+                ? "bg-emerald-950/70 border border-emerald-400/60 shadow-emerald-950/40"
+                : "bg-black/20 border border-white/15"
+            }`}>
               {/* Left: Prayer Icon */}
               <div className="h-9 sm:h-14 md:h-16 w-auto shrink-0 flex items-center justify-center">
                 <img
@@ -745,17 +936,31 @@ export default function DashboardPage() {
               </div>
 
               {/* Center: Prayer Details */}
-              <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
-                <span className="text-[8px] sm:text-[10px] font-bold text-slate-300 uppercase tracking-wider block leading-none">
-                  Sholat Berikutnya
-                </span>
-                <span className="text-xs sm:text-xl font-black text-white block leading-tight truncate">
-                  {nextPrayerInfo.name}
-                </span>
-                <span className="text-[10px] sm:text-sm font-mono font-bold text-amber-300 block leading-none">
-                  {nextPrayerInfo.time}
-                </span>
-              </div>
+              {nextPrayerInfo.isGracePeriod ? (
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <span className="text-[8px] sm:text-[9px] font-black text-emerald-300 uppercase tracking-wider block leading-none animate-pulse">
+                    🤲 Waktu Sholat Tiba
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-white block leading-tight">
+                    Selamat Menunaikan Ibadah Sholat {nextPrayerInfo.name}
+                  </span>
+                  <span className="text-[9px] font-mono font-bold text-amber-300 block leading-none pt-0.5">
+                    {nextPrayerInfo.time} WIB
+                  </span>
+                </div>
+              ) : (
+                <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+                  <span className="text-[8px] sm:text-[10px] font-bold text-slate-300 uppercase tracking-wider block leading-none">
+                    Sholat Berikutnya
+                  </span>
+                  <span className="text-xs sm:text-xl font-black text-white block leading-tight truncate">
+                    {nextPrayerInfo.name}
+                  </span>
+                  <span className="text-[10px] sm:text-sm font-mono font-bold text-amber-300 block leading-none">
+                    {nextPrayerInfo.time}
+                  </span>
+                </div>
+              )}
 
               {/* Right: Circular Progress with Countdown */}
               <div className="flex flex-col items-center shrink-0 gap-0.5">
@@ -782,7 +987,7 @@ export default function DashboardPage() {
                   {/* Countdown inside circle */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-[8px] sm:text-[9px] font-black text-amber-300 leading-none text-center px-0.5">
-                      {nextPrayerInfo.text}
+                      {nextPrayerInfo.isGracePeriod ? "Jeda 3m" : nextPrayerInfo.text}
                     </span>
                   </div>
                 </div>
@@ -920,30 +1125,53 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Habit Checklist Preview */}
+                  {/* Habit Checklist Preview — supports quantity sub-step counter */}
                   <div className="space-y-1.5 pt-1">
-                    {habits.slice(0, 5).map((h) => (
-                      <button
-                        key={h.id}
-                        onClick={() => toggleHabitToday(h.id)}
-                        className={`w-full flex items-center justify-between py-1.5 px-3 rounded-lg text-xs font-semibold transition-all text-left ${
-                          h.completedToday
-                            ? "bg-emerald-50/70 text-emerald-900 border border-emerald-200/60"
-                            : "bg-warm-bg text-slate-700 hover:bg-slate-100 border border-warm-border/60"
-                        }`}
-                      >
-                        <span className="truncate">{h.title}</span>
+                    {habits.slice(0, 5).map((h) => {
+                      const isMultiStep = h.category === 'general' && h.quantity > 1;
+                      return (
                         <div
-                          className={`h-4 w-4 rounded-full flex items-center justify-center shrink-0 ${
+                          key={h.id}
+                          className={`w-full flex items-center justify-between py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
                             h.completedToday
-                              ? "bg-emerald-600 text-white"
-                              : "border border-slate-300 bg-white"
+                              ? "bg-emerald-50/70 text-emerald-900 border border-emerald-200/60"
+                              : "bg-warm-bg text-slate-700 border border-warm-border/60"
                           }`}
                         >
-                          {h.completedToday && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                          <span className="truncate flex-1">{h.title}</span>
+                          {isMultiStep ? (
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                h.completedToday ? "bg-emerald-200 text-emerald-800" : "bg-slate-200 text-slate-600"
+                              }`}>
+                                {h.completedCount}/{h.quantity}
+                              </span>
+                              {!h.completedToday && (
+                                <button
+                                  onClick={() => incrementHabitCount(h.id)}
+                                  className="h-5 w-5 rounded-full bg-amber-400 text-white flex items-center justify-center hover:bg-amber-500 transition-colors font-bold text-xs"
+                                  title={`Tandai +1 (${h.completedCount+1}/${h.quantity})`}
+                                >
+                                  +
+                                </button>
+                              )}
+                              {h.completedToday && <Check className="h-3 w-3 text-emerald-600 stroke-[3] shrink-0" />}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => toggleHabitToday(h.id)}
+                              className={`h-4 w-4 rounded-full flex items-center justify-center shrink-0 ml-2 ${
+                                h.completedToday
+                                  ? "bg-emerald-600 text-white"
+                                  : "border border-slate-300 bg-white hover:border-amber-400"
+                              }`}
+                            >
+                              {h.completedToday && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                            </button>
+                          )}
                         </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -976,7 +1204,7 @@ export default function DashboardPage() {
 
         {/* ─── BARIS 3: 2 CARDS BENTO (PROGRESS JOURNEY & JOURNAL REFLEKSI) ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          {/* Card 1: Progress Journey (Total Progress 90 Hari) */}
+          {/* Card 1: Progress Journey (Total Progress 90 Hari - Countdown) */}
           <Card className="bg-white border-warm-border p-6 rounded-2xl shadow-2xs flex flex-col justify-between space-y-5">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
@@ -985,32 +1213,32 @@ export default function DashboardPage() {
                     Progress Journey
                   </h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Total Progress 90 Hari
+                    Countdown Sisa Hari Menuju 90 Hari
                   </p>
                 </div>
                 <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-bold text-[10px]">
-                  Fase Istiqamah
+                  {Math.max(0, 90 - dayCount)} Hari Lagi
                 </Badge>
               </div>
 
-              {/* Big Percentage & Day Progress */}
+              {/* Countdown Big Display */}
               <div className="flex items-baseline justify-between">
                 <div className="flex items-baseline space-x-2">
                   <span className="text-4xl sm:text-5xl font-black text-navy-900 tracking-tight">
-                    {progressPercent}%
+                    {Math.max(0, 90 - dayCount)}
                   </span>
                   <span className="text-xs text-slate-500 font-bold">
-                    {dayCount} / 90 hari
+                    hari tersisa (Hari ke-{dayCount} dari 90)
                   </span>
                 </div>
               </div>
 
               {/* Progress Bar */}
               <div className="space-y-1">
-                <Progress value={progressPercent} className="h-3 bg-warm-bg" />
+                <Progress value={Math.min(100, Math.round((dayCount / 90) * 100))} className="h-3 bg-warm-bg" />
                 <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium pt-1">
-                  <span>Start (Hari 1)</span>
-                  <span className="font-bold text-amber-700">Finish (Hari 90)</span>
+                  <span>Hari 1 (Start)</span>
+                  <span className="font-bold text-amber-700">Hari 90 (Finish)</span>
                 </div>
               </div>
 
@@ -1482,6 +1710,83 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── FULLSCREEN SCREEN SAVER OVERLAY MODAL ─── */}
+      {isScreenSaver && (
+        <div
+          className="fixed inset-0 z-50 bg-black bg-cover bg-center text-white flex flex-col justify-between p-6 sm:p-12 md:p-16 animate-in fade-in duration-300 select-none overflow-hidden"
+          style={{ backgroundImage: `url('${adaptiveHeroBgImage}')` }}
+        >
+          {/* Dark overlay for contrast */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/70 pointer-events-none" />
+
+          {/* Top Bar: Title & Exit Button */}
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-amber-900 font-extrabold bg-amber-400 px-3.5 py-1 rounded-full text-xs shadow-md">
+                Hari ke-{dayCount} dari 90
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-slate-300 hidden sm:inline">
+                Spiritual Leadership Journey
+              </span>
+            </div>
+
+            <button
+              onClick={() => setIsScreenSaver(false)}
+              className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 border border-white/30 text-white px-4 py-2 rounded-full text-xs font-extrabold backdrop-blur-md transition-all shadow-lg cursor-pointer"
+            >
+              <Minimize2 className="h-4 w-4 text-amber-300" />
+              <span>Keluar Screen Saver (ESC)</span>
+            </button>
+          </div>
+
+          {/* Center / Giant Digital Clock */}
+          <div className="relative z-10 my-auto text-center space-y-4 py-8">
+            <h1 className="text-6xl sm:text-9xl md:text-[12rem] font-black font-mono tracking-tighter text-white drop-shadow-2xl leading-none">
+              {heroClockMain}
+            </h1>
+            <div className="flex items-center justify-center gap-3 text-amber-300 font-mono text-2xl sm:text-4xl md:text-5xl font-bold">
+              <span>:{heroClockSeconds}</span>
+              <span className="text-sm sm:text-xl font-sans bg-black/40 border border-amber-300/40 text-amber-200 px-3 py-0.5 rounded-lg backdrop-blur-md">
+                {timeZoneStr}
+              </span>
+            </div>
+            <p className="text-sm sm:text-xl text-slate-200 font-semibold pt-2">
+              📅 {heroDate}
+            </p>
+          </div>
+
+          {/* Bottom Bar: Prayer Info & Ticker */}
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/20 pt-6">
+            <div className="flex items-center gap-3">
+              <img
+                src={prayerIconMap[nextPrayerInfo.name] || "/icon_subuh.webp"}
+                alt={nextPrayerInfo.name}
+                className="h-12 w-12 object-contain drop-shadow-xl"
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  {nextPrayerInfo.isGracePeriod ? "Waktu Sholat" : "Sholat Berikutnya"}
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-white">
+                  {nextPrayerInfo.name} ({nextPrayerInfo.time})
+                </span>
+              </div>
+            </div>
+
+            {nextPrayerInfo.isGracePeriod ? (
+              <div className="bg-emerald-500/90 border border-emerald-300 text-white font-black text-sm px-5 py-2.5 rounded-2xl shadow-xl animate-pulse">
+                🤲 {nextPrayerInfo.graceMessage}
+              </div>
+            ) : (
+              <div className="text-right">
+                <span className="text-xs font-bold text-slate-400 uppercase block">Menghitung Mundur</span>
+                <span className="text-xl sm:text-3xl font-black font-mono text-amber-300">{nextPrayerInfo.text}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </ParticipantLayout>
   );
 }

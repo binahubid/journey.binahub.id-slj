@@ -27,19 +27,19 @@ const HADITHS = [
     narrator: "HR. Muslim no. 2699 (dari Abu Hurairah RA)",
   },
   {
-    matn: "احْفَظِ اللَّهَ يَحْفَظْكَ، احْفَظِ اللَّهَ تَجِدْهُ تُجَاهَكَ",
-    translation: "Jagalah Allah, niscaya Allah akan menjagamu. Jagalah Allah, niscaya engkau akan mendapati-Nya di hadapanmu.",
-    narrator: "HR. Tirmidzi no. 2516 (dari Ibnu Abbas RA)",
+    matn: "أَحَبُّ الأَعْمَالِ إِلَى اللَّهِ أَدْوَمُهَا وَإِنْ قَلَّ",
+    translation: "Amalan yang paling dicintai Allah adalah amalan yang kontinyu (istiqamah) meskipun sedikit.",
+    narrator: "HR. Bukhari no. 6464 & Muslim no. 783 (dari Aisyah RA)",
   },
   {
-    matn: "طَهُورُ شَطْرُ الإِيمَانِ، وَالْحَمْدُ لِلَّهِ تَمْلأُ الْمِيزَانَ",
+    matn: "الطَّهُورُ شَطْرُ الإِيمَانِ، وَالْحَمْدُ لِلَّهِ تَمْلأُ الْمِيزَانَ",
     translation: "Bersuci adalah setengah dari iman, dan ucapan 'Alhamdulillah' memenuhi timbangan pahala.",
     narrator: "HR. Muslim no. 223 (dari Abu Malik Al-Asy'ari RA)",
   },
   {
-    matn: "لاَ يَقُودُ الرَّجُلُ أَخَاهُ إِلاَّ إِلَى خَيْرٍ، وَقَالَ المُؤْمِنُ المِرْآةُ لِلْمُؤْمِنِ",
-    translation: "Seorang mukmin adalah cermin bagi mukmin yang lainnya; ia saling menjaga dan menasihati dalam kebaikan.",
-    narrator: "HR. Abu Daud no. 4918 (dari Abu Hurairah RA)",
+    matn: "لاَ يُؤْمِنُ أَحَدُكُمْ حَتَّى يُحِبَّ لأَخِيهِ مَا يُحِبُّ لِنَفْسِهِ",
+    translation: "Tidak beriman salah seorang di antara kalian sampai ia mencintai untuk saudaranya apa yang ia cintai untuk dirinya sendiri.",
+    narrator: "HR. Bukhari no. 13 & Muslim no. 45 (dari Anas bin Malik RA)",
   },
 ];
 

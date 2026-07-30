@@ -24,3 +24,7 @@ yarn-error.log*
 *.pem
 .idea/
 .vscode/
+
+# Markdown documentation files
+*.md
+

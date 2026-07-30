@@ -8,7 +8,7 @@ Status: Draft — siap direview sebelum development dimulai
 
 ## 1. Executive Summary
 
-SLJ (Spiritual Leadership Journey) adalah platform digital pendamping program transformasi 90 hari milik BinaJourney, yang menggabungkan pengalaman Umrah dengan proses coaching kepemimpinan spiritual. Platform ini mengubah Personal Transformation Project (PTP) — saat ini masih berupa form cetak/statis — menjadi sebuah *digital contract for change* yang hidup: diisi bertahap lewat onboarding wizard, lalu ditindaklanjuti setiap hari lewat dashboard berbasis habit, jurnal, dan monitoring bulanan.
+SLJ (Spiritual Leadership Journey) adalah platform digital pendamping program transformasi 90 hari milik BinaJourney, yang menggabungkan pengalaman Umrah dengan proses coaching kepemimpinan spiritual. Platform ini mengubah **Personal Transformation Project (PTP)** — saat ini masih berupa form cetak/statis — menjadi sebuah *digital contract for change* yang hidup: diisi bertahap lewat onboarding wizard, lalu ditindaklanjuti setiap hari lewat dashboard berbasis habit, jurnal, dan monitoring bulanan.
 
 Berbeda dengan BinaHub AMS (talent management system yang kompleks, banyak role dan workflow approval), SLJ secara sengaja dirancang sebagai **Personal Growth / Habit Operating System** — kompleksitas backend rendah, UX yang tenang dan personal, dan arsitektur yang ringan untuk dipelihara oleh tim kecil. Referensi kualitas produk: Apple Health, Notion, Linear, Headspace, Stoic, Reflect.app — bukan "habit tracker Islami" pada umumnya.
 
@@ -69,22 +69,39 @@ Rekan seperjalanan yang dicatat sebagai bagian dari Tim Pendukung peserta; inter
 
 ## 7. Functional Requirements
 
-### 7.1 Autentikasi & Akun
+### 7.1 Autentikasi & Akun (Identitas)
 - Sign up / sign in dengan email + password via Supabase Auth.
 - (Opsional fase 2) Magic link dan Google login.
 - Reset password.
 - Role: `participant`, `coach`, `admin` (disimpan di tabel `profiles`, dicek lewat RLS Supabase).
+- **Signup tidak sama dengan enrollment** — akun (`profiles`) adalah identitas permanen peserta di ekosistem BinaHub, terpisah dari akses ke program SLJ itu sendiri. Lihat §7.1a.
+
+### 7.1a Enrollment via Kode Program (wajib)
+SLJ tidak mendukung pendaftaran mandiri tanpa kode — setiap peserta harus terdaftar lewat perusahaan/mitra penyelenggara (Company + Batch). Alur:
+
+1. Peserta membuat akun (nama, email, password) → verifikasi email → login.
+2. Dashboard kosong: *"Anda belum terdaftar pada program apa pun."* + input **Kode Program**.
+3. Peserta memasukkan Kode Program yang diberikan admin/HR perusahaan penyelenggara.
+4. Sistem validasi: kode ditemukan, masih aktif, dan (jika whitelist email dipakai) email peserta cocok dengan daftar yang didaftarkan perusahaan.
+5. Jika valid → tampilkan konfirmasi (nama program, perusahaan, batch, coach yang ditugaskan) → peserta klik "Gabung Program" → journey record dibuat dengan `journey_status = DRAFT`.
+6. Lanjut ke Onboarding Wizard (§7.2).
+
+Penamaan di UI **"Kode Program"**, bukan "Access Code" — istilah lebih ramah dan sesuai konteks (lihat `UX_COPY_GUIDE.md`). Field database boleh tetap `access_code` di level teknis.
+
+Pesan error mengikuti nada `UX_COPY_GUIDE.md` (tidak menghakimi): "Kode tidak ditemukan", "Kode ini sudah tidak aktif", "Kode ini khusus untuk peserta yang sudah didaftarkan perusahaan — hubungi HR/penyelenggara Anda." Jika kode sudah dipakai peserta yang sama: "Anda sudah terdaftar pada program ini."
+
+**Keputusan scope (penting)**: fitur multi-program (memilih di antara beberapa program aktif, halaman "My Programs") **tidak dibangun sekarang** — ALS/JIJ/TCJ masih visi, belum ada rencana konkret. Yang dibangun sekarang hanya skema data yang tidak menutup pintu ke sana (lihat ADR-008 dan Lampiran B). Kalau peserta cuma ikut SLJ, dashboard langsung masuk ke SLJ setelah kode divalidasi — tidak perlu halaman pemilihan program.
 
 ### 7.2 Onboarding Wizard (PTP digital)
-Menggantikan form PTP kertas menjadi wizard 7–8 langkah, diisi sekali di awal, hasilnya jadi data hidup di dashboard:
-1. Data peserta & durasi program (mulai — otomatis +90 hari, coach ditugaskan admin).
+Menggantikan form PTP kertas menjadi wizard 7–8 langkah, diisi sekali di awal **setelah Kode Program divalidasi (§7.1a)**, hasilnya jadi data hidup di dashboard:
+1. Konfirmasi data program (perusahaan, batch, durasi 90 hari, coach — semua sudah terisi otomatis dari hasil validasi Kode Program, bukan diinput manual).
 2. Hasil Muhasabah (insight terbesar tentang diri — textarea).
 3. Niat Perubahan ("Karena Allah, saya berkomitmen untuk..." — textarea).
 4. Area Transformasi (multi-select): Spiritual Growth, Personal Character, Family Bonding, Leadership/Professional Excellence, Community Impact.
 5. Target Perubahan 90 Hari: satu target utama + 3 indikator keberhasilan.
 6. Action Plan: daftar aktivitas + frekuensi (bisa tambah baris dinamis) — baris ini juga otomatis menjadi seed data di Habit Engine.
 7. Tim Pendukung: nama Coach (biasanya sudah terisi dari penugasan admin) + Sahabat Safar (input bebas).
-8. Ringkasan & konfirmasi — setelah ini data menjadi "kontrak perubahan" yang tidak bisa dihapus, hanya bisa diedit dengan riwayat perubahan dasar.
+8. Ringkasan & konfirmasi — setelah disubmit, PTP langsung **aktif** dan masuk ke dashboard. PTP tetap bisa diedit bebas oleh peserta sampai dikunci oleh admin (lihat §"Lock PTP" di §7.10 dan §12) — bukan lagi butuh persetujuan coach untuk tiap perubahan.
 
 ### 7.3 Dashboard Harian
 Menggabungkan elemen dari PTP (prioritas) dan referensi M+:
@@ -129,10 +146,16 @@ Menggabungkan elemen dari PTP (prioritas) dan referensi M+:
 - Halaman detail per peserta: ringkasan PTP, habit completion, jurnal (jika diizinkan dibagikan), catatan monitoring.
 - Coach bisa menulis catatan/dukungan singkat yang muncul di dashboard peserta.
 
-### 7.10 Admin Panel (ringkas untuk MVP)
-- Kelola peserta (buat akun/undang, tautkan ke coach, atur tanggal mulai program).
-- Kelola daftar coach.
-- Dashboard kesehatan program (jumlah peserta aktif, distribusi status On Track/Need Support).
+### 7.10 Admin Panel
+- **Kelola Company**: buat/edit perusahaan atau mitra penyelenggara.
+- **Kelola Batch**: per Company, buat batch (mis. "PT Pertamina — Batch Januari 2027") dengan tanggal keberangkatan.
+- **Generate Kode Program**: per Batch, buat satu atau banyak kode (opsional: whitelist email peserta yang boleh pakai kode tersebut), tetapkan coach default untuk batch itu.
+- **Kelola peserta**: lihat siapa yang sudah redeem kode di tiap batch, tautkan/ubah coach per peserta bila perlu.
+- **Lock/Unlock PTP** (per peserta, individual — bukan aturan global/otomatis): admin mengunci PTP peserta kapan pun dianggap tepat (situasional, tidak ada jadwal baku — bisa 1 hari, 1 minggu, 1 bulan, dst. setelah PTP aktif). Setelah dikunci, peserta tidak bisa lagi mengedit Muhasabah/Niat/Area Transformasi/Target/Action Plan miliknya — jadi read-only. Admin bisa unlock lagi bila diperlukan. Aksi lock/unlock tercatat (siapa, kapan) untuk audit dasar.
+- **Kelola daftar coach**.
+- **Dashboard kesehatan program** (jumlah peserta aktif, distribusi status On Track/Need Support) — lihat `MONITORING-SYSTEM.md`.
+
+Ini bukan lagi "admin panel tipis" seperti draf sebelumnya — Company/Batch/Kode Program adalah bagian inti MVP karena enrollment SLJ wajib lewat mekanisme ini (§7.1a), bukan fitur tambahan.
 
 ## 8. Non-Functional Requirements
 
@@ -152,15 +175,11 @@ Empty state untuk setiap widget (Schedule, Jurnal, Goals, Habits) mengikuti nada
 
 ## 10. Landing Page
 
-Struktur mengikuti materi brand yang sudah ada (lihat poster SLJ):
-1. Hero — judul "Spiritual Leadership Journey (SLJ)", tagline "Perjalanan 90 Hari Mengubah Nilai Spiritual Menjadi Kepemimpinan dalam Kehidupan", CTA daftar/konsultasi.
-2. Kutipan pembuka program.
-3. Empat Tahapan Transformasi Spiritual: Muhasabah → Niyyah → Mujahadah → Istiqamah, masing-masing dengan output-nya (Kesadaran Diri & Baseline Transformasi; Transformation Blueprint & Action Plan; Spiritual Experience & Commitment to Change; Sustainable Personal Transformation).
-4. Apa yang didapat: Pendampingan Personal Coach, Learning Community, Monitoring & Reflection, Coaching Bulanan, Final Review & Action Plan.
-5. Untuk siapa program ini: Leader & Executive, Entrepreneur & Business Owner, Profesional, Pendidik, Pemimpin Komunitas, siapa pun yang ingin bertumbuh.
-6. CTA akhir + kontak (WhatsApp, Instagram @binahub.id, binahub.id).
+**Reposisi (per Draft Flyer SLJ, arahan CEO)**: landing page tidak lagi menyasar "siapa pun yang ingin bertumbuh" secara luas — sekarang eksplisit diposisikan sebagai **"Executive Umrah-Based Transformation Program"**, tagline "Leadership Beyond the Limit", menyasar audiens korporat/eksekutif (Executive, Senior Leaders, Manager, Supervisor, dst.). Konsisten dengan model enrollment wajib via Kode Program dari perusahaan (§7.1a).
 
-Interaksi mengikuti referensi MotionSites (scroll reveal antar tahap, animasi progress) — hanya sebagai referensi interaksi, bukan tema visual untuk di-copy (lihat TOOLS-INTEGRATION.md).
+Copy final lengkap (hero, section masalah, framework, ekosistem, key benefits, FAQ, CTA berulang) ada di `LANDING-PAGE-COPY.md` (v2) — dokumen itu jadi acuan utama, bukan ringkasan di sini. Struktur visual (alternating section, solid-fill stat block, bukan grid card berbingkai) tetap mengikuti `ILLUSTRATION_GUIDE.md` dan `LANDING-PAGE-VISUAL-PROMPT.md`.
+
+Interaksi (scroll reveal, animasi progress) mengikuti referensi MotionSites hanya sebagai referensi interaksi, bukan tema visual untuk di-copy (lihat `TOOLS-INTEGRATION.md`).
 
 ## 11. Authentication
 
@@ -170,7 +189,9 @@ Interaksi mengikuti referensi MotionSites (scroll reveal antar tahap, animasi pr
 
 ## 12. User Profile
 
-Field: nama, foto, lokasi (untuk waktu sholat), tanggal mulai & selesai program, coach yang ditugaskan, area transformasi yang dipilih saat onboarding (read-only setelah dikonfirmasi, dengan opsi "ajukan perubahan" yang butuh persetujuan coach — mencegah peserta mengubah "kontrak" secara sepihak).
+Field: nama, foto, lokasi (untuk waktu sholat), tanggal mulai & selesai program, coach yang ditugaskan.
+
+**Mekanisme Lock PTP (koreksi dari draf sebelumnya)**: PTP (Muhasabah, Niat, Area Transformasi, Target 90 Hari, Action Plan) aktif langsung setelah wizard onboarding disubmit — **tidak** butuh persetujuan coach untuk tiap perubahan seperti draf sebelumnya. Peserta bebas mengedit PTP-nya sendiri selama status **belum dikunci**. Admin yang mengunci (lock) PTP lewat Admin Panel — waktunya situasional, bisa 1 hari, 1 minggu, 1 bulan, 2 bulan setelah aktif, tergantung kebijakan program saat itu, **tidak ada aturan waktu tetap/otomatis**. Setelah dikunci, PTP jadi read-only untuk peserta (kontrak final); admin bisa membuka kunci lagi bila diperlukan.
 
 ## 13. Habit Engine
 
@@ -228,7 +249,7 @@ Lihat §7.8. Arsitektur: Supabase Edge Function terjadwal (cron) memeriksa jadwa
 
 ## 18. Admin Panel
 
-Lihat §7.10. MVP sengaja tipis — cukup untuk mendaftarkan peserta, menugaskan coach, dan memantau kesehatan program secara agregat. Fitur administratif kompleks (yang ada di AMS) sengaja tidak dibawa ke SLJ.
+Lihat §7.10. Company, Batch, dan Kode Program adalah inti MVP (bukan fitur tipis tambahan) karena SLJ mewajibkan enrollment lewat kode — lihat §7.1a. Fitur administratif kompleks lain (workflow approval berlapis seperti di AMS) sengaja tidak dibawa ke SLJ.
 
 Spesifikasi lengkap tampilan monitoring program agregat, beban kerja per coach, dan aturan flag/alert peserta yang butuh perhatian ada di `MONITORING-SYSTEM.md`.
 
@@ -288,9 +309,9 @@ Arsitektur berat seperti Domain-Driven Design penuh (repository/application/doma
 
 ## 24. MVP Scope
 
-Termasuk: Auth, Onboarding Wizard PTP, Dashboard harian (habit, jurnal, waktu sholat, target), Monitoring bulanan, Notification reminder dasar (in-app + email), Profile & Settings, Coach view ringkas, Admin panel ringkas, Landing page.
+Termasuk: Auth (identitas), **Enrollment via Kode Program (Company/Batch)**, Onboarding Wizard PTP, Dashboard harian (habit, jurnal, waktu sholat, target), Monitoring bulanan, Notification reminder dasar (in-app + email), Profile & Settings, Coach view ringkas, Admin panel (termasuk Company/Batch/Kode Program), Landing page.
 
-Tidak termasuk di MVP: chat langsung coach–peserta, AI polish jurnal, learning community, aplikasi mobile, gamifikasi/achievement, multi-bahasa.
+Tidak termasuk di MVP: multi-program UI (halaman "My Programs", pilih program aktif — ditunda sampai ada program kedua yang benar-benar disetujui), chat langsung coach–peserta, AI polish jurnal, learning community, aplikasi mobile, gamifikasi/achievement, multi-bahasa, pendaftaran mandiri tanpa kode (self-enroll).
 
 ## 25. Post-MVP (Roadmap lanjutan)
 
@@ -336,6 +357,10 @@ Tidak termasuk di MVP: chat langsung coach–peserta, AI polish jurnal, learning
 | Deploy | Vercel (frontend) + Supabase (backend) | Tidak perlu VPS/Railway |
 | Mobile (lanjutan) | React Native + Expo | Berbagi backend Supabase, tanpa Flutter/Dart baru |
 
-## Lampiran B — Estimasi Tabel Database (≈15 tabel)
+## Lampiran B — Estimasi Tabel Database (≈18 tabel)
 
-`profiles`, `coach`, `participants`, `goals`, `habits`, `habit_logs`, `journals`, `action_plans`, `action_logs`, `notifications`, `reflections`, `monthly_reviews`, `support_team`, `settings`, `achievements`.
+`profiles`, `companies`, `batches`, `access_codes`, `enrollments`, `coach`, `goals`, `habits`, `habit_logs`, `journals`, `action_plans`, `action_logs`, `notifications`, `reflections`, `monthly_reviews`, `support_team`, `settings`, `achievements`.
+
+**Catatan penamaan (lihat ADR-008)**: tabel yang tadinya bernama `journeys`/`participants` diganti/disatukan jadi `enrollments` dengan kolom `program_id` — meski cuma SLJ yang berjalan sekarang, penamaan generik ini "asuransi murah" untuk kalau ALS/JIJ/TCJ (masih visi, belum ada rencana konkret) suatu saat benar direalisasikan, migrasinya jauh lebih ringan. Ini **bukan** alasan untuk membangun UI/flow multi-program sekarang — lihat §7.1a.
+
+**Catatan field Lock PTP**: `enrollments` (atau tabel `action_plans`/`goals` tempat PTP disimpan) perlu kolom `ptp_locked` (boolean, default `false`), `ptp_locked_at` (timestamp, nullable), `ptp_locked_by` (foreign key ke admin, nullable) — field independen dari `journey_status` (§14.1), karena locking dikontrol admin secara situasional, bukan mengikuti tahapan journey otomatis.
