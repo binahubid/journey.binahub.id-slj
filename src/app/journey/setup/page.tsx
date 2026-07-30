@@ -192,12 +192,11 @@ export default function JourneySetupPage() {
   };
 
   const areaOptions = [
-    { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "Kedisiplinan ibadah & kedekatan dengan Allah" },
-    { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "Integritas, kesabaran, & kontrol emosi" },
-    { id: "Leadership Excellence", icon: Award, label: "Leadership Excellence", desc: "Etos kerja & keteladanan dalam karir" },
-    { id: "Family Bonding", icon: Users, label: "Family Bonding", desc: "Keharmonisan & komunikasi keluarga" },
-    { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "Kebermanfaatan sosial & dakwah" },
-    { id: "Health & Wellbeing", icon: Activity, label: "Health & Wellbeing", desc: "Kesehatan fisik & mental yang optimal" },
+    { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT" },
+    { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri" },
+    { id: "Leadership Excellence", icon: Award, label: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan" },
+    { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain" },
+    { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "dampak terhadap lingkungan sekitar" },
   ];
 
   return (
@@ -693,7 +692,7 @@ export default function JourneySetupPage() {
                       Langkah 8: Simpan & Mulai Perjalanan
                     </h1>
                     <p className="text-xs text-gray-600 max-w-md mx-auto leading-relaxed">
-                      Setelah menekan tombol di bawah, Perjalanan 90 Hari Anda resmi dimulai (**Hari ke-1**). Kontrak PTP Anda masih dapat disempurnakan selama masa revisi sebelum dikunci oleh Admin.
+                      Setelah menekan tombol di bawah, Perjalanan 90 Hari Anda resmi dimulai (**Hari ke-1**). Personal Transformation Project Anda masih dapat disempurnakan selama masa revisi sebelum dikunci oleh Admin.
                     </p>
                   </div>
 
@@ -729,7 +728,7 @@ export default function JourneySetupPage() {
                       Journey Resmi Dimulai!
                     </h2>
                     <p className="text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
-                      Perjalanan 90 Hari Anda telah dimulai hari ini (Hari ke-1). Kontrak PTP Anda masih dapat direvisi selama belum dikunci oleh Admin.
+                      Perjalanan 90 Hari Anda telah dimulai hari ini (Hari ke-1). Personal Transformation Project Anda masih dapat direvisi selama belum dikunci oleh Admin.
                     </p>
                   </div>
 

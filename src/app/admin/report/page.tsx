@@ -165,7 +165,7 @@ export default function ImpactReportPage() {
                   <User className="h-3 w-3 text-blue-300" /> HR Director
                 </span>
                 <span className="bg-white/10 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-amber-300" /> Direct Supervisor
+                  <ShieldCheck className="h-3 w-3 text-amber-300" /> Direct Superior
                 </span>
                 <span className="bg-white/10 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
                   <Briefcase className="h-3 w-3 text-purple-300" /> Coach
@@ -229,21 +229,21 @@ export default function ImpactReportPage() {
         {/* ─── SECTION 4 & 5: ROI TREND & EXECUTIVE SUMMARY ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* SECTION 4: ROI TREND (LINE CHART 6 BULAN) */}
+          {/* SECTION 4: ROI TREND (LINE CHART 3 BULAN) */}
           <div className="lg:col-span-8 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
               <div className="space-y-0.5">
                 <h3 className="text-sm font-extrabold text-[#071A33] flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-amber-500" /> ROI Trend (Return on Investment)
                 </h3>
-                <span className="text-[10px] text-slate-400 font-medium">Perkembangan ROI dari bulan ke bulan (Bln 1 s/d Bln 6)</span>
+                <span className="text-[10px] text-slate-400 font-medium">Perkembangan ROI dari bulan ke bulan (Bln 1 s/d Bln 3)</span>
               </div>
               <span className="text-xs font-bold bg-[#FAF8F4] border border-[#EAE5D9] px-3 py-1 rounded-xl text-slate-600">
-                6 Bulan Terakhir
+                3 Bulan (Program 90 Hari)
               </span>
             </div>
 
-            {/* SVG Line Chart for ROI Trend */}
+            {/* SVG Line Chart for ROI Trend (3 Bulan) */}
             <div className="h-48 w-full pt-4 relative">
               <svg className="w-full h-full overflow-visible" viewBox="0 0 500 150" preserveAspectRatio="none">
                 {/* Grid Lines */}
@@ -251,9 +251,9 @@ export default function ImpactReportPage() {
                 <line x1="0" y1="70" x2="500" y2="70" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4" />
                 <line x1="0" y1="110" x2="500" y2="110" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4" />
 
-                {/* Trend Line Path (Jan:80% -> Feb:123% -> Mar:169% -> Apr:215% -> Mei:247% -> Jun:277%) */}
+                {/* Trend Line Path (Bln 1: 80% -> Bln 2: 175% -> Bln 3: 277%) */}
                 <path
-                  d="M 20 120 L 110 95 L 200 70 L 290 48 L 380 32 L 470 15"
+                  d="M 50 120 L 250 65 L 450 15"
                   fill="none"
                   stroke="#d97706"
                   strokeWidth="3.5"
@@ -263,19 +263,16 @@ export default function ImpactReportPage() {
 
                 {/* Points & Labels */}
                 {[
-                  { x: 20, y: 120, label: "80%", month: "Jan" },
-                  { x: 110, y: 95, label: "123%", month: "Feb" },
-                  { x: 200, y: 70, label: "169%", month: "Mar" },
-                  { x: 290, y: 48, label: "215%", month: "Apr" },
-                  { x: 380, y: 32, label: "247%", month: "Mei" },
-                  { x: 470, y: 15, label: "277%", month: "Jun" },
+                  { x: 50, y: 120, label: "80%", month: "Bulan 1 (Hari 30)" },
+                  { x: 250, y: 65, label: "175%", month: "Bulan 2 (Hari 60)" },
+                  { x: 450, y: 15, label: "277%", month: "Bulan 3 (Hari 90)" },
                 ].map((pt, idx) => (
                   <g key={idx}>
-                    <circle cx={pt.x} cy={pt.y} r="5" fill="#d97706" stroke="#ffffff" strokeWidth="2" />
-                    <text x={pt.x} y={pt.y - 10} textAnchor="middle" className="text-[10px] font-black fill-[#071A33]">
+                    <circle cx={pt.x} cy={pt.y} r="6" fill="#d97706" stroke="#ffffff" strokeWidth="2" />
+                    <text x={pt.x} y={pt.y - 12} textAnchor="middle" className="text-[11px] font-black fill-[#071A33]">
                       {pt.label}
                     </text>
-                    <text x={pt.x} y={145} textAnchor="middle" className="text-[10px] font-bold fill-slate-400">
+                    <text x={pt.x} y={145} textAnchor="middle" className="text-[10px] font-bold fill-slate-500">
                       {pt.month}
                     </text>
                   </g>
@@ -306,10 +303,10 @@ export default function ImpactReportPage() {
         {/* ─── SECTION 6, 7, 8: BEFORE vs AFTER, BUSINESS IMPACT BREAKDOWN, KPI INDICATOR ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* SECTION 6: Perubahan Kinerja (Before vs After) */}
+          {/* SECTION 6: Baseline Result (Before vs After) */}
           <div className="bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-[#071A33]">Perubahan Kinerja (Before vs After)</h3>
+              <h3 className="text-sm font-extrabold text-[#071A33]">Baseline Result (Before vs After)</h3>
               <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400">
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300" /> Sebelum</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#071A33]" /> Setelah 90 Hari</span>

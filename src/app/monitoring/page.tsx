@@ -250,9 +250,8 @@ export default function MonitoringPage() {
           spiritual_growth: "Spiritual Growth",
           personal_development: "Personal Development",
           leadership_excellence: "Leadership Excellence",
-          relationship: "Family Bonding",
+          relationship: "Relationship",
           community_impact: "Community Impact",
-          health_wellbeing: "Health & Wellbeing",
         };
 
         Object.entries(areaSums).forEach(([aKey, val]) => {

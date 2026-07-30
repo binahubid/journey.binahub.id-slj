@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ArrowLeft,
   Brain,
+  Sparkles,
 } from "lucide-react";
 
 interface ParticipantLayoutProps {
@@ -88,6 +89,7 @@ export function ParticipantLayout({
     { href: "/journey", label: "Journey (PTP)", icon: Compass },
     { href: "/monitoring", label: "Monitoring", icon: TrendingUp },
     { href: "/journal", label: "Journal", icon: BookOpen },
+    { href: "/initial-process", label: "Initial Process", icon: Sparkles },
     { href: "/baseline", label: "Baseline Self-Discovery", icon: Brain },
     { href: "/notifications", label: "Notifikasi", icon: Bell },
   ];
@@ -342,7 +344,7 @@ export function ParticipantLayout({
                 <span className="text-[11px] font-semibold text-slate-600">Spiritual Leadership Journey (SLJ)</span>
               </div>
               <div className="flex items-center gap-4 text-[11px] font-medium text-slate-500">
-                <Link href="/journey" className="hover:text-navy-900 transition-colors">PTP Contract</Link>
+                <Link href="/journey" className="hover:text-navy-900 transition-colors">Personal Transformation Project</Link>
                 <Link href="/profile" className="hover:text-navy-900 transition-colors">Profil Peserta</Link>
                 <span>&copy; {new Date().getFullYear()} BinaHub</span>
               </div>
@@ -351,25 +353,27 @@ export function ParticipantLayout({
         )}
       </div>
 
-      {/* ─── MOBILE BOTTOM DOCK NAVIGATION (Fixed at Bottom on Mobile) ─── */}
-      <nav className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-warm-border px-2 py-1.5 items-center justify-around shadow-lg">
-        {bottomNavItems.map((item) => {
-          const isActive = currentPath === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
-                isActive ? "text-[#0B2C6B] font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
-              }`}
-            >
-              <Icon className={`h-5 w-5 mb-0.5 ${isActive ? "text-[#C79A3C]" : "text-slate-400"}`} />
-              <span className="text-[10px] tracking-tight">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {/* ─── MOBILE BOTTOM DOCK NAVIGATION (Hidden on Baseline Page) ─── */}
+      {!currentPath?.startsWith("/baseline") && (
+        <nav className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-warm-border px-2 py-1.5 items-center justify-around shadow-lg">
+          {bottomNavItems.map((item) => {
+            const isActive = currentPath === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
+                  isActive ? "text-[#0B2C6B] font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
+                }`}
+              >
+                <Icon className={`h-5 w-5 mb-0.5 ${isActive ? "text-[#C79A3C]" : "text-slate-400"}`} />
+                <span className="text-[10px] tracking-tight">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }

@@ -73,7 +73,7 @@ export default function LandingPage() {
     {
       question: "Apa itu Spiritual Leadership Journey (SLJ)?",
       answer:
-        "SLJ adalah program pendampingan 90 hari dari BinaJourney yang mengubah pengalaman Umrah menjadi perjalanan transformasi kepemimpinan yang berkelanjutan — melalui empat tahap: Muhasabah, Niyyah, Mujahadah, dan Istiqamah — didampingi coach, Sahabat Safar, dan platform digital untuk mencatat progres harian.",
+        "SLJ adalah program pendampingan 90 hari dari BinaJourney dan mitranya yang mengubah pengalaman Umrah menjadi perjalanan transformasi kepemimpinan yang berkelanjutan — melalui empat tahap: Muhasabah, Niyyah, Mujahadah, dan Istiqamah — didampingi coach, Sahabat Safar, dan platform digital untuk mencatat progres harian.",
     },
     {
       question: "Mengapa pendampingan berlangsung selama 90 hari?",
@@ -103,7 +103,7 @@ export default function LandingPage() {
     {
       question: "Apakah SLJ hanya untuk jamaah umrah?",
       answer:
-        "Program dirancang untuk peserta yang menjalani perjalanan Umrah bersama BinaJourney, karena tahap Muhasabah, Niyyah, dan Mujahadah terjadi di sepanjang persiapan dan pelaksanaan perjalanan tersebut. Tahap Istiqamah setelah pulang adalah inti dari pendampingan digitalnya. Pendaftaran dilakukan lewat perusahaan atau mitra penyelenggara Anda, bukan langsung secara mandiri.",
+        "Program dirancang untuk peserta yang menjalani perjalanan Umrah bersama BinaJourney, karena tahap Muhasabah, Niyyah, dan Mujahadah terjadi di sepanjang persiapan dan pelaksanaan perjalanan tersebut. Tahap Istiqamah setelah pulang adalah inti dari pendampingan digitalnya. Pendaftaran dilakukan lewat perusahaan atau mitra perjalanan anda.",
     },
     {
       question: "Apa itu Kode Program dan dari mana saya mendapatkannya?",
@@ -113,12 +113,7 @@ export default function LandingPage() {
     {
       question: "Apa yang akan saya lakukan selama 90 hari?",
       answer:
-        "Empat tahap: Muhasabah (mengenali diri sebelum berangkat), Niyyah (meluruskan arah dan menyusun Personal Transformation Project menjelang berangkat), Mujahadah (menjalani ibadah dan perubahan bermakna di Madinah & Makkah), dan Istiqamah (menjaga perubahan jadi kebiasaan setelah pulang ke rumah) — semuanya didampingi coach dan tercatat di platform digital.",
-    },
-    {
-      question: "Apakah data jurnal dan refleksi saya bersifat pribadi?",
-      answer:
-        "Ya, jurnal dan hasil Muhasabah Anda bersifat privat secara default. Anda yang memutuskan apakah ingin membagikannya ke coach untuk pendampingan lebih personal — tidak otomatis terbuka.",
+        "Empat tahap: Muhasabah (mengenali diri sebelum berangkat), Niyyah (meluruskan arah dan menyusun Personal Transformation Project menjelang berangkat), Mujahadah (menjalani ibadah dan perubahan bermakna di Madinah & Makkah), dan Istiqamah (menjaga perubahan jadi kebiasaan setelah pulang ke rumah) — semuanya didampingi coach dan tercatat di platform digital kami.",
     },
     {
       question: "Apakah saya bisa mengubah Personal Transformation Project (PTP)?",
@@ -128,7 +123,7 @@ export default function LandingPage() {
     {
       question: "Bagaimana progres saya diukur?",
       answer:
-        "Lewat kombinasi completion habit harian, jurnal, dan tiga checkpoint bulanan (Hari 30, 60, 90) dengan status On Track atau Need Support — bukan skor yang menghakimi, tapi penanda untuk tahu kapan Anda butuh dukungan lebih.",
+        "Melalui check point dan platform digital binahub.",
     },
     {
       question: "Bagaimana cara bergabung?",
@@ -227,7 +222,7 @@ export default function LandingPage() {
                   Banyak orang pulang dari Umrah dengan hati yang tenang. Namun hanya sedikit yang berhasil mempertahankan perubahan itu ketika kembali pada rutinitas.
                 </p>
                 <p className="text-slate-600 text-xs sm:text-base">
-                  Spiritual Leadership Journey adalah program pendampingan transformasi 90 hari yang membantu pengalaman Umrah menjadi perubahan nyata, berkelanjutan, dan berdampak pada kehidupan pribadi, keluarga, serta kepemimpinan Anda.
+                  Spiritual Leadership Journey adalah program pendampingan transformasi 90 hari yang membantu pengalaman Umrah menjadi perubahan nyata, berkelanjutan, dan berdampak pada kehidupan pribadi, keluarga, pekerjaan, serta kepemimpinan Anda.
                 </p>
               </div>
 
@@ -524,7 +519,7 @@ export default function LandingPage() {
                     <div className="pt-2 border-t border-[#C79A3C]/20 text-xs font-semibold text-[#0F1E3D] flex flex-wrap gap-2">
                       <span className="bg-[#FAF8F4] px-2.5 py-1 rounded border border-[#C79A3C]/30">Meaningful Umrah</span>
                       <span className="bg-[#FAF8F4] px-2.5 py-1 rounded border border-[#C79A3C]/30">Reflection</span>
-                      <span className="bg-[#FAF8F4] px-2.5 py-1 rounded border border-[#C79A3C]/30">Executive Coaching</span>
+                      <span className="bg-[#FAF8F4] px-2.5 py-1 rounded border border-[#C79A3C]/30">Coaching</span>
                     </div>
                   </div>
 
@@ -612,7 +607,7 @@ export default function LandingPage() {
                     <div className="pt-2 text-xs font-semibold text-[#0F1E3D] flex flex-wrap gap-1.5">
                       <span className="bg-white/80 px-2.5 py-1 rounded border border-[#C79A3C]/30 text-[11px]">Meaningful Umrah</span>
                       <span className="bg-white/80 px-2.5 py-1 rounded border border-[#C79A3C]/30 text-[11px]">Reflection</span>
-                      <span className="bg-white/80 px-2.5 py-1 rounded border border-[#C79A3C]/30 text-[11px]">Executive Coaching</span>
+                      <span className="bg-white/80 px-2.5 py-1 rounded border border-[#C79A3C]/30 text-[11px]">Coaching</span>
                     </div>
                   </div>
 
@@ -680,13 +675,13 @@ export default function LandingPage() {
                   <tr>
                     <td className="p-3.5 sm:p-6 text-slate-600">Berakhir saat pulang</td>
                     <td className="p-3.5 sm:p-6 font-semibold text-[#0F1E3D] bg-[#C79A3C]/5 border-l border-[#C79A3C]/20">
-                      Justru dimulai saat pulang
+                      Berlanjut saat pulang
                     </td>
                   </tr>
                   <tr>
-                    <td className="p-3.5 sm:p-6 text-slate-600">Ibadah semata</td>
+                    <td className="p-3.5 sm:p-6 text-slate-600">Fokus ritual ibadah</td>
                     <td className="p-3.5 sm:p-6 font-semibold text-[#0F1E3D] bg-[#C79A3C]/5 border-l border-[#C79A3C]/20">
-                      Ibadah + Perubahan Hidup &amp; Leadership
+                      Ritual ibadah + transformasi diri + peningkatan performa/kinerja
                     </td>
                   </tr>
                   <tr>
@@ -698,7 +693,7 @@ export default function LandingPage() {
                   <tr>
                     <td className="p-3.5 sm:p-6 text-slate-600">Tour leader</td>
                     <td className="p-3.5 sm:p-6 font-semibold text-[#0F1E3D] bg-[#C79A3C]/5 border-l border-[#C79A3C]/20">
-                      Executive Coach &amp; Accountability System
+                      Tour leader + tim dan sistem pengembangan diri
                     </td>
                   </tr>
                 </tbody>
@@ -850,7 +845,7 @@ export default function LandingPage() {
                   Key Benefits
                 </h2>
                 <p className="text-xs sm:text-base text-slate-600 font-normal leading-relaxed">
-                  Dampak nyata yang dirasakan oleh peserta dan organisasi setelah mengikuti 90 hari pendampingan.
+                  Dampak nyata yang insya Allah dirasakan oleh peserta dan organisasi setelah mengikuti 90 hari pendampingan.
                 </p>
               </div>
 
@@ -886,7 +881,7 @@ export default function LandingPage() {
                     </div>
                     <h3 className="font-bold text-[#0F1E3D] text-sm sm:text-xl leading-snug">Purpose-Driven Leadership</h3>
                     <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed">
-                      Memimpin dengan kejelasan tujuan yang melampaui sekadar target finansial.
+                      Memimpin/beyond the limit dengan tujuan yang lebih jelas melampaui target duniawi.
                     </p>
                   </div>
 
@@ -908,7 +903,7 @@ export default function LandingPage() {
                     </div>
                     <h3 className="font-bold text-[#0F1E3D] text-sm sm:text-xl leading-snug">Organizational Impact</h3>
                     <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed">
-                      Membawa pengaruh positif dan budaya kerja yang berlandaskan nilai spiritual ke tim &amp; perusahaan.
+                      Membawa pengaruh positif dan budaya kerja yang berlandaskan nilai spiritual ke dalam tim dan perusahaan, untuk berkontribusi mencapai target-target organisasi.
                     </p>
                   </div>
 
@@ -919,7 +914,7 @@ export default function LandingPage() {
                     </div>
                     <h3 className="font-bold text-[#0F1E3D] text-sm sm:text-xl leading-snug">Sustainable Transformation</h3>
                     <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed">
-                      Memastikan perubahan bersifat permanen dan berlanjut secara terukur selama 90 hari dan seterusnya.
+                      Mendorong perubahan transformasi diri berkelanjutan secara terukur selama 90 hari dan seterusnya.
                     </p>
                   </div>
                 </div>

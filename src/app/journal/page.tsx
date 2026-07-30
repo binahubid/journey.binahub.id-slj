@@ -383,15 +383,15 @@ export default function RefactoredJournalPage() {
       <main className="w-full min-h-screen bg-[#FAF9F5] text-navy-950 font-sans pb-20">
 
         {/* ─── MAIN CONTENT WRAPPER (2-COLUMN: 75% LEFT / 25% RIGHT) ───────────── */}
-        <div className="w-full px-4 sm:px-8 pt-6 pb-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+        <div className="w-full px-3 sm:px-8 pt-4 sm:pt-6 pb-28 sm:pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-7 items-start">
 
             {/* ─── LEFT COLUMN (75% / col-span-8 or col-span-9) ───────────────── */}
-            <div className="lg:col-span-8 xl:col-span-9 space-y-7 w-full">
+            <div className="lg:col-span-8 xl:col-span-9 space-y-5 sm:space-y-7 w-full">
               
               {/* 1. CLEAN HERO BANNER WITH FULL ADAPTIVE TIME BACKGROUND */}
               <div
-                className="relative rounded-3xl p-6 sm:p-8 min-h-[260px] flex flex-col justify-between overflow-hidden shadow-lg border border-white/20 text-white bg-cover transition-all duration-700"
+                className="relative rounded-2xl sm:rounded-3xl p-4 sm:p-8 min-h-[200px] sm:min-h-[260px] flex flex-col justify-between overflow-hidden shadow-lg border border-white/20 text-white bg-cover transition-all duration-700"
                 style={{
                   backgroundImage: `url('${adaptiveJournalBg}')`,
                   backgroundPosition: "center top",
@@ -400,23 +400,23 @@ export default function RefactoredJournalPage() {
                 {/* Dark Gradient Overlay for Optimal Readability */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/60 pointer-events-none" />
 
-                <div className="relative z-10 flex flex-col justify-between h-full min-h-[220px] w-full space-y-6">
+                <div className="relative z-10 flex flex-col justify-between h-full min-h-[180px] sm:min-h-[220px] w-full space-y-4 sm:space-y-6">
                   
                   {/* TOP ROW: Sisi Kiri Atas (Hari ke-X) & Sisi Kanan Atas (Jam WIB 18:50 dengan titik dua berkedip) */}
-                  <div className="flex items-start justify-between gap-4 w-full">
+                  <div className="flex items-start justify-between gap-2 w-full">
                     {/* Sisi Kiri Atas: Hari ke-X */}
                     <div>
-                      <span className="text-amber-300 font-extrabold bg-black/50 px-3.5 py-1 rounded-full border border-amber-300/30 text-xs sm:text-sm shadow-xs inline-block">
+                      <span className="text-amber-300 font-extrabold bg-black/50 px-3 py-1 rounded-full border border-amber-300/30 text-xs sm:text-sm shadow-xs inline-block">
                         Hari ke-{dayCount} Journey
                       </span>
                     </div>
 
                     {/* Sisi Kanan Atas: Jam WIB 18:50 (WIB di kiri, titik dua berkedip) */}
-                    <div className="flex items-center gap-2 text-right">
-                      <span className="text-xs font-mono font-bold text-amber-900 bg-amber-400 px-2 py-0.5 rounded shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-right">
+                      <span className="text-[10px] sm:text-xs font-mono font-bold text-amber-900 bg-amber-400 px-1.5 py-0.5 rounded shadow-2xs">
                         WIB
                       </span>
-                      <div className="text-3xl sm:text-5xl font-black text-white font-mono tracking-tighter leading-none drop-shadow-lg flex items-center">
+                      <div className="text-2xl sm:text-5xl font-black text-white font-mono tracking-tighter leading-none drop-shadow-lg flex items-center">
                         <span>{heroClockHH}</span>
                         <span className={`inline-block transition-opacity duration-200 ${showColon ? "opacity-100" : "opacity-20 text-amber-300"}`}>:</span>
                         <span>{heroClockMM}</span>
@@ -425,20 +425,20 @@ export default function RefactoredJournalPage() {
                   </div>
 
                   {/* BOTTOM ROW: Sisi Kiri Bawah (Refleksi Hari Ini & Quote) & Sisi Kanan Bawah (Tanggal) */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 w-full pt-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 w-full pt-1">
                     {/* Sisi Kiri Bawah: Judul & Quote */}
-                    <div className="space-y-1 max-w-lg w-full text-left">
-                      <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
+                    <div className="space-y-0.5 max-w-lg w-full text-left">
+                      <h1 className="text-xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
                         Refleksi Hari Ini
                       </h1>
-                      <p className="text-xs sm:text-sm text-slate-100 italic font-serif leading-relaxed drop-shadow-sm">
+                      <p className="text-[11px] sm:text-sm text-slate-100 italic font-serif leading-relaxed drop-shadow-sm">
                         &ldquo;Setiap langkah kecil yang ditulis akan lebih mudah menjadi kebiasaan.&rdquo;
                       </p>
                     </div>
 
                     {/* Sisi Kanan Bawah: Tanggal */}
                     <div className="text-left sm:text-right shrink-0">
-                      <p className="text-xs sm:text-sm font-semibold text-slate-200 drop-shadow-sm">
+                      <p className="text-[11px] sm:text-sm font-semibold text-slate-200 drop-shadow-sm">
                         📅 {dateFormatted}
                       </p>
                     </div>
@@ -448,29 +448,29 @@ export default function RefactoredJournalPage() {
               </div>
 
               {/* 2. FORM REFLEKSI CARD */}
-              <Card className="w-full bg-white p-6 sm:p-8 rounded-3xl shadow-2xs space-y-6 border border-slate-200/80">
+              <Card className="w-full bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xs space-y-5 sm:space-y-6 border border-slate-200/80">
                 
                 {/* SECTION 1: PERTANYAAN HARI INI */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                      <Lightbulb className="h-4 w-4" />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                      <Lightbulb className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                     <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
                       Pertanyaan Hari Ini
                     </h3>
                   </div>
 
-                  <div className="bg-[#FFFDF3] p-4 rounded-2xl border border-amber-200/70 text-xs sm:text-sm font-bold text-[#071A33]">
+                  <div className="bg-[#FFFDF3] p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-amber-200/70 text-xs sm:text-sm font-bold text-[#071A33] leading-relaxed">
                     {dailyPrompt}
                   </div>
                 </div>
 
                 {/* SECTION 2: CERITAKAN PERJALANANMU HARI INI */}
-                <div className="space-y-2 border-t border-slate-100 pt-5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                      <Edit3 className="h-4 w-4" />
+                <div className="space-y-2 border-t border-slate-100 pt-4 sm:pt-5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                      <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                     <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
                       Ceritakan perjalananmu hari ini
@@ -484,7 +484,7 @@ export default function RefactoredJournalPage() {
                       value={mainReflection}
                       onChange={e => setMainReflection(e.target.value)}
                       placeholder="Tulis refleksi, rasa syukur, hikmah, atau hal yang ingin kamu pelajari..."
-                      className="text-xs sm:text-sm leading-relaxed border-slate-200 focus:border-amber-500 rounded-2xl p-4 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
+                      className="text-xs sm:text-sm leading-relaxed border-slate-200 focus:border-amber-500 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
                     />
                     <span className="absolute right-3.5 bottom-3 text-[10px] font-mono text-slate-400">
                       {mainReflection.length}/1000
@@ -493,23 +493,23 @@ export default function RefactoredJournalPage() {
                 </div>
 
                 {/* SECTION 3: HARI INI SAYA MERASA (5 MOOD CARDS GRID) */}
-                <div className="space-y-3 border-t border-slate-100 pt-5">
+                <div className="space-y-3 border-t border-slate-100 pt-4 sm:pt-5">
                   <div>
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                        <Smile className="h-4 w-4" />
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                        <Smile className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                       <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
                         Hari ini saya merasa
                       </h3>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5 ml-9.5">
+                    <p className="text-[11px] text-slate-400 mt-0.5 ml-8 sm:ml-9.5">
                       Pilih satu yang paling menggambarkan perasaan Anda.
                     </p>
                   </div>
 
                   {/* 5 Mood Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-2.5">
                     {MOOD_ITEMS.map((m) => {
                       const isSelected = selectedMood === m.label;
                       return (
@@ -517,16 +517,16 @@ export default function RefactoredJournalPage() {
                           key={m.label}
                           type="button"
                           onClick={() => setSelectedMood(m.label)}
-                          className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1.5 ${
+                          className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 sm:gap-1.5 ${
                             isSelected
                               ? "bg-[#FFFDF3] border-amber-400 text-amber-950 font-bold shadow-2xs scale-102"
                               : "bg-white border-slate-100 hover:border-slate-200 text-slate-600 font-medium"
                           }`}
                         >
-                          <div className={`h-7 w-7 rounded-full border-2 flex items-center justify-center text-xs ${m.colorClass}`}>
+                          <div className={`h-6 w-6 sm:h-7 sm:w-7 rounded-full border-2 flex items-center justify-center text-xs ${m.colorClass}`}>
                             {m.emoji}
                           </div>
-                          <span className="text-xs">{m.label}</span>
+                          <span className="text-[11px] sm:text-xs truncate w-full text-center">{m.label}</span>
                         </button>
                       );
                     })}
@@ -534,19 +534,19 @@ export default function RefactoredJournalPage() {
                 </div>
 
                 {/* SECTION 4 & 5: PELAJARAN & PERBAIKAN BESOK */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 border-t border-slate-100 pt-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 border-t border-slate-100 pt-4 sm:pt-5">
                   
                   <div className="space-y-2">
                     <div>
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                          <BookOpen className="h-4 w-4" />
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                          <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </div>
                         <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
                           Pelajaran hari ini
                         </h3>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5 ml-9.5">
+                      <p className="text-[11px] text-slate-400 mt-0.5 ml-8 sm:ml-9.5">
                         Apa yang bisa Anda ambil dari hari ini?
                       </p>
                     </div>
@@ -558,9 +558,9 @@ export default function RefactoredJournalPage() {
                         value={pelajaran}
                         onChange={e => setPelajaran(e.target.value)}
                         placeholder="Tuliskan pelajaran atau hikmah..."
-                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3.5 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
+                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
                       />
-                      <span className="absolute right-3.5 bottom-2.5 text-[10px] font-mono text-slate-400">
+                      <span className="absolute right-3.5 bottom-2 text-[10px] font-mono text-slate-400">
                         {pelajaran.length}/500
                       </span>
                     </div>
@@ -568,15 +568,15 @@ export default function RefactoredJournalPage() {
 
                   <div className="space-y-2">
                     <div>
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                          <Target className="h-4 w-4" />
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
+                          <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </div>
                         <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
                           Apa yang ingin diperbaiki besok?
                         </h3>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5 ml-9.5">
+                      <p className="text-[11px] text-slate-400 mt-0.5 ml-8 sm:ml-9.5">
                         Langkah kecil apa yang akan dilakukan?
                       </p>
                     </div>
@@ -588,9 +588,9 @@ export default function RefactoredJournalPage() {
                         value={perbaikanBesok}
                         onChange={e => setPerbaikanBesok(e.target.value)}
                         placeholder="Tuliskan komitmen perbaikan..."
-                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3.5 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
+                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3 placeholder:text-slate-400 placeholder:italic font-serif bg-white"
                       />
-                      <span className="absolute right-3.5 bottom-2.5 text-[10px] font-mono text-slate-400">
+                      <span className="absolute right-3.5 bottom-2 text-[10px] font-mono text-slate-400">
                         {perbaikanBesok.length}/500
                       </span>
                     </div>
@@ -599,7 +599,7 @@ export default function RefactoredJournalPage() {
                 </div>
 
                 {/* FOOTER BAR */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-5">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-4 sm:pt-5">
                   <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
                     <Lock className="h-3.5 w-3.5 text-slate-400" />
                     Jurnal ini bersifat privat dan terenkripsi.
@@ -630,8 +630,8 @@ export default function RefactoredJournalPage() {
 
             </div>
 
-            {/* ─── RIGHT COLUMN (25% / col-span-4 or col-span-3) INSTAGRAM FEED 3-COLUMN GRID ─── */}
-            <div className="lg:col-span-4 xl:col-span-3 space-y-4 w-full">
+            {/* ─── RIGHT COLUMN INSTAGRAM FEED GRID ─── */}
+            <div className="lg:col-span-4 xl:col-span-3 space-y-4 w-full pt-4 lg:pt-0">
               
               {/* Header Section */}
               <div className="flex items-center gap-2.5 border-b border-slate-200/80 pb-3">
@@ -642,35 +642,35 @@ export default function RefactoredJournalPage() {
                   <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
                     Riwayat Refleksi
                   </h3>
-                  <p className="text-[11px] text-slate-400">Instagram Feed Grid (3 Kolom)</p>
+                  <p className="text-[11px] text-slate-400">Refleksi Harian Anda</p>
                 </div>
               </div>
 
-              {/* Instagram Feed Grid (3-Columns of Square 1:1 Cards) */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Instagram Feed Grid (2-Columns on Mobile, 3-Columns on Desktop) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {posts.map((post) => (
                   <button
                     key={post.id}
                     onClick={() => setSelectedPost(post)}
-                    className="aspect-square bg-white border border-slate-200/80 rounded-2xl p-2 flex flex-col justify-between hover:border-amber-400 hover:shadow-md transition-all text-left group relative overflow-hidden"
+                    className="aspect-square bg-white border border-slate-200/80 rounded-2xl p-2.5 flex flex-col justify-between hover:border-amber-400 hover:shadow-md transition-all text-left group relative overflow-hidden"
                   >
                     {/* Top: Day Tag */}
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-[9px] font-black text-[#071A33] leading-none">
+                      <span className="text-[10px] font-black text-[#071A33] leading-none">
                         H-{post.dayNumber}
                       </span>
-                      <span className="text-[10px]">
+                      <span className="text-[11px]">
                         {MOOD_ITEMS.find(m => m.label === post.mood)?.emoji || "😊"}
                       </span>
                     </div>
 
                     {/* Middle Excerpt */}
-                    <p className="text-[9px] text-slate-600 italic font-serif line-clamp-2 leading-tight my-auto">
+                    <p className="text-[10px] text-slate-600 italic font-serif line-clamp-2 leading-tight my-auto">
                       &ldquo;{post.content}&rdquo;
                     </p>
 
                     {/* Bottom: Heart / Action */}
-                    <div className="flex items-center justify-between w-full text-[8px] text-slate-400 pt-0.5 border-t border-slate-100">
+                    <div className="flex items-center justify-between w-full text-[9px] text-slate-400 pt-1 border-t border-slate-100">
                       <span className="flex items-center gap-0.5 text-rose-500 font-bold">
                         <Heart className="h-2.5 w-2.5 fill-rose-500" />
                         {post.likeCount}

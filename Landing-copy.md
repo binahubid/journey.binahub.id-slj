@@ -26,7 +26,7 @@ Urutan baru: **Hero → Masalah → Why This Program → Solusi (Filosofi) → F
   >
   > Banyak orang pulang dari Umrah dengan hati yang tenang. Namun hanya sedikit yang berhasil mempertahankan perubahan itu ketika kembali pada rutinitas.
   >
-  > Spiritual Leadership Journey adalah program pendampingan transformasi 90 hari yang membantu pengalaman Umrah menjadi perubahan nyata, berkelanjutan, dan berdampak — pada kehidupan pribadi, keluarga, serta kepemimpinan Anda.
+  > Spiritual Leadership Journey adalah program pendampingan transformasi 90 hari yang membantu pengalaman Umrah menjadi perubahan nyata, berkelanjutan, dan berdampak — pada kehidupan pribadi, keluarga, pekerjaan, serta kepemimpinan Anda.
 
 - **CTA** [ChatGPT poin 9 — hindari "Get Started" generik]: primer **"Mulai Journey Saya"**, sekunder **"Jadwalkan Discovery Session"** (lebih pas untuk audiens korporat/eksekutif dibanding CTA self-serve biasa, konsisten dengan model enrollment B2B via Kode Program).
 
@@ -103,7 +103,7 @@ Struktur inti (kicker/judul/deskripsi Tujuan) dari infografis 25 Juli **tidak be
 |---|---|---|---|---|---|
 | 01 | SEBELUM KEBERANGKATAN | Muhasabah | Discover Yourself | Menyadari kondisi diri secara jujur dan mendalam sebagai titik awal perubahan. | Baseline Self Discovery · Refleksi Diri · Ukhuwah |
 | 02 | MENJELANG KEBERANGKATAN | Niyyah | Align Your Purpose | Menemukan alasan dan tujuan hidup yang lurus karena Allah, lalu merencanakan perubahan yang jelas. | Meluruskan Tujuan · Amanah Kehidupan · Perencanaan Transformasi |
-| 03 | DI MADINAH & MAKKAH | Mujahadah | Experience the Transformation | Mengalami ibadah Umrah secara bermakna, memperdalam hubungan dengan Allah, dan memperjuangkan perubahan diri. | Meaningful Umrah · Reflection · Executive Coaching |
+| 03 | DI MADINAH & MAKKAH | Mujahadah | Experience the Transformation | Mengalami ibadah Umrah secara bermakna, memperdalam hubungan dengan Allah, dan memperjuangkan perubahan diri. | Meaningful Umrah · Reflection · Coaching |
 | 04 | SETELAH PULANG KE RUMAH | Istiqamah | Sustain the Change | Mengimplementasikan perubahan dalam kehidupan sehari-hari secara konsisten dan berkelanjutan. | Habit Building · Project Implementation · Coaching |
 
 ---
@@ -115,10 +115,10 @@ Struktur inti (kicker/judul/deskripsi Tujuan) dari infografis 25 Juli **tidak be
 | Umrah Konvensional | BinaJourney |
 |---|---|
 | Fokus perjalanan | Fokus transformasi |
-| Berakhir saat pulang | Justru dimulai saat pulang |
-| Ibadah | Ibadah + perubahan hidup |
+| Berakhir saat pulang | Berlanjut saat pulang |
+| Fokus ritual ibadah | Ritual ibadah + transformasi diri + peningkatan performa/kinerja |
 | Itinerary | Roadmap transformasi |
-| Tour leader | Coach & accountability system |
+| Tour leader | Tour leader + tim dan sistem pengembangan diri |
 
 ---
 
@@ -142,14 +142,16 @@ Struktur inti (kicker/judul/deskripsi Tujuan) dari infografis 25 Juli **tidak be
 
 ## 8. Key Benefits — [Wajib, section baru dari flyer]
 
+> **Deskripsi**: Dampak nyata yang insya Allah dirasakan oleh peserta dan organisasi setelah mengikuti 90 hari pendampingan.
+
 6 item (dari flyer, verbatim, dwibahasa sesuai desain asli flyer):
 
 1. Stronger Leadership Character
 2. Spiritual Awareness
-3. Purpose-Driven Leadership
+3. Purpose-Driven Leadership: Memimpin/beyond the limit dengan tujuan yang lebih jelas melampaui target duniawi
 4. Positive Habits
-5. Organizational Impact
-6. Sustainable Transformation
+5. Organizational Impact: Membawa pengaruh positif dan budaya kerja yang berlandaskan nilai spiritual ke dalam tim dan perusahaan, untuk berkontribusi mencapai target-target organisasi
+6. Sustainable Transformation: Mendorong perubahan transformasi diri berkelanjutan secara terukur selama 90 hari dan seterusnya
 
 ---
 

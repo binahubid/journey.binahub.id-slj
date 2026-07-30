@@ -1245,9 +1245,9 @@ export default function DashboardPage() {
               {/* 3 Micro Stats */}
               <div className="grid grid-cols-3 gap-2 pt-2 text-center">
                 <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">
-                  <span className="text-lg font-black text-navy-900 block">5</span>
+                  <span className="text-lg font-black text-navy-900 block">5 Hari</span>
                   <span className="text-[10px] text-slate-500 font-bold block leading-tight">
-                    Terbaik Beruntun
+                    konsistensi berturut-turut
                   </span>
                 </div>
                 <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">

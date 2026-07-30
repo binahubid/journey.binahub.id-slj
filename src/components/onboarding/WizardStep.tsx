@@ -58,7 +58,7 @@ export function WizardStep({
           className="font-semibold gap-1"
         >
           {isSubmitting ? (
-            "Menyimpan Kontrak..."
+            "Menyimpan Personal Transformation Project..."
           ) : stepNumber === totalSteps ? (
             <>
               Konfirmasi & Kunci PTP <Check className="h-4 w-4" />

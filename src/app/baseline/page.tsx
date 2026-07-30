@@ -155,7 +155,7 @@ const BASELINE_STEPS: StepMeta[] = [
     questions: [
       { id: 37, text: "Saya merasa bertanggung jawab untuk memberi manfaat kepada orang lain.", area: "community_impact" },
       { id: 38, text: "Saya percaya hidup yang bermakna adalah hidup yang bermanfaat.", area: "community_impact" },
-      { id: 39, text: "Saya ingin meninggalkan amal jariyah yang terus memberi manfaat.", area: "community_impact" },
+      { id: 39, text: "Saya ingin memberikan amal jariyah yang terus memberikan manfaat.", area: "community_impact" },
       { id: 40, text: "Saya terlibat dalam kegiatan sosial, dakwah, pendidikan, atau pelayanan masyarakat.", area: "community_impact" },
       { id: 41, text: "Saya senang berbagi ilmu, pengalaman, atau rezeki.", area: "community_impact" },
       { id: 42, text: "Saya berusaha menjadi solusi bagi permasalahan di sekitar saya.", area: "community_impact" },
@@ -203,6 +203,13 @@ export default function BaselinePage() {
         return;
       }
 
+      // Restore from localStorage first as instant fallback
+      let localAnswers: Record<number, number> = {};
+      try {
+        const stored = localStorage.getItem("baseline_answers_draft");
+        if (stored) localAnswers = JSON.parse(stored);
+      } catch {}
+
       // Check existing assessment
       let { data: assessment } = await supabase.from("baseline_assessments")
         .select("*").eq("user_id", user.id).maybeSingle();
@@ -231,7 +238,7 @@ export default function BaselinePage() {
           .select("question_number, score")
           .eq("assessment_id", assessment.id);
 
-        const aMap: Record<number, number> = {};
+        const aMap: Record<number, number> = { ...localAnswers };
         (ansList || []).forEach((a: any) => {
           aMap[a.question_number] = a.score;
         });
@@ -251,14 +258,19 @@ export default function BaselinePage() {
 
   useEffect(() => { loadBaselineData(); }, [loadBaselineData]);
 
-  // ── AUTO-SAVE ANSWER ──────────────────────────────────────────────────────
+  // ── AUTO-SAVE ANSWER ON EVERY SELECTION ───────────────────────────────────
 
   const handleSelectScore = async (q: QuestionItem, scoreVal: number) => {
-    // Local state update
+    // 1. Instant local state update
     const updatedMap = { ...answersMap, [q.id]: scoreVal };
     setAnswersMap(updatedMap);
 
-    // Save to Supabase DB asynchronously
+    // 2. Instant localStorage cache for offline/reload safety
+    try {
+      localStorage.setItem("baseline_answers_draft", JSON.stringify(updatedMap));
+    } catch {}
+
+    // 3. Save to Supabase DB asynchronously
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;

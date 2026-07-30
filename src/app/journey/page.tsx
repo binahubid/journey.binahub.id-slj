@@ -41,17 +41,15 @@ const SECTIONS = [
   { num: 3, title: "Area Transformasi", subtitle: "Pilih maksimal 3 area fokus pertumbuhan" },
   { num: 4, title: "Sasaran & Indikator Capaian", subtitle: "Sasaran 90 hari & 4 dimensi indikator terukur" },
   { num: 5, title: "Action Plan (Habit Engine)", subtitle: "Kebiasaan harian/mingguan yang dipantau" },
-  { num: 6, title: "Tim Pendukung", subtitle: "Sahabat Safar (Akuntabilitas Mutual)" },
 ];
 
 // ─── Area List ───────────────────────────────────────────────────
 const AREA_LIST = [
-  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "Kedisiplinan ibadah & kedekatan dengan Allah", sel: "border-amber-600 bg-amber-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-amber-300" },
-  { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "Integritas, kesabaran & kontrol emosi", sel: "border-blue-600 bg-blue-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-blue-300" },
-  { id: "Leadership Excellence", icon: Award, label: "Leadership/Profesional Excellence", desc: "Etos kerja & keteladanan dalam karir", sel: "border-[#071A33] bg-[#071A33] text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-slate-400" },
-  { id: "Family Bonding", icon: Users, label: "Family Bonding", desc: "Keharmonisan & komunikasi keluarga", sel: "border-rose-600 bg-rose-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-rose-300" },
-  { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "Kebermanfaatan sosial & dakwah", sel: "border-emerald-600 bg-emerald-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-emerald-300" },
-  { id: "Health & Wellbeing", icon: Activity, label: "Health & Wellbeing", desc: "Kesehatan fisik & mental yang optimal", sel: "border-teal-600 bg-teal-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-teal-300" },
+  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT", sel: "border-amber-600 bg-amber-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-amber-300" },
+  { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", sel: "border-blue-600 bg-blue-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-blue-300" },
+  { id: "Leadership Excellence", icon: Award, label: "Leadership/Profesional Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", sel: "border-[#071A33] bg-[#071A33] text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-slate-400" },
+  { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", sel: "border-rose-600 bg-rose-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-rose-300" },
+  { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "dampak terhadap lingkungan sekitar", sel: "border-emerald-600 bg-emerald-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-emerald-300" },
 ];
 
 // ─── Habit Icon Detector ─────────────────────────────────────────
@@ -109,14 +107,7 @@ const SECTION_TIPS: Record<number, { title: string; tips: { icon: string; title:
       { icon: "✦", title: "Kaitkan dengan area transformasi", desc: "Pilih kebiasaan yang langsung mendukung area yang dipilih." },
     ],
   },
-  6: {
-    title: "Tips Tim Pendukung",
-    tips: [
-      { icon: "✦", title: "Pilih yang berkomitmen", desc: "Sahabat Safar yang juga ingin berubah akan lebih efektif." },
-      { icon: "✦", title: "Sepakati jadwal check-in", desc: "Minimal seminggu sekali untuk saling berbagi progres." },
-      { icon: "✦", title: "Saling doakan", desc: "Doa untuk saudara adalah ibadah yang paling ringan namun bermakna." },
-    ],
-  },
+
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -417,14 +408,13 @@ interface BatchMate {
       case 3: return selectedAreas.length > 0;
       case 4: return Object.values(areaTargetsMap).some(t => t.mainTarget && t.mainTarget.trim().length > 0);
       case 5: return actionPlans.length > 0;
-      case 6: return sahabatSafar.trim().length > 0;
       default: return false;
     }
   };
 
   const completedCount = SECTIONS.filter((_, i) => isSectionComplete(i + 1)).length;
-  const progressPct = Math.round((completedCount / 6) * 100);
-  const estimatedMinutes = (6 - completedCount) * 8;
+  const progressPct = Math.round((completedCount / 5) * 100);
+  const estimatedMinutes = (5 - completedCount) * 8;
 
   const getSectionStatus = (num: number): "completed" | "in-progress" | "not-started" => {
     if (isSectionComplete(num)) return "completed";
@@ -466,7 +456,7 @@ interface BatchMate {
   };
 
   const goToNext = () => {
-    if (activeSection < 6) { setActiveSection(activeSection + 1); setMobileView("editor"); }
+    if (activeSection < 5) { setActiveSection(activeSection + 1); setMobileView("editor"); }
     else { setShowCelebration(true); }
   };
 
@@ -625,61 +615,168 @@ interface BatchMate {
 
             {/* Area Target & Indicators Editor */}
             {(() => {
-              const placeholdersByArea: Record<string, { sasaran: string; kualitas: string; kuantitasBaseline: string; kuantitasTarget: string; waktu: string; biaya: string }> = {
+              const shortcutsByArea: Record<string, {
+                kualitas: string[];
+                kuantitas: string[];
+                waktu: string[];
+                biaya: string[];
+              }> = {
                 "Spiritual Growth": {
-                  sasaran: "Contoh: Konsisten sholat 5 waktu berjamaah di masjid & khatam Al-Qur'an 1 juz per minggu.",
-                  kualitas: "Misal: Sholat khusyu, tumakninah & selesai dzikir sesudah salam...",
-                  kuantitasBaseline: "Misal: 2 juz/bulan",
-                  kuantitasTarget: "Misal: 4 juz/bulan (khatam 90 hari)",
-                  waktu: "Misal: Hadir di masjid 10 menit sebelum adzan Subuh & Isya...",
-                  biaya: "Misal: Sedekah subuh Rp 20.000 / hari via transfer/kotak masjid...",
+                  kualitas: [
+                    "Khusyu, tumakninah & dzikir sesudah salam",
+                    "Meresapi makna ayat Al-Qur'an yang dibaca",
+                    "Menjaga wudhu dan niat ikhlas karena Allah",
+                    "Menghindari perkataan sia-sia dan ghibah",
+                    "Hadir Hati saat berdoa & istighfar harian"
+                  ],
+                  kuantitas: [
+                    "Khatam 1 Juz / minggu (90 hari 13 Juz)",
+                    "Sholat 5 waktu berjamaah di masjid",
+                    "Sholat Tahajud 4 rakaat + Witir 3x/minggu",
+                    "Sholat Dhuha 4 rakaat setiap pagi",
+                    "Membaca Al-Matsurat pagi & petang 7x/minggu"
+                  ],
+                  waktu: [
+                    "Hadir di masjid 10 menit sebelum adzan",
+                    "Tahajud jam 04:00 - 04:30 sebelum Subuh",
+                    "Tilawah Al-Qur'an 20 menit setelah Subuh",
+                    "Dzikir pagi jam 06:30 - 06:45",
+                    "Evaluasi muhasabah malam jam 21:30"
+                  ],
+                  biaya: [
+                    "Budget Rp 10.000 / hari via transfer",
+                    "Budget Rp 20.000 / hari via transfer",
+                    "Budget Rp 50.000 / hari via transfer",
+                    "Infak rutin Rp 100.000 / minggu ke panti/masjid",
+                    "Wakaf Quran Rp 150.000 / bulan"
+                  ]
                 },
                 "Personal Development": {
-                  sasaran: "Contoh: Meningkatkan disiplin manajemen waktu, kontrol emosi, dan membaca 1 buku pengembangan diri per bulan.",
-                  kualitas: "Misal: Mampu merespon masalah secara tenang tanpa emosi meluap...",
-                  kuantitasBaseline: "Misal: 10 jam terbuang/minggu",
-                  kuantitasTarget: "Misal: Maksimal 2 jam screen time non-produktif/hari",
-                  waktu: "Misal: Alokasi waktu belajar/membaca jam 20:00 - 21:00 setiap malam...",
-                  biaya: "Misal: Budget pembelian buku / webinar pengembangan diri Rp 300.000/bulan...",
+                  kualitas: [
+                    "Merespon masalah secara tenang tanpa emosi meluap",
+                    "Mampu berpikir jernih saat di bawah tekanan",
+                    "Disiplin menjalankan rencana harian tanpa menunda",
+                    "Jujur mengakui kesalahan dan langsung memperbaiki",
+                    "Fokus mengerjakan 1 tugas hingga tuntas (deep work)"
+                  ],
+                  kuantitas: [
+                    "Maksimal 2 jam screen time non-produktif/hari",
+                    "Membaca 1 buku pengembangan diri / bulan",
+                    "Menulis jurnal refleksi 1x setiap malam",
+                    "Menyelesaikan 1 modul kursus/skill baru per minggu",
+                    "Evaluasi habit harian 7x / minggu"
+                  ],
+                  waktu: [
+                    "Alokasi membaca jam 20:00 - 20:30 setiap malam",
+                    "Deep work jam 08:30 - 10:30 tanpa distraksi",
+                    "Bangun pagi jam 04:30 secara konsisten",
+                    "Review mingguan setiap hari Minggu jam 16:00",
+                    "Digital detox jam 21:00 - 05:00"
+                  ],
+                  biaya: [
+                    "Budget pembelian buku Rp 150.000 / bulan",
+                    "Budget pelatihan / webinar Rp 300.000 / bulan",
+                    "Budget langganan platform edukasi Rp 100.000 / bulan",
+                    "Budget alat pendukung belajar Rp 200.000 / bulan",
+                    "Budget tabungan pengembangan diri Rp 500.000 / bulan"
+                  ]
                 },
                 "Leadership Excellence": {
-                  sasaran: "Contoh: Menjadi teladan etos kerja tinggi, menyelesaikan proyek tim tepat waktu, dan aktif memberikan coaching staf.",
-                  kualitas: "Misal: Memberikan arahan tugas yang jelas dan konstruktif kepada anggota tim...",
-                  kuantitasBaseline: "Misal: 2 proyek terlambat",
-                  kuantitasTarget: "Misal: 100% KPI proyek selesai sebelum deadline",
-                  waktu: "Misal: Melakukan 1-on-1 coaching dengan tim 30 menit setiap hari Senin...",
-                  biaya: "Misal: Alokasi apresiasi / apresiasi insentif tim Rp 500.000/bulan...",
+                  kualitas: [
+                    "Memberikan arahan tugas yang jelas & konstruktif",
+                    "Menjadi teladan etos kerja & kedisiplinan tim",
+                    "Aktif mendengarkan dan menghargai masukan tim",
+                    "Mengambil keputusan berbasis data & nilai etika",
+                    "Memberikan feedback positif & membangun secara berkala"
+                  ],
+                  kuantitas: [
+                    "100% KPI proyek selesai sebelum deadline",
+                    "1-on-1 coaching dengan anggota tim 2x / minggu",
+                    "Melakukan pembinaan / mentoring tim 1x / minggu",
+                    "Menyelesaikan 3 milestone strategis dalam 90 hari",
+                    "Nol keluhan keterlambatan laporan dari manajemen"
+                  ],
+                  waktu: [
+                    "Hadir 15 menit sebelum rapat/meeting dimulai",
+                    "Session 1-on-1 coaching setiap Senin jam 10:00",
+                    "Daily standup meeting jam 09:00 - 09:15",
+                    "Review kinerja tim setiap hari Jumat jam 15:00",
+                    "Penyelesaian laporan mingguan setiap Kamis jam 16:00"
+                  ],
+                  biaya: [
+                    "Budget apresiasi tim Rp 300.000 / bulan",
+                    "Budget makan siang / coaching tim Rp 500.000 / bulan",
+                    "Budget sertifikasi profesional Rp 1.000.000 / batch",
+                    "Budget fasilitasi alat kerja tim Rp 250.000 / bulan",
+                    "Budget kegiatan keakraban tim Rp 400.000 / bulan"
+                  ]
                 },
-                "Family Bonding": {
-                  sasaran: "Contoh: Membangun komunikasi hangat dalam keluarga, quality time harian, dan makan malam bersama tanpa gadget.",
-                  kualitas: "Misal: Mendengarkan cerita pasangan dan anak secara penuh tanpa terdistraksi HP...",
-                  kuantitasBaseline: "Misal: 1x quality time/bulan",
-                  kuantitasTarget: "Misal: 4x weekend family gathering per bulan",
-                  waktu: "Misal: No-gadget hour jam 18:30 - 20:00 bersama keluarga...",
-                  biaya: "Misal: Budget rekreasi dan kuliner keluarga Rp 1.500.000/bulan...",
+                "Relationship": {
+                  kualitas: [
+                    "Mendengarkan cerita keluarga tanpa terdistraksi HP",
+                    "Berbicara dengan nada lembut, sabar & empati tinggi",
+                    "Mudah memaafkan & meminta maaf saat ada khilaf",
+                    "Menunjukkan apresiasi & rasa terima kasih setiap hari",
+                    "Menciptakan suasana hangat & aman di rumah/lingkungan"
+                  ],
+                  kuantitas: [
+                    "Makan malam bersama keluarga tanpa gadget 5x/minggu",
+                    "Quality time khusus pasangan/keluarga 1x / minggu",
+                    "Menghubungi orang tua / saudara via telp 3x / minggu",
+                    "Silaturahim dengan sahabat / teman 2x / bulan",
+                    "Family gathering weekend 4x / bulan"
+                  ],
+                  waktu: [
+                    "No-gadget hour jam 18:30 - 20:00 bersama keluarga",
+                    "Family time Sabtu pagi jam 08:00 - 11:00",
+                    "Telepon orang tua setiap Minggu jam 19:30",
+                    "Ngobrol santai sebelum tidur jam 21:00 - 21:30",
+                    "Jalan bersama pasangan setiap Jumat malam jam 19:00"
+                  ],
+                  biaya: [
+                    "Budget rekreasi & makan keluarga Rp 500.000 / bulan",
+                    "Budget rekreasi & makan keluarga Rp 1.000.000 / bulan",
+                    "Budget nafkah / bakti orang tua Rp 500.000 / bulan",
+                    "Budget hadiah / kejutan keluarga Rp 300.000 / bulan",
+                    "Budget tabungan liburan keluarga Rp 750.000 / bulan"
+                  ]
                 },
                 "Community Impact": {
-                  sasaran: "Contoh: Aktif berkontribusi dalam kegiatan sosial masyarakat, berbagi ilmu, dan mendukung program pemberdayaan.",
-                  kualitas: "Misal: Memberikan pendampingan warga secara tulus dan berkesinambungan...",
-                  kuantitasBaseline: "Misal: 0 jam kegiatan sosial",
-                  kuantitasTarget: "Misal: Mengajar / bakti sosial 4 jam setiap akhir pekan",
-                  waktu: "Misal: Pelaksanaan pengabdian setiap hari Sabtu jam 09:00 - 11:00...",
-                  biaya: "Misal: Donasi rutin program masyarakat Rp 500.000/bulan...",
-                },
-                "Health & Wellbeing": {
-                  sasaran: "Contoh: Menjaga pola hidup sehat, tidur teratur 7 jam, olahraga rutin, dan mencapai berat badan ideal.",
-                  kualitas: "Misal: Tubuh terasa bugar, stamina terjaga, dan pikiran segar saat bekerja...",
-                  kuantitasBaseline: "Misal: 85 kg (BB awal)",
-                  kuantitasTarget: "Misal: 75 kg (turun 10 kg dalam 90 hari)",
-                  waktu: "Misal: Olahraga jogging / jalan cepat jam 06:00 - 06:45 setiap Selasa & Kamis...",
-                  biaya: "Misal: Langganan gym / beli suplemen kesehatan Rp 400.000/bulan...",
-                },
+                  kualitas: [
+                    "Memberikan pendampingan warga secara tulus & ikhlas",
+                    "Aktif mencari solusi masalah lingkungan sekitar",
+                    "Ramah & peduli terhadap tetangga serta masyarakat",
+                    "Berbagi ilmu & pengalaman dengan niat memberi manfaat",
+                    "Menjadi penggerak kebaikan di lingkungan tempat tinggal"
+                  ],
+                  kuantitas: [
+                    "Mengajar / bakti sosial 4 jam setiap akhir pekan",
+                    "Mengikuti kegiatan gotong royong / RT 2x / bulan",
+                    "Berbagi makanan / sembako ke tetangga 2x / bulan",
+                    "Menjadi relawan program pemberdayaan 1x / bulan",
+                    "Mengisi materi / edukasi komunitas 1x / bulan"
+                  ],
+                  waktu: [
+                    "Bakti sosial setiap hari Sabtu jam 09:00 - 11:00",
+                    "Kerja bakti lingkungan Minggu pagi jam 07:00 - 09:00",
+                    "Pengajian / majelis warga Minggu malam jam 19:30",
+                    "Rapat RT / komunitas setiap awal bulan jam 20:00",
+                    "Aktivitas relawan Sabtu sore jam 15:30 - 17:30"
+                  ],
+                  biaya: [
+                    "Donasi rutin kegiatan warga Rp 100.000 / bulan",
+                    "Donasi rutin program masyarakat Rp 250.000 / bulan",
+                    "Donasi rutin program masyarakat Rp 500.000 / bulan",
+                    "Budget santunan anak yatim Rp 300.000 / bulan",
+                    "Budget kas kegiatan dakwah/sosial Rp 200.000 / bulan"
+                  ]
+                }
               };
 
-              const currentPh = placeholdersByArea[activeAreaTab] || placeholdersByArea["Spiritual Growth"];
+              const currentShortcuts = shortcutsByArea[activeAreaTab] || shortcutsByArea["Spiritual Growth"];
 
               return (
-                <div className="bg-[#FAF8F4] border border-[#EAE5D9] rounded-2xl p-5 space-y-4">
+                <div className="bg-[#FAF8F4] border border-[#EAE5D9] rounded-2xl p-4 sm:p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
                     <span className="text-xs font-extrabold text-[#0B2C6B] uppercase tracking-wider">
                       Target & Indikator: {activeAreaTab}
@@ -703,7 +800,7 @@ interface BatchMate {
                         <div className="absolute left-0 top-7 z-50 bg-navy-900 text-white text-xs rounded-xl p-3.5 shadow-xl w-64 border border-amber-400/30">
                           <p className="font-extrabold text-amber-300 mb-1">💡 Panduan Formulasi SMART:</p>
                           <p className="opacity-90 leading-relaxed text-[11px]">
-                            <strong>S</strong>pecific · <strong>M</strong>easurable · <strong>A</strong>chievable · <strong>R</strong>elevant · <strong>T</strong>ime-bound.
+                            <strong>S</strong>specific · <strong>M</strong>easurable · <strong>A</strong>chievable · <strong>R</strong>elevant · <strong>T</strong>ime-bound.
                           </p>
                           <p className="mt-2 text-[10px] text-amber-200 italic">Contoh: &ldquo;Meningkatkan kedisiplinan sholat tepat waktu 5x sehari selama 90 hari.&rdquo;</p>
                         </div>
@@ -713,8 +810,8 @@ interface BatchMate {
                       disabled={locked}
                       value={currentTargetData.mainTarget}
                       onChange={e => updateField("mainTarget", e.target.value)}
-                      placeholder={currentPh.sasaran}
-                      className="min-h-[90px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:text-slate-400 placeholder:italic"
+                      placeholder="Contoh: Konsisten sholat 5 waktu berjamaah di masjid & khatam Al-Qur'an..."
+                      className="min-h-[90px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:text-slate-400 placeholder:italic p-3"
                       maxLength={500}
                     />
                   </div>
@@ -726,19 +823,19 @@ interface BatchMate {
                       value={currentTargetData.targetAlasan}
                       onChange={e => updateField("targetAlasan", e.target.value)}
                       placeholder="Apa motivasi terdalam Anda mencapai sasaran ini?"
-                      className="min-h-[70px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:text-slate-400 placeholder:italic"
+                      className="min-h-[70px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:text-slate-400 placeholder:italic p-3"
                       maxLength={300}
                     />
                   </div>
 
                   {/* 4 Dimension Structured Indicators (Quality, Quantity, Time, Cost) */}
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-4 pt-2">
                     <div className="border-t border-[#EAE5D9] pt-3">
                       <p className="text-sm font-bold text-[#071A33]">Indikator Keberhasilan (4 Dimensi):</p>
-                      <p className="text-xs text-slate-500">Peserta tidak harus mengisi semua 4 dimensi (opsional).</p>
+                      <p className="text-xs text-slate-500">Pilih 5 contoh shortcut di bawah atau ketik langsung indikator Anda.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* 1. Kualitas */}
                       <div className="bg-white p-3.5 rounded-xl border border-purple-100 space-y-2">
                         <div className="flex items-center justify-between">
@@ -751,13 +848,31 @@ interface BatchMate {
                             </div>
                           </div>
                         </div>
-                        <Input
+                        <Textarea
                           disabled={locked}
                           value={currentTargetData.kualitas}
                           onChange={e => updateField("kualitas", e.target.value)}
-                          placeholder={currentPh.kualitas}
-                          className="text-xs border-slate-200 focus:border-purple-400 rounded-lg h-9 placeholder:text-slate-400 placeholder:italic"
+                          placeholder="Misal: Sholat khusyu, tumakninah & selesai dzikir..."
+                          className="min-h-[64px] w-full text-xs border-slate-200 focus:border-purple-400 rounded-lg p-2.5 resize-y placeholder:text-slate-400 placeholder:italic"
                         />
+                        {/* 5 Shortcut Examples */}
+                        {!locked && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] font-bold text-purple-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
+                            <div className="flex flex-wrap gap-1">
+                              {currentShortcuts.kualitas.map((ex, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => updateField("kualitas", ex)}
+                                  className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
+                                >
+                                  + {ex}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* 2. Kuantitas */}
@@ -779,8 +894,8 @@ interface BatchMate {
                               disabled={locked}
                               value={currentTargetData.kuantitasBaseline || ""}
                               onChange={e => updateField("kuantitasBaseline", e.target.value)}
-                              placeholder={currentPh.kuantitasBaseline}
-                              className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-9 bg-slate-50/50 placeholder:text-slate-400 placeholder:italic"
+                              placeholder="Kondisi awal..."
+                              className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-9 bg-slate-50/50 placeholder:text-slate-400 placeholder:italic w-full"
                             />
                           </div>
                           <div>
@@ -789,11 +904,29 @@ interface BatchMate {
                               disabled={locked}
                               value={currentTargetData.kuantitas}
                               onChange={e => updateField("kuantitas", e.target.value)}
-                              placeholder={currentPh.kuantitasTarget}
-                              className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-9 placeholder:text-slate-400 placeholder:italic"
+                              placeholder="Target 90 hari..."
+                              className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-9 placeholder:text-slate-400 placeholder:italic w-full"
                             />
                           </div>
                         </div>
+                        {/* 5 Shortcut Examples */}
+                        {!locked && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] font-bold text-blue-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
+                            <div className="flex flex-wrap gap-1">
+                              {currentShortcuts.kuantitas.map((ex, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => updateField("kuantitas", ex)}
+                                  className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
+                                >
+                                  + {ex}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* 3. Waktu */}
@@ -808,19 +941,37 @@ interface BatchMate {
                             </div>
                           </div>
                         </div>
-                        <Input
+                        <Textarea
                           disabled={locked}
                           value={currentTargetData.waktu}
                           onChange={e => updateField("waktu", e.target.value)}
-                          placeholder={currentPh.waktu}
-                          className="text-xs border-slate-200 focus:border-amber-400 rounded-lg h-9 placeholder:text-slate-400 placeholder:italic"
+                          placeholder="Misal: Hadir 10 menit sebelum jadwal..."
+                          className="min-h-[64px] w-full text-xs border-slate-200 focus:border-amber-400 rounded-lg p-2.5 resize-y placeholder:text-slate-400 placeholder:italic"
                         />
+                        {/* 5 Shortcut Examples */}
+                        {!locked && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] font-bold text-amber-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
+                            <div className="flex flex-wrap gap-1">
+                              {currentShortcuts.waktu.map((ex, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => updateField("waktu", ex)}
+                                  className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
+                                >
+                                  + {ex}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* 4. Biaya */}
                       <div className="bg-white p-3.5 rounded-xl border border-emerald-100 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-emerald-800">4. Indikator Biaya & Sedekah</span>
+                          <span className="text-xs font-extrabold text-emerald-800">4. Indikator Biaya</span>
                           <div className="group relative cursor-pointer">
                             <Info className="h-4 w-4 text-emerald-400 hover:text-emerald-600 transition-colors" />
                             <div className="absolute right-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-52 border border-emerald-400/30">
@@ -829,13 +980,31 @@ interface BatchMate {
                             </div>
                           </div>
                         </div>
-                        <Input
+                        <Textarea
                           disabled={locked}
                           value={currentTargetData.biaya}
                           onChange={e => updateField("biaya", e.target.value)}
-                          placeholder={currentPh.biaya}
-                          className="text-xs border-slate-200 focus:border-emerald-400 rounded-lg h-9 placeholder:text-slate-400 placeholder:italic"
+                          placeholder="Misal: Budget Rp 20.000 / hari via transfer..."
+                          className="min-h-[64px] w-full text-xs border-slate-200 focus:border-emerald-400 rounded-lg p-2.5 resize-y placeholder:text-slate-400 placeholder:italic"
                         />
+                        {/* 5 Shortcut Examples */}
+                        {!locked && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] font-bold text-emerald-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
+                            <div className="flex flex-wrap gap-1">
+                              {currentShortcuts.biaya.map((ex, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => updateField("biaya", ex)}
+                                  className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
+                                >
+                                  + {ex}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -889,15 +1058,40 @@ interface BatchMate {
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 mb-1 block">Kuantitas Target</label>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewActionQty(Math.max(1, newActionQty - 1))}
+                        className="h-10 w-10 rounded-lg border border-amber-200 bg-white hover:bg-amber-100 text-amber-900 font-bold text-base flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-2xs"
+                      >
+                        -
+                      </button>
                       <Input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={newActionQty}
-                        onChange={e => setNewActionQty(Number(e.target.value) || 1)}
-                        className="text-xs border-amber-200 focus:border-amber-400 rounded-lg h-10 bg-white font-bold text-center"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={newActionQty === 0 ? "" : newActionQty}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === "") {
+                            setNewActionQty(0);
+                          } else {
+                            const parsed = parseInt(val, 10);
+                            if (!isNaN(parsed)) setNewActionQty(Math.max(0, parsed));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!newActionQty || newActionQty < 1) setNewActionQty(1);
+                        }}
+                        className="text-sm border-amber-200 focus:border-amber-400 rounded-lg h-10 bg-white font-extrabold text-center w-full min-w-[50px]"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setNewActionQty(newActionQty + 1)}
+                        className="h-10 w-10 rounded-lg border border-amber-200 bg-white hover:bg-amber-100 text-amber-900 font-bold text-base flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-2xs"
+                      >
+                        +
+                      </button>
                       <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
                         {newActionFreq === "Harian" ? "x / hari" : "x / minggu"}
                       </span>
@@ -955,74 +1149,6 @@ interface BatchMate {
                 );
               })}
             </div>
-          </div>
-        );
-
-      case 6:
-        return (
-          <div className="space-y-5">
-            <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="h-4 w-4 text-amber-600" />
-                <span className="text-sm font-bold text-amber-800">Sahabat Safar (Akuntabilitas Mutual)</span>
-              </div>
-              <p className="text-xs text-amber-900 leading-relaxed">
-                Pilih teman sesama peserta batch Anda. Ketika Anda menekan tombol <strong>&ldquo;Ingatkan Sahabat Safar&rdquo;</strong> di Dashboard, sistem akan mengirimkan notifikasi pengingat secara langsung ke akun mereka.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 block">Pilih Sahabat Safar dari Rombongan/Batch Anda:</label>
-              {batchMates.length > 0 ? (
-                <select
-                  disabled={locked}
-                  value={sahabatSafarUserId || ""}
-                  onChange={e => {
-                    const selectedId = e.target.value;
-                    const mate = batchMates.find(m => m.userId === selectedId);
-                    setSahabatSafarUserId(selectedId || null);
-                    setSahabatSafar(mate ? mate.fullName : "");
-                    scheduleAutosave(6);
-                  }}
-                  className="w-full border border-warm-border focus:border-amber-400 rounded-xl h-11 px-3 text-sm font-bold text-navy-900 bg-white"
-                >
-                  <option value="">-- Pilih Sahabat Safar --</option>
-                  {batchMates.map(m => (
-                    <option key={m.userId} value={m.userId}>
-                      {m.fullName}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="space-y-2">
-                  <Input
-                    disabled={locked}
-                    value={sahabatSafar}
-                    onChange={e => {
-                      setSahabatSafar(e.target.value);
-                      scheduleAutosave(6);
-                    }}
-                    placeholder="Nama Sahabat Safar Anda..."
-                    className="text-sm border-warm-border focus:border-amber-400 rounded-xl h-11"
-                  />
-                  <p className="text-[11px] text-slate-400 italic">
-                    Belum ada peserta lain terdaftar di batch Anda. Anda tetap bisa mengetikkan nama manual.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {sahabatSafar && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center shrink-0 text-sm">
-                  {sahabatSafar.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-emerald-900">Sahabat Safar Terhubung: {sahabatSafar}</p>
-                  <p className="text-[10px] text-emerald-700">Tombol &quot;Ingatkan Sahabat Safar&quot; di Dashboard siap mengirimkan notifikasi.</p>
-                </div>
-              </div>
-            )}
           </div>
         );
     }
@@ -1096,16 +1222,16 @@ interface BatchMate {
       <div className="text-7xl mb-2">📖</div>
       <div className="text-3xl mb-3">✨✨</div>
       <h2 className="text-2xl font-black text-navy-900 mb-2">Journey Setup Selesai!</h2>
-      <p className="text-slate-500 text-sm mb-5 max-w-xs">Kontrak perjalanan Anda telah selesai disimpan.</p>
+      <p className="text-slate-500 text-sm mb-5 max-w-xs">Personal Transformation Project perjalanan Anda telah selesai disimpan.</p>
       <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold mb-2 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700 border border-navy-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
         {ptpStatus === "LOCKED" ? <Lock className="h-3 w-3" /> : <Edit3 className="h-3 w-3" />}
-        Status Kontrak: {ptpStatus}
+        Status Personal Transformation Project: {ptpStatus}
       </div>
-      {ptpStatus === "EDITABLE" && <p className="text-xs text-slate-400 mb-6 max-w-xs">PTP masih dapat diperbarui hingga Admin mengunci kontrak.</p>}
+      {ptpStatus === "EDITABLE" && <p className="text-xs text-slate-400 mb-6 max-w-xs">PTP masih dapat diperbarui hingga Admin mengunci Personal Transformation Project.</p>}
       <div className="w-full max-w-sm bg-white border border-warm-border rounded-2xl p-4 shadow-2xs mb-6 text-left">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ringkasan Kontrak Anda</p>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ringkasan Personal Transformation Project Anda</p>
         <div className="space-y-2.5">
-          <div className="flex justify-between items-center"><span className="text-sm text-slate-600">6 Bagian</span><span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Selesai</span></div>
+          <div className="flex justify-between items-center"><span className="text-sm text-slate-600">5 Bagian</span><span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Selesai</span></div>
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Terakhir diubah</span><span className="text-sm font-semibold text-navy-900">{lastSaved ? `Hari ini, ${lastSaved.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}` : "Baru saja"}</span></div>
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Coach</span><span className="text-sm font-semibold text-navy-900 truncate max-w-[150px]">{coachName}</span></div>
         </div>
@@ -1137,7 +1263,7 @@ interface BatchMate {
         </div>
         <div className="w-px h-7 bg-warm-border shrink-0" />
         <div>
-          <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Status Kontrak PTP</span>
+          <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Status Personal Transformation Project</span>
           <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] mt-0.5 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
             {ptpStatus === "LOCKED" ? <Lock className="h-2.5 w-2.5" /> : <Edit3 className="h-2.5 w-2.5" />}{ptpStatus}
           </span>
@@ -1162,7 +1288,7 @@ interface BatchMate {
     <div className="flex flex-col h-full bg-white overflow-y-auto">
       <div className="p-5 border-b border-warm-border">
         <h2 className="text-base font-black text-navy-900">Journey Setup</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Kontrak Perjalanan 90 Hari</p>
+        <p className="text-xs text-slate-400 mt-0.5">Personal Transformation Project 90 Hari</p>
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-sm font-bold text-navy-900">{progressPct}% Complete</span>
@@ -1171,7 +1297,7 @@ interface BatchMate {
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
-          <p className="text-xs text-slate-400 mt-1">{completedCount} dari 6 bagian selesai</p>
+          <p className="text-xs text-slate-400 mt-1">{completedCount} dari 5 bagian selesai</p>
         </div>
       </div>
       <div className="flex-1 p-3">
@@ -1250,7 +1376,7 @@ interface BatchMate {
                   <span>Kembali ke Home</span>
                 </button>
                 <h1 className="text-xl font-black text-navy-900 leading-tight">Journey Setup</h1>
-                <p className="text-xs text-slate-400 mt-0.5">Kontrak Perjalanan 90 Hari</p>
+                <p className="text-xs text-slate-400 mt-0.5">Personal Transformation Project 90 Hari</p>
               </div>
 
               {/* Info bar */}
@@ -1278,7 +1404,7 @@ interface BatchMate {
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">{completedCount} dari 6 bagian selesai</p>
+                <p className="text-[11px] text-slate-400 mt-1">{completedCount} dari 5 bagian selesai</p>
               </div>
             </div>
 
@@ -1334,7 +1460,7 @@ interface BatchMate {
               {/* Step dots */}
               <div className="bg-slate-50 border-t border-warm-border px-4 py-2.5 flex items-center justify-between">
                 <StepDots />
-                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">STEP {activeSection} OF 6</span>
+                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">STEP {activeSection} OF 5</span>
               </div>
             </div>
 
@@ -1354,7 +1480,7 @@ interface BatchMate {
                 <ArrowLeft className="h-4 w-4" />Sebelumnya
               </Button>
               <Button onClick={goToNext} className="flex-1 flex items-center justify-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 font-bold shadow-sm">
-                {activeSection === 6 ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
+                {activeSection === 5 ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -1407,7 +1533,7 @@ interface BatchMate {
                       <ArrowLeft className="h-4 w-4" /><span className="text-sm font-semibold">Sebelumnya</span>
                     </Button>
                     <Button onClick={goToNext} className="flex items-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 font-bold shadow-sm">
-                      <span className="text-sm">{activeSection === 6 ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
+                      <span className="text-sm">{activeSection === 5 ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

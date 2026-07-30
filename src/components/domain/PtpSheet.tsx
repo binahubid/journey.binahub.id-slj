@@ -121,11 +121,11 @@ export function PtpSheet({ open, onOpenChange = () => {}, readOnly = false }: Pt
   };
 
   const areaList = [
-    { id: "Spiritual Growth", label: "Spiritual Growth", desc: "Kedisiplinan ibadah & kedekatan dengan Allah" },
-    { id: "Personal Development", label: "Personal Development", desc: "Integritas, kesabaran, & kontrol emosi" },
-    { id: "Family Bonding", label: "Family Bonding", desc: "Keharmonisan keluarga & kepemimpinan rumah tangga" },
-    { id: "Leadership / Professional Excellence", label: "Leadership / Professional Excellence", desc: "Etos kerja & keteladanan dalam karir" },
-    { id: "Community Impact", label: "Community Impact", desc: "Kebermanfaatan & kontribusi sosial" },
+    { id: "Spiritual Growth", label: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT" },
+    { id: "Personal Development", label: "Personal Development", desc: "hubungan kita dengan diri sendiri" },
+    { id: "Leadership Excellence", label: "Leadership/Profesional Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan" },
+    { id: "Relationship", label: "Relationship", desc: "hubungan kita dengan orang lain" },
+    { id: "Community Impact", label: "Community Impact", desc: "dampak terhadap lingkungan sekitar" },
   ];
 
   return (
@@ -245,8 +245,8 @@ export function PtpSheet({ open, onOpenChange = () => {}, readOnly = false }: Pt
                   <p className="text-slate-600">Jadwal subuh (misal: <em>Bangun jam 04.00 WIB setiap hari</em>)</p>
                 </div>
                 <div className="bg-white p-2 rounded-lg border border-amber-200/60 shadow-2xs">
-                  <span className="font-bold text-[#0B2C6B] block">4. Biaya / Sedekah</span>
-                  <p className="text-slate-600">Nominal ikhtiar (misal: <em>Sedekah subuh Rp 20.000/hari</em>)</p>
+                  <span className="font-bold text-[#0B2C6B] block">4. Biaya</span>
+                  <p className="text-slate-600">Nominal ikhtiar (misal: <em>Budget / alokasi nominal Rp 20.000/hari</em>)</p>
                 </div>
               </div>
             </div>
@@ -288,27 +288,15 @@ export function PtpSheet({ open, onOpenChange = () => {}, readOnly = false }: Pt
             </div>
           </div>
 
-          {/* Section 6: TIM PENDUKUNG */}
-          <div className="bg-white p-5 rounded-xl border border-warm-border space-y-3 shadow-2xs">
-            <div className="flex items-center space-x-2 text-navy-900 font-bold text-sm">
-              <span className="h-6 w-6 rounded-full bg-navy-900 text-accent text-xs flex items-center justify-center font-extrabold">6</span>
-              <h4>TIM PENDUKUNG</h4>
+          {/* Section 6: TIM PENDUKUNG (DITENTUKAN OLEH ADMIN) */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-warm-border space-y-2">
+            <div className="flex items-center space-x-2 text-navy-900 font-bold text-xs">
+              <ShieldCheck className="h-4 w-4 text-amber-600" />
+              <h4>TIM PENDUKUNG (DITENTUKAN OLEH ADMIN)</h4>
             </div>
-
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Input
-                label="Nama Coach"
-                value={coachName}
-                onChange={(e) => setCoachName(e.target.value)}
-                className="text-xs"
-              />
-              <Input
-                label="Sahabat Safar"
-                value={sahabatSafar}
-                onChange={(e) => setSahabatSafar(e.target.value)}
-                className="text-xs"
-              />
-            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Coach Pendamping dan Sahabat Safar akan ditentukan oleh Admin berdasarkan evaluasi Initial Process Anda.
+            </p>
           </div>
 
           {/* Section 8: REFLEKSI AKHIR */}
@@ -334,7 +322,7 @@ export function PtpSheet({ open, onOpenChange = () => {}, readOnly = false }: Pt
             className="w-full bg-navy-900 hover:bg-black text-accent font-bold text-xs gap-2 py-5 rounded-lg shadow-sm"
           >
             <Save className="h-4 w-4" />
-            {loading ? "Menyimpan PTP..." : saved ? "✓ Kontrak PTP Tersimpan" : "Simpan Kontrak PTP Digital"}
+            {loading ? "Menyimpan PTP..." : saved ? "✓ Personal Transformation Project Tersimpan" : "Simpan Personal Transformation Project Digital"}
           </Button>
         </SheetFooter>
       </SheetContent>
