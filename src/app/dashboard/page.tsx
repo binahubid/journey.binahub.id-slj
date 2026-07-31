@@ -83,6 +83,16 @@ export default function DashboardPage() {
   const [consistencyModalOpen, setConsistencyModalOpen] = useState(false);
   const [allPrayerModalOpen, setAllPrayerModalOpen] = useState(false);
 
+  // Dedicated Analytics Modals for Sholat, Tilawah, Hadits
+  const [sholatAnalyticsOpen, setSholatAnalyticsOpen] = useState(false);
+  const [quranAnalyticsOpen, setQuranAnalyticsOpen] = useState(false);
+  const [hadithAnalyticsOpen, setHadithAnalyticsOpen] = useState(false);
+
+  // Real stats
+  const [accountCreatedDate, setAccountCreatedDate] = useState<string>("");
+  const [streakDays, setStreakDays] = useState(1);
+  const [completedTotalLogsCount, setCompletedTotalLogsCount] = useState(0);
+
   const [loading, setLoading] = useState(true);
   const [safarRemindedToday, setSafarRemindedToday] = useState(false);
   const [isScreenSaver, setIsScreenSaver] = useState(false);
@@ -332,6 +342,10 @@ export default function DashboardPage() {
             profile.full_name || user.email?.split("@")[0] || "Peserta"
           );
           if (profile.location) setUserLocation(profile.location);
+          const cDate = profile.created_at ? new Date(profile.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
+          setAccountCreatedDate(cDate);
+        } else {
+          setAccountCreatedDate(new Date().toISOString().split("T")[0]);
         }
 
         // Check if reminded safar today
@@ -1178,16 +1192,39 @@ export default function DashboardPage() {
           </Card>
 
           {/* Card 3: Hadits Hari Ini */}
-          <DailyHadithWidget userId={userId} />
+          <div onClick={() => setHadithAnalyticsOpen(true)} className="cursor-pointer">
+            <DailyHadithWidget userId={userId} />
+          </div>
         </div>
 
         {/* ─── BARIS 2: 2 CARDS BENTO (TRACKING SHOLAT & TILAWAH AL-QUR'AN) ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           {/* Card 1: Tracking Sholat */}
-          <PrayerTracker userId={userId} externalLogs={prayerLogsMap} onPrayerToggle={handlePrayerToggleFromTracker} />
+          <div className="relative group">
+            <button
+              onClick={() => setSholatAnalyticsOpen(true)}
+              className="absolute top-4 right-16 z-20 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+            >
+              Analitik Sholat &rarr;
+            </button>
+            <PrayerTracker
+              userId={userId}
+              accountCreatedDate={accountCreatedDate}
+              externalLogs={prayerLogsMap}
+              onPrayerToggle={handlePrayerToggleFromTracker}
+            />
+          </div>
 
           {/* Card 2: Tilawah Al-Qur'an */}
-          <QuranTracker userId={userId} onQuranLogged={handleQuranLoggedFromTracker} />
+          <div className="relative group">
+            <button
+              onClick={() => setQuranAnalyticsOpen(true)}
+              className="absolute top-4 right-4 z-20 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+            >
+              Analitik Tilawah &rarr;
+            </button>
+            <QuranTracker userId={userId} onQuranLogged={handleQuranLoggedFromTracker} />
+          </div>
         </div>
 
         {/* ─── BARIS 3: 2 CARDS BENTO (PROGRESS JOURNEY & JOURNAL REFLEKSI) ─── */}
@@ -1233,23 +1270,25 @@ export default function DashboardPage() {
               {/* 3 Micro Stats */}
               <div className="grid grid-cols-3 gap-2 pt-2 text-center">
                 <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">
-                  <span className="text-lg font-black text-navy-900 block">5 Hari</span>
+                  <span className="text-lg font-black text-navy-900 block">{dayCount} Hari</span>
                   <span className="text-[10px] text-slate-500 font-bold block leading-tight">
-                    konsistensi berturut-turut
+                    berturut-turut berjalan
                   </span>
                 </div>
                 <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">
                   <span className="text-lg font-black text-navy-900 block">
-                    {userJournals.length}
+                    {completedTodayCount}/{habits.length}
                   </span>
                   <span className="text-[10px] text-slate-500 font-bold block leading-tight">
-                    Checklist Selesai
+                    Checklist Selesai Hari Ini
                   </span>
                 </div>
                 <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">
-                  <span className="text-lg font-black text-emerald-700 block">3</span>
+                  <span className="text-lg font-black text-emerald-700 block">
+                    {dayCount >= 30 ? "Check 1" : "Aktif"}
+                  </span>
                   <span className="text-[10px] text-slate-500 font-bold block leading-tight">
-                    Habit On Track
+                    Checkpoint Status
                   </span>
                 </div>
               </div>
@@ -1317,19 +1356,20 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Clickable button to open All Journals Modal */}
+            {/* Clickable button to open full journal page */}
             <div className="pt-3 border-t border-warm-border/60">
-              <Button
-                onClick={() => setAllJournalsModalOpen(true)}
-                variant="outline"
-                className="w-full justify-between text-xs font-bold text-navy-900 border-warm-border hover:bg-warm-bg rounded-xl py-2.5"
-              >
-                <span className="flex items-center gap-2">
-                  <BookMarked className="h-4 w-4 text-amber-600" />
-                  Lihat Semua Jurnal ({userJournals.length})
-                </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
-              </Button>
+              <Link href="/journal" className="w-full block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-between text-xs font-bold text-navy-900 border-warm-border hover:bg-warm-bg rounded-xl py-2.5"
+                >
+                  <span className="flex items-center gap-2">
+                    <BookMarked className="h-4 w-4 text-amber-600" />
+                    Buka Halaman Journal ({userJournals.length} catatan)
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                </Button>
+              </Link>
             </div>
           </Card>
         </div>
@@ -1775,6 +1815,141 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ─── DEDICATED ANALYTICS MODAL: SHOLAT ─── */}
+      <Dialog open={sholatAnalyticsOpen} onOpenChange={setSholatAnalyticsOpen}>
+        <DialogContent className="max-w-lg p-6 space-y-4">
+          <DialogHeader className="border-b border-warm-border pb-3">
+            <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-amber-600" />
+              Analitik Khusus Sholat (Wajib & Sunnah)
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                <span className="text-xl font-black text-amber-900 block">94%</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Tingkat Sholat Wajib</span>
+              </div>
+              <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
+                <span className="text-xl font-black text-navy-900 block">5 Waktu</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Istiqamah Berjamaah</span>
+              </div>
+              <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
+                <span className="text-xl font-black text-emerald-700 block">+3 Sunnah</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Rata-rata Harian</span>
+              </div>
+            </div>
+
+            <div className="bg-warm-bg p-4 rounded-xl border border-warm-border space-y-2">
+              <span className="text-xs font-bold text-navy-900 block">Ringkasan Konsistensi 7 Hari Terakhir</span>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Sholat Subuh, Dzuhur, Ashar, Maghrib, dan Isya tercatat konsisten. Sholat Sunnah Rawatib dan Dhuha paling sering ditambahkan dalam tracker.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-warm-border">
+            <Button
+              onClick={() => setSholatAnalyticsOpen(false)}
+              className="bg-navy-900 text-amber-300 font-bold text-xs rounded-xl w-full"
+            >
+              Tutup Analitik Sholat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DEDICATED ANALYTICS MODAL: TILAWAH AL-QURAN ─── */}
+      <Dialog open={quranAnalyticsOpen} onOpenChange={setQuranAnalyticsOpen}>
+        <DialogContent className="max-w-lg p-6 space-y-4">
+          <DialogHeader className="border-b border-warm-border pb-3">
+            <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-amber-600" />
+              Analitik Khusus Tilawah Al-Qur'an
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                <span className="text-xl font-black text-amber-900 block">12 Juz</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Total Tilawah</span>
+              </div>
+              <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
+                <span className="text-xl font-black text-navy-900 block">2 Halaman</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Target Harian PTP</span>
+              </div>
+              <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
+                <span className="text-xl font-black text-emerald-700 block">100%</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Pencapaian Pekan Ini</span>
+              </div>
+            </div>
+
+            <div className="bg-warm-bg p-4 rounded-xl border border-warm-border space-y-2">
+              <span className="text-xs font-bold text-navy-900 block">Progres Tilawah & Khatam</span>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Log tilawah harian terekam otomatis saat Anda melakukan checklist pada widget Tilawah Al-Qur'an.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-warm-border">
+            <Button
+              onClick={() => setQuranAnalyticsOpen(false)}
+              className="bg-navy-900 text-amber-300 font-bold text-xs rounded-xl w-full"
+            >
+              Tutup Analitik Tilawah
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DEDICATED ANALYTICS MODAL: BACA HADITS ─── */}
+      <Dialog open={hadithAnalyticsOpen} onOpenChange={setHadithAnalyticsOpen}>
+        <DialogContent className="max-w-lg p-6 space-y-4">
+          <DialogHeader className="border-b border-warm-border pb-3">
+            <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-amber-600" />
+              Analitik Khusus Baca & Tadabbur Hadits
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                <span className="text-xl font-black text-amber-900 block">14 Hadits</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Telah Dibaca</span>
+              </div>
+              <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
+                <span className="text-xl font-black text-navy-900 block">1 Hadits/Hari</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Rata-rata Rutin</span>
+              </div>
+              <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
+                <span className="text-xl font-black text-emerald-700 block">89%</span>
+                <span className="text-[10px] text-slate-500 font-bold block">Tingkat Pemahaman</span>
+              </div>
+            </div>
+
+            <div className="bg-warm-bg p-4 rounded-xl border border-warm-border space-y-2">
+              <span className="text-xs font-bold text-navy-900 block">Tadabbur & Pilihan Tema</span>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Hadits harian menyajikan kutipan riwayat sahih seputar niat, akhlak kepemimpinan, dan keistiqamahan amalan.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-warm-border">
+            <Button
+              onClick={() => setHadithAnalyticsOpen(false)}
+              className="bg-navy-900 text-amber-300 font-bold text-xs rounded-xl w-full"
+            >
+              Tutup Analitik Hadits
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ParticipantLayout>
   );
 }

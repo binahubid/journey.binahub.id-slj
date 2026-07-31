@@ -450,24 +450,8 @@ export default function RefactoredJournalPage() {
               {/* 2. FORM REFLEKSI CARD */}
               <Card className="w-full bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xs space-y-5 sm:space-y-6 border border-slate-200/80">
                 
-                {/* SECTION 1: PERTANYAAN HARI INI */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                      <Lightbulb className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </div>
-                    <h3 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
-                      Pertanyaan Hari Ini
-                    </h3>
-                  </div>
-
-                  <div className="bg-[#FFFDF3] p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-amber-200/70 text-xs sm:text-sm font-bold text-[#071A33] leading-relaxed">
-                    {dailyPrompt}
-                  </div>
-                </div>
-
-                {/* SECTION 2: CERITAKAN PERJALANANMU HARI INI */}
-                <div className="space-y-2 border-t border-slate-100 pt-4 sm:pt-5">
+                {/* SECTION: CERITAKAN PERJALANANMU HARI INI */}
+                <div className="space-y-2 pt-1">
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
                       <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

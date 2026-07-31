@@ -87,7 +87,8 @@ const SUPPORT_EXCHANGE_OPTIONS = [
 
 function getGenerationLabel(yearStr: string): string {
   const year = parseInt(yearStr, 10);
-  if (isNaN(year) || year < 1920 || year > 2026) return "";
+  if (isNaN(year) || year < 1920 || year > 2030) return "";
+  if (year >= 2013) return "Gen Alpha";
   if (year >= 1997) return "Gen Z";
   if (year >= 1981) return "Millennial (Gen Y)";
   if (year >= 1965) return "Gen X";
@@ -106,6 +107,13 @@ export default function InitialProcessPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const handleStepChange = (nextStep: number) => {
+    setActiveStep(nextStep);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   // Layer 1
   const [layer1, setLayer1] = useState<Layer1Data>({
     gender: "",
@@ -119,13 +127,13 @@ export default function InitialProcessPage() {
     umrahExperience: "",
   });
 
-  // Layer 2 (100 Poin)
+  // Layer 2 (100 Poin - Starts from 0)
   const [layer2, setLayer2] = useState<Layer2Points>({
-    spiritual_growth: 30,
-    personal_development: 25,
-    relationship: 15,
-    leadership_excellence: 20,
-    community_impact: 10,
+    spiritual_growth: 0,
+    personal_development: 0,
+    relationship: 0,
+    leadership_excellence: 0,
+    community_impact: 0,
   });
 
   // Layer 3
@@ -510,7 +518,7 @@ export default function InitialProcessPage() {
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
               <Button
-                onClick={() => setActiveStep(2)}
+                onClick={() => handleStepChange(2)}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
                 Lanjut ke Layer 2: Prioritas <ChevronRight className="h-4 w-4" />
@@ -571,8 +579,12 @@ export default function InitialProcessPage() {
                       step="5"
                       value={val}
                       onChange={(e) => {
-                        const newV = parseInt(e.target.value, 10) || 0;
-                        setLayer2({ ...layer2, [item.key]: newV });
+                        const targetV = parseInt(e.target.value, 10) || 0;
+                        const currentTotalExceptThis = totalPoints - val;
+                        const maxForThis = Math.max(0, 100 - currentTotalExceptThis);
+                        if (targetV > val && totalPoints >= 100) return;
+                        const finalV = Math.min(targetV, maxForThis);
+                        setLayer2({ ...layer2, [item.key]: finalV });
                       }}
                       className="w-full accent-amber-500 cursor-pointer"
                     />
@@ -584,7 +596,7 @@ export default function InitialProcessPage() {
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
               <Button
                 variant="outline"
-                onClick={() => setActiveStep(1)}
+                onClick={() => handleStepChange(1)}
                 className="rounded-xl h-10 text-xs border-slate-200"
               >
                 <ChevronLeft className="h-4 w-4" /> Kembali
@@ -596,7 +608,7 @@ export default function InitialProcessPage() {
                     return;
                   }
                   setErrorMessage("");
-                  setActiveStep(3);
+                  handleStepChange(3);
                 }}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
@@ -672,11 +684,11 @@ export default function InitialProcessPage() {
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              <Button variant="outline" onClick={() => setActiveStep(2)} className="rounded-xl h-10 text-xs border-slate-200">
+              <Button variant="outline" onClick={() => handleStepChange(2)} className="rounded-xl h-10 text-xs border-slate-200">
                 <ChevronLeft className="h-4 w-4" /> Kembali
               </Button>
               <Button
-                onClick={() => setActiveStep(4)}
+                onClick={() => handleStepChange(4)}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
                 Lanjut ke Journey Preference <ChevronRight className="h-4 w-4" />
@@ -848,7 +860,7 @@ export default function InitialProcessPage() {
             </div>
 
             <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-              <Button variant="outline" onClick={() => setActiveStep(3)} className="rounded-xl h-10 text-xs border-slate-200">
+              <Button variant="outline" onClick={() => handleStepChange(3)} className="rounded-xl h-10 text-xs border-slate-200">
                 <ChevronLeft className="h-4 w-4" /> Kembali
               </Button>
               <Button

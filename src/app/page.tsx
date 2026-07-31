@@ -68,62 +68,62 @@ export default function LandingPage() {
     {
       question: "Apakah program ini hanya untuk level eksekutif/manajer?",
       answer:
-        "Program dirancang khusus untuk berbagai jenjang kepemimpinan di organisasi — mulai dari Executive dan Senior Leaders, Manager dan Supervisor, hingga High Performing Employees dan Future Leaders yang sedang disiapkan naik jenjang. Entrepreneurs dan Professionals juga bisa bergabung lewat perusahaan/mitra penyelenggara yang mendaftarkan mereka.",
+        "Program dirancang khusus untuk berbagai jenjang kepemimpinan di organisasi, mulai dari Executive dan Senior Leaders, Manager dan Supervisor, hingga High Performing Employees dan Future Leaders yang sedang disiapkan naik jenjang. Entrepreneurs dan Professionals juga bisa bergabung lewat perusahaan/mitra penyelenggara yang mendaftarkan mereka.",
     },
     {
       question: "Apa itu Spiritual Leadership Journey (SLJ)?",
       answer:
-        "SLJ adalah program pendampingan 90 hari dari BinaJourney dan mitranya yang mengubah pengalaman Umrah menjadi perjalanan transformasi kepemimpinan yang berkelanjutan — melalui empat tahap: Muhasabah, Niyyah, Mujahadah, dan Istiqamah — didampingi coach, Sahabat Safar, dan platform digital untuk mencatat progres harian.",
+        "SLJ adalah program pendampingan 90 hari dari BinaJourney dan mitranya yang mengubah pengalaman Umrah menjadi perjalanan transformasi yang berkelanjutan melalui empat tahap: Muhasabah, Niyyah, Mujahadah, dan Istiqamah didampingi coach, Sahabat Safar, dan platform digital untuk mencatat progres harian.",
     },
     {
       question: "Mengapa pendampingan berlangsung selama 90 hari?",
       answer:
-        "90 hari bukan angka acak. Riset habit formation dari University College London (Lally et al., 2010) menemukan rata-rata 66 hari dibutuhkan untuk sebuah kebiasaan baru menjadi otomatis (dengan rentang 18–254 hari). Kami memilih 90 hari sebagai margin yang cukup panjang untuk mengakomodasi variasi tersebut, sekaligus cukup terstruktur untuk tetap fokus. Program dibagi ke tiga checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur.",
+        "90 hari bukan angka acak. Riset habit formation dari University College London (Lally et al., 2010) menemukan rata-rata 66 hari dibutuhkan untuk sebuah kebiasaan baru menjadi otomatis (dengan rentang 18 hingga 254 hari). Kami memilih 90 hari sebagai durasi yang diharapkan cukup untuk mengakomodasi variasi tersebut, sekaligus cukup terstruktur untuk tetap fokus. Program dibagi ke tiga checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur.",
     },
     {
       question: "Apakah saya akan didampingi oleh coach?",
       answer:
-        "Ya. Setiap peserta didampingi coach personal sejak sebelum keberangkatan (coaching debrief) hingga rutin setelah pulang (coaching & mentoring), memberikan ulasan dan dukungan secara personal di sepanjang 90 hari.",
+        "Ya, akan ada sesi-sesi khusus bersama Coach selama program berlangsung.",
     },
     {
       question: "Bagaimana jika saya tertinggal atau melewatkan beberapa hari?",
       answer:
-        "Tidak masalah — SLJ dirancang tanpa rasa bersalah saat ada hari yang terlewat. Sistem hanya menandai untuk membantu Anda dan coach tahu kapan perlu perhatian lebih, bukan untuk menghakimi. Anda bisa melanjutkan kapan saja.",
+        "Tidak masalah, SLJ dirancang tanpa rasa bersalah saat ada hari yang terlewat. Sistem hanya menandai untuk membantu Anda dan coach tahu kapan perlu perhatian lebih, bukan untuk menghakimi. Anda bisa melanjutkan kapan saja.",
     },
     {
       question: "Apakah saya harus membuka aplikasi setiap hari?",
       answer:
-        "Tidak wajib, tapi disarankan — mengisi habit harian dan jurnal singkat membantu Anda tetap terhubung dengan niat awal. Coach dan Sahabat Safar juga akan menghubungi Anda jika progres perlu didampingi lebih intensif.",
+        "Tidak wajib, tapi disarankan, mengisi habit harian dan jurnal singkat membantu Anda tetap terhubung dengan niat awal. Coach dan Sahabat Safar juga akan menghubungi Anda jika progres perlu didampingi lebih intensif.",
     },
     {
       question: "Mengapa perubahan sering tidak bertahan setelah umrah?",
       answer:
-        "Karena semangat spiritual yang muncul di Tanah Suci sering tidak punya struktur pendampingan saat kembali ke rutinitas. SLJ hadir mengisi celah itu — lewat rencana aksi tertulis (PTP), coach, dan Sahabat Safar yang saling menjaga selama 90 hari setelah pulang.",
+        "Karena semangat spiritual yang muncul di Tanah Suci sering tidak punya struktur pendampingan saat kembali ke rutinitas. SLJ hadir mengisi celah itu lewat rencana aksi tertulis (PTP), Coach, dan Sahabat Safar yang saling menjaga selama total 90 hari.",
     },
     {
       question: "Apakah SLJ hanya untuk jamaah umrah?",
       answer:
-        "Program dirancang untuk peserta yang menjalani perjalanan Umrah bersama BinaJourney, karena tahap Muhasabah, Niyyah, dan Mujahadah terjadi di sepanjang persiapan dan pelaksanaan perjalanan tersebut. Tahap Istiqamah setelah pulang adalah inti dari pendampingan digitalnya. Pendaftaran dilakukan lewat perusahaan atau mitra perjalanan anda.",
+        "Ya, saat ini program SLJ menggunakan moment perjalanan umrah untuk membantu proses transformasi diri",
     },
     {
       question: "Apa itu Kode Program dan dari mana saya mendapatkannya?",
       answer:
-        "Kode Program adalah kode unik yang menghubungkan akun Anda ke program SLJ di batch keberangkatan tertentu. Kode ini diberikan oleh perusahaan, komunitas, atau mitra penyelenggara yang mendaftarkan Anda — bukan dibeli langsung lewat website. Setelah membuat akun, Anda memasukkan Kode Program ini untuk mengaktifkan akses ke program.",
+        "Kode Program adalah kode unik yang menghubungkan akun Anda ke program SLJ di batch keberangkatan tertentu. Kode ini diberikan oleh BinaHub kepada perusahaan, komunitas, atau mitra penyelenggara yang mendaftarkan Anda. Setelah membuat akun, masukkan Kode Program ini untuk mengaktifkan akses ke program",
     },
     {
       question: "Apa yang akan saya lakukan selama 90 hari?",
       answer:
-        "Empat tahap: Muhasabah (mengenali diri sebelum berangkat), Niyyah (meluruskan arah dan menyusun Personal Transformation Project menjelang berangkat), Mujahadah (menjalani ibadah dan perubahan bermakna di Madinah & Makkah), dan Istiqamah (menjaga perubahan jadi kebiasaan setelah pulang ke rumah) — semuanya didampingi coach dan tercatat di platform digital kami.",
+        "Empat tahap: Muhasabah (mengenali diri sebelum berangkat), Niyyah (meluruskan arah dan menyusun Personal Transformation Project menjelang berangkat), Mujahadah (menjalani ibadah dan perubahan bermakna di Madinah & Makkah), dan Istiqamah (menjaga perubahan jadi kebiasaan setelah pulang ke rumah), semuanya didampingi coach dan tercatat di platform digital kami.",
     },
     {
       question: "Apakah saya bisa mengubah Personal Transformation Project (PTP)?",
       answer:
-        "PTP adalah komitmen yang Anda tulis sendiri di awal perjalanan, jadi perubahannya memang bisa diajukan — misalnya jika target awal ternyata kurang realistis — tapi melalui persetujuan coach, supaya PTP tetap menjadi kontrak perubahan yang serius, bukan berubah sepihak.",
+        "PTP adalah komitmen yang Anda tulis sendiri di awal perjalanan, jadi perubahannya memang bisa diajukan, misalnya jika target awal ternyata kurang realistis, tapi melalui persetujuan coach, supaya PTP tetap menjadi kontrak perubahan yang serius, bukan berubah sepihak.",
     },
     {
       question: "Bagaimana progres saya diukur?",
       answer:
-        "Melalui check point dan platform digital binahub.",
+        "Melalui checkpoint dan platform digital binahub.",
     },
     {
       question: "Bagaimana cara bergabung?",
@@ -288,14 +288,14 @@ export default function LandingPage() {
                   <span className="text-2xl sm:text-3xl font-extrabold text-[#C79A3C] font-serif block">01</span>
                   <h4 className="font-bold text-[#0F1E3D] text-sm sm:text-base">Spirit Menurun</h4>
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                    Bukan karena iman hilang, tapi karena rutinitas lama kembali mengambil alih.
+                    Pada dasarnya iman naik dan turun tergantung kondisi diri dan lingkungan.
                   </p>
                 </div>
 
                 {/* 02 */}
                 <div className="space-y-1.5 sm:space-y-2">
                   <span className="text-2xl sm:text-3xl font-extrabold text-[#C79A3C] font-serif block">02</span>
-                  <h4 className="font-bold text-[#0F1E3D] text-sm sm:text-base">Target Menghilang</h4>
+                  <h4 className="font-bold text-[#0F1E3D] text-sm sm:text-base">Target Perubahan Kurang Jelas</h4>
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
                     Niat tanpa rencana berubah menjadi harapan yang perlahan terlupakan.
                   </p>
@@ -306,32 +306,32 @@ export default function LandingPage() {
                   <span className="text-2xl sm:text-3xl font-extrabold text-[#C79A3C] font-serif block">03</span>
                   <h4 className="font-bold text-[#0F1E3D] text-sm sm:text-base">Kesibukan Mengambil Alih</h4>
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                    Meeting, deadline, target pekerjaan, semua datang lebih cepat daripada kebiasaan baru terbentuk.
+                    Meeting, deadline, semua rutinitas harian kembali menyita waktu sebelum kebiasaan baru terbentuk.
                   </p>
                 </div>
 
                 {/* 04 */}
                 <div className="space-y-1.5 sm:space-y-2">
                   <span className="text-2xl sm:text-3xl font-extrabold text-[#C79A3C] font-serif block">04</span>
-                  <h4 className="font-bold text-[#0F1E3D] text-sm sm:text-base">Tidak Ada Accountability</h4>
+                  <h4 className="font-bold text-[#0F1E3D] text-sm sm:text-base">Tidak Ada Akuntabilitas</h4>
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                    Tidak ada coach, tidak ada partner, tidak ada yang mengingatkan ketika mulai turun. Bahkan secara struktural, pemerintah hanya menyediakan pembinaan sebelum keberangkatan, tanpa program resmi pasca-kepulangan.<sup className="text-[#C79A3C]">1</sup>
+                    Kurangnya pendampingan, mitra, dan komunitas yang saling mengingatkan ketika semangat mulai turun. Sistem yang menunjang perubahan diri juga biasanya kurang optimal untuk sebelum, saat, dan pasca kepulangan.<sup className="text-[#C79A3C]">1</sup>
                   </p>
                   <p className="text-[10px] text-slate-400 italic pt-1.5 leading-tight">
-                    <sup>1</sup> Sumber: kajian akademik tentang pembinaan pasca-haji Indonesia
+                    <sup>1</sup> Riset: Pembinaan Pasca Ibadah Haji Menuju Mabrur Sepanjang Hayat (2019, ResearchGate / Kajian Akademik Indonesia)
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* 2.4 Pull Quote Card (Bridge) & CTA - Navy Card dengan Warna Gold (Tanpa Aksen Border Kiri) */}
+            {/* 2.4 Pull Quote Card (Bridge) & CTA */}
             <div className="p-5 sm:p-8 rounded-2xl bg-[#0F1E3D] text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5 sm:gap-6">
               <div className="space-y-2 text-center sm:text-left">
                 <h4 className="text-xl sm:text-3xl font-serif text-[#C79A3C] font-semibold leading-tight">
                   &ldquo;Kami Tidak Mengubah Orang.&rdquo;
                 </h4>
                 <p className="text-sm sm:text-lg text-slate-200 leading-relaxed font-normal">
-                  Kami membantu menjaga komitmen yang sudah Anda bangun di Tanah Suci.
+                  Kami membantu proses transformasi diri untuk menjadi versi pribadi yang lebih baik.
                 </p>
                 <p className="text-xs sm:text-sm font-semibold italic text-[#C79A3C] pt-1">
                   Karena itu, kami membangun Spiritual Leadership Journey.
@@ -407,7 +407,7 @@ export default function LandingPage() {
               Perjalanan ke Baitullah mengubah cara kita memandang kehidupan. Istiqamah menentukan bagaimana kita menjalaninya.
             </blockquote>
             <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#C79A3C] font-extrabold pt-2 block">
-              BINAJOURNEY LEADERSHIP COUNCIL
+              BINAJOURNEY
             </p>
           </div>
         </section>
@@ -964,10 +964,9 @@ export default function LandingPage() {
                   tergantung jenis kebiasaan dan individunya.
                 </p>
                 <p className="text-xs sm:text-base text-slate-300 leading-relaxed font-normal">
-                  Kami memilih 90 hari sebagai margin yang cukup panjang untuk mengakomodasi variasi
+                  Kami memilih 90 hari sebagai durasi yang diharapkan cukup untuk mengakomodasi variasi
                   tersebut, sekaligus cukup terstruktur untuk tetap fokus. Program dibagi ke tiga
-                  checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur,
-                  bukan sekaligus.
+                  checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur.
                 </p>
               </div>
             </div>
@@ -989,13 +988,13 @@ export default function LandingPage() {
             {/* Header */}
             <div className="text-center space-y-2.5 sm:space-y-3 mb-10 sm:mb-16">
               <span className="text-[10px] sm:text-xs font-extrabold text-[#C79A3C] uppercase tracking-[0.25em] block">
-                AUDIENS SASARAN (WHO SHOULD ATTEND)
+                SASARAN AUDIENS (WHO SHOULD ATTEND)
               </span>
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-[#0F1E3D] tracking-tight">
                 Program Ini Untuk Anda
               </h2>
               <p className="text-xs sm:text-base md:text-lg text-slate-700 max-w-2xl mx-auto font-medium">
-                Dirancang khusus untuk 8 jenjang kepemimpinan dan profesional di organisasi yang mendaftar melalui perusahaan/mitra penyelenggara.
+                Dirancang khusus untuk para leader, profesional, dan para talent yang mendaftar melalui perusahaan/mitra penyelenggara.
               </p>
             </div>
 

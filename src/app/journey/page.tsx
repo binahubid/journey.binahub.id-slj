@@ -47,11 +47,12 @@ const SECTIONS = [
   { num: 2, title: "Niat Perubahan", subtitle: "Landasan komitmen ibadah karena Allah" },
   { num: 3, title: "Area Transformasi", subtitle: "Pilih area fokus dan tetapkan target 90 hari" },
   { num: 4, title: "Action Plan (Habit Engine)", subtitle: "Kebiasaan harian/mingguan yang dipantau" },
+  { num: 5, title: "Refleksi Akhir (90 Hari)", subtitle: "Evaluasi akhir perjalanan dan komitmen istiqamah" },
 ];
 
 // ─── Area List ───────────────────────────────────────────────────
 const AREA_LIST = [
-  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT", sel: "border-amber-600 bg-amber-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-amber-300" },
+  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah عَزَّ وَجَلَّ", sel: "border-amber-600 bg-amber-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-amber-300" },
   { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", sel: "border-blue-600 bg-blue-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-blue-300" },
   { id: "Leadership Excellence", icon: Award, label: "Leadership/Profesional Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", sel: "border-[#071A33] bg-[#071A33] text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-slate-400" },
   { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", sel: "border-rose-600 bg-rose-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-rose-300" },
@@ -537,10 +538,10 @@ interface BatchMate {
             </button>
             {guideOpen && (
               <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-3 -mt-2">
-                <ul className="text-sm text-amber-900 space-y-1.5">
-                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5 shrink-0">•</span> Apa hal terpenting yang paling ingin Anda ubah dalam 90 hari?</li>
-                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5 shrink-0">•</span> Apa kebiasaan yang paling sering menghambat potensi Anda?</li>
-                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5 shrink-0">•</span> Apa yang ingin Allah lihat berubah dari diri Anda?</li>
+                <ul className="text-sm text-amber-900 space-y-2">
+                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">1.</span> Kondisi hati dan aspek mana dalam hidup Anda saat ini yang paling membutuhkan petunjuk dan perbaikan dari Allah SWT?</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">2.</span> Kebiasaan, kekhilafan, atau kendala apa yang selama ini paling menghambat tumbuh kembang Anda sebagai hamba dan pemimpin?</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">3.</span> Jika perjalanan hidup Anda berakhir hari ini, hal penting apa yang paling Anda harapkan telah diperbaiki?</li>
                 </ul>
               </div>
             )}
@@ -562,24 +563,25 @@ interface BatchMate {
       case 2:
         return (
           <div className="space-y-4">
-            {/* Collapsible Hadith */}
+            {/* Collapsible Reflection Guide Niat */}
             <button
               type="button"
               onClick={() => setHadithOpen(v => !v)}
               className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-left hover:bg-amber-100/60 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <span className="text-amber-600 text-base leading-none">&ldquo;</span>
-                <span className="text-sm font-bold text-amber-800">Hadith tentang Niat</span>
+                <span className="text-amber-500 text-sm">✦</span>
+                <span className="text-sm font-bold text-amber-800">Reflection Guide Niat</span>
               </div>
               <ChevronRight className={`h-4 w-4 text-amber-500 transition-transform duration-200 ${hadithOpen ? "rotate-90" : ""}`} />
             </button>
             {hadithOpen && (
               <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-3 -mt-2">
-                <p className="text-sm text-amber-900 italic leading-relaxed font-medium">
-                  Sesungguhnya amal itu bergantung pada niatnya, dan sesungguhnya setiap orang akan mendapatkan sesuai dengan apa yang ia niatkan.
-                </p>
-                <p className="text-xs text-amber-700 mt-1.5 font-semibold">(HR. Bukhari & Muslim)</p>
+                <ul className="text-sm text-amber-900 space-y-2">
+                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">1.</span> Apakah niat utama Anda menunaikan Umrah murni karena Allah SWT dan kerinduan untuk bertransformasi?</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">2.</span> Perubahan bermakna apa yang ingin Anda bawa pulang agar memberi dampak positif bagi diri dan lingkungan?</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">3.</span> Komitmen konkret apa yang siap Anda jalankan secara istiqamah selama 90 hari ke depan?</li>
+                </ul>
               </div>
             )}
             <div>
@@ -783,17 +785,16 @@ interface BatchMate {
                             {/* 1. Kualitas */}
                             <div className="bg-white p-3.5 rounded-xl border border-purple-100 space-y-2">
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 w-full">
                                   <span className="text-xs font-extrabold text-purple-800">1. Indikator Kualitas</span>
-                                  <div className="group relative cursor-pointer">
+                                  <div className="group relative cursor-pointer ml-auto">
                                     <Info className="h-3.5 w-3.5 text-purple-400 hover:text-purple-600 transition-colors" />
-                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-purple-400/30">
+                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-purple-400/30 pointer-events-none">
                                       <p className="font-bold text-purple-300 mb-0.5">Rumus Skor Kualitas:</p>
                                       <p className="opacity-90 leading-tight">Diukur dengan Rating 1–5 Bintang pada Monitoring.<br/><span className="font-mono text-purple-200 block mt-1">Skor % = Bintang × 20%</span></p>
                                     </div>
                                   </div>
                                 </div>
-                                <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60">Rating 1–5 Bintang</span>
                               </div>
                               <Textarea disabled={locked} value={targetData.kualitas} onChange={e => updateField(area.id, "kualitas", e.target.value)} placeholder="Contoh: Sholat khusyu, tumakninah & selesai dzikir..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-purple-400 rounded-lg p-2.5 resize-y placeholder:italic" />
                             </div>
@@ -801,17 +802,16 @@ interface BatchMate {
                             {/* 2. Kuantitas */}
                             <div className="bg-white p-3.5 rounded-xl border border-blue-100 space-y-2">
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 w-full">
                                   <span className="text-xs font-extrabold text-blue-800">2. Indikator Kuantitas</span>
-                                  <div className="group relative cursor-pointer">
+                                  <div className="group relative cursor-pointer ml-auto">
                                     <Info className="h-3.5 w-3.5 text-blue-400 hover:text-blue-600 transition-colors" />
-                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-60 border border-blue-400/30">
+                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-60 border border-blue-400/30 pointer-events-none">
                                       <p className="font-bold text-blue-300 mb-0.5">Rumus Skor Kuantitas:</p>
                                       <p className="opacity-90 leading-tight">Perbandingan progres dari posisi awal (Baseline) ke Target 90 hari.<br/><span className="font-mono text-blue-200 block mt-1">Skor % = |Realisasi - Baseline| ÷ |Target - Baseline| × 100%</span></p>
                                     </div>
                                   </div>
                                 </div>
-                                <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">Baseline ➔ Target</span>
                               </div>
                               <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                                 <div>
@@ -828,17 +828,16 @@ interface BatchMate {
                             {/* 3. Waktu */}
                             <div className="bg-white p-3.5 rounded-xl border border-amber-100 space-y-2">
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 w-full">
                                   <span className="text-xs font-extrabold text-amber-800">3. Indikator Waktu</span>
-                                  <div className="group relative cursor-pointer">
+                                  <div className="group relative cursor-pointer ml-auto">
                                     <Info className="h-3.5 w-3.5 text-amber-400 hover:text-amber-600 transition-colors" />
-                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-amber-400/30">
+                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-amber-400/30 pointer-events-none">
                                       <p className="font-bold text-amber-300 mb-0.5">Rumus Skor Waktu:</p>
                                       <p className="opacity-90 leading-tight">Persentase jumlah hari konsistensi jadwal tepat waktu dalam 30 hari.<br/><span className="font-mono text-amber-200 block mt-1">Skor % = Hari Tepat Waktu ÷ 30 × 100%</span></p>
                                     </div>
                                   </div>
                                 </div>
-                                <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">Jadwal & Konsistensi</span>
                               </div>
                               <Textarea disabled={locked} value={targetData.waktu} onChange={e => updateField(area.id, "waktu", e.target.value)} placeholder="Contoh: Hadir di masjid 10 menit sebelum adzan..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-amber-400 rounded-lg p-2.5 resize-y placeholder:italic" />
                             </div>
@@ -846,17 +845,16 @@ interface BatchMate {
                             {/* 4. Biaya */}
                             <div className="bg-white p-3.5 rounded-xl border border-emerald-100 space-y-2">
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 w-full">
                                   <span className="text-xs font-extrabold text-emerald-800">4. Indikator Biaya / Finansial</span>
-                                  <div className="group relative cursor-pointer">
+                                  <div className="group relative cursor-pointer ml-auto">
                                     <Info className="h-3.5 w-3.5 text-emerald-400 hover:text-emerald-600 transition-colors" />
-                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-emerald-400/30">
+                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-emerald-400/30 pointer-events-none">
                                       <p className="font-bold text-emerald-300 mb-0.5">Rumus Skor Biaya:</p>
                                       <p className="opacity-90 leading-tight">Capaian nominal realisasi dibanding nominal target.<br/><span className="font-mono text-emerald-200 block mt-1">Skor % = Realisasi ÷ Target × 100%</span></p>
                                     </div>
                                   </div>
                                 </div>
-                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">Nominal Anggaran (Rp)</span>
                               </div>
                               <Textarea disabled={locked} value={targetData.biaya} onChange={e => updateField(area.id, "biaya", e.target.value)} placeholder="Contoh: Budget Rp 20.000 / hari via transfer infak..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-emerald-400 rounded-lg p-2.5 resize-y placeholder:italic" />
                             </div>
@@ -1173,6 +1171,54 @@ interface BatchMate {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        );
+      }
+
+      case 5: {
+        const isLockedDay89 = dayCount < 89;
+        if (isLockedDay89) {
+          return (
+            <div className="space-y-4">
+              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-8 text-center space-y-4 shadow-2xs">
+                <div className="h-14 w-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-2xs border border-amber-200">
+                  <Lock className="h-7 w-7" />
+                </div>
+                <div className="space-y-1.5 max-w-md mx-auto">
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-bold text-xs mb-1">
+                    Terkunci &bull; Hari ke-{dayCount} dari 90
+                  </Badge>
+                  <h3 className="text-base font-extrabold text-navy-900">
+                    Refleksi Akhir Program (90 Hari)
+                  </h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Fitur Refleksi Akhir Program ini akan terbuka secara otomatis pada <strong>Hari ke-89</strong> perjalanan Anda. Di sini Anda akan merangkum pencapaian, dampak perubahan, serta komitmen istiqamah pasca 90 hari.
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="space-y-4">
+            <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 space-y-1">
+              <h3 className="text-sm font-black text-navy-900 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-500 fill-amber-400" />
+                Refleksi Akhir & Komitmen Istiqamah
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Tuliskan pencapaian terbesar, pembelajaran paling berharga, dan janji istiqamah Anda pasca 90 hari program.
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-2 font-medium">1. Apa transformasi terbesar yang Anda rasakan selama 90 hari ini?</p>
+              <Textarea disabled={locked} placeholder="Tuliskan refleksi pencapaian Anda..." className="min-h-[140px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={2000} />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-2 font-medium">2. Komitmen konkret apa yang akan terus Anda jaga secara konsisten di masa mendatang?</p>
+              <Textarea disabled={locked} placeholder="Tuliskan komitmen istiqamah Anda..." className="min-h-[100px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={1000} />
             </div>
           </div>
         );

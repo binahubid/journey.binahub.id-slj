@@ -247,7 +247,7 @@ export default function AdminImpactReportPage() {
               }`}
             >
               <Building2 className="h-3.5 w-3.5" />
-              <span>Laporan Perusahaan (Group)</span>
+              <span>Group Report</span>
             </button>
             <button
               onClick={() => setViewMode("individual")}
@@ -258,7 +258,7 @@ export default function AdminImpactReportPage() {
               }`}
             >
               <User className="h-3.5 w-3.5" />
-              <span>Laporan Peserta (Individual)</span>
+              <span>Individual Report</span>
             </button>
           </div>
 
@@ -267,7 +267,7 @@ export default function AdminImpactReportPage() {
             onClick={handlePrint}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#C79A3C] hover:bg-[#b08732] text-[#0F1E3D] text-xs font-extrabold shadow-md transition-all cursor-pointer"
           >
-            <Download className="h-4 w-4" /> Export Board Meeting PDF
+            <Download className="h-4 w-4" /> Export Report to PDF
           </button>
         </div>
       </div>
@@ -613,7 +613,7 @@ export default function AdminImpactReportPage() {
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Kedisiplinan Kerja</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Peningkatan Quality Index</span>
                 <div className="text-3xl font-black text-[#0F1E3D]">94%</div>
                 <span className="text-[11px] font-semibold text-emerald-600">+12% dibanding baseline</span>
               </div>
@@ -625,13 +625,13 @@ export default function AdminImpactReportPage() {
               </div>
 
               <div className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Retensi &amp; Employee Engagement</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Peningkatan Produktivitas</span>
                 <div className="text-3xl font-black text-[#0F1E3D]">96%</div>
                 <span className="text-[11px] font-semibold text-emerald-600">Turnover mendekati 0%</span>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Indeks Kolaborasi Lintas Unit</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Efisiensi Biaya</span>
                 <div className="text-3xl font-black text-[#0F1E3D]">92%</div>
                 <span className="text-[11px] font-semibold text-emerald-600">Komunikasi antar-divisi lancar</span>
               </div>
@@ -678,7 +678,7 @@ export default function AdminImpactReportPage() {
 
                   <div className="pt-1 flex items-center justify-between text-[10px] font-bold text-slate-500 border-t border-slate-200/60">
                     <span>Produktivitas: <strong className="text-[#0F1E3D]">{p.productivity}</strong></span>
-                    <span>Disiplin: <strong className="text-[#0F1E3D]">{p.discipline}</strong></span>
+                    <span>Konsistensi: <strong className="text-[#0F1E3D]">{p.discipline}</strong></span>
                     <span className="text-emerald-600 font-black">{p.status}</span>
                   </div>
                 </div>

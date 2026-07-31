@@ -24,11 +24,37 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Auth provider & Security States
+  const [userEmail, setUserEmail] = useState("");
+  const [authProvider, setAuthProvider] = useState<"google" | "email">("email");
+  const [hasPassword, setHasPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [securityMsg, setSecurityMsg] = useState("");
+  const [securityErr, setSecurityErr] = useState("");
+  const [updatingSecurity, setUpdatingSecurity] = useState(false);
+
   useEffect(() => {
     async function loadSettings() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+
+        setUserEmail(user.email || "");
+
+        // Detect provider
+        const provider = user.app_metadata?.provider || user.identities?.[0]?.provider || "email";
+        if (provider === "google") {
+          setAuthProvider("google");
+        } else {
+          setAuthProvider("email");
+        }
+
+        // Check if user has encrypted password / password set indicator in localStorage or metadata
+        const passwordSetLocal = localStorage.getItem(`slj_pass_set_${user.id}`);
+        if (passwordSetLocal === "true" || provider === "email") {
+          setHasPassword(true);
+        }
 
         const { data: profile } = await supabase
           .from("profiles")
@@ -54,6 +80,56 @@ export default function SettingsPage() {
 
     loadSettings();
   }, []);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setSecurityErr("Password minimal 6 karakter");
+      return;
+    }
+    setUpdatingSecurity(true);
+    setSecurityErr("");
+    setSecurityMsg("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) localStorage.setItem(`slj_pass_set_${user.id}`, "true");
+
+      setHasPassword(true);
+      setNewPassword("");
+      setSecurityMsg(authProvider === "google" && !hasPassword ? "Password berhasil diset untuk akun Google!" : "Password berhasil diperbarui!");
+    } catch (err: any) {
+      setSecurityErr(err.message || "Gagal memperbarui password");
+    } finally {
+      setUpdatingSecurity(false);
+    }
+  };
+
+  const handleUpdateEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmail || !newEmail.includes("@")) {
+      setSecurityErr("Format email tidak valid");
+      return;
+    }
+    setUpdatingSecurity(true);
+    setSecurityErr("");
+    setSecurityMsg("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({ email: newEmail });
+      if (error) throw error;
+
+      setSecurityMsg(`Email verifikasi dikirimkan ke ${newEmail}. Silakan periksa inbox Anda.`);
+      setNewEmail("");
+    } catch (err: any) {
+      setSecurityErr(err.message || "Gagal memperbarui email");
+    } finally {
+      setUpdatingSecurity(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,7 +301,7 @@ export default function SettingsPage() {
                 </div>
               </TabsContent>
 
-              {/* Tab 2: Privasi & Data */}
+              {/* Tab 2: Privasi & Keamanan Account */}
               <TabsContent value="privasi" className="space-y-6">
                 <div className="space-y-3">
                   <label className="block text-sm font-semibold text-navy-900 flex items-center gap-1.5">
@@ -239,6 +315,114 @@ export default function SettingsPage() {
                     </div>
                     <Switch checked={journalPrivacy} onCheckedChange={setJournalPrivacy} />
                   </div>
+                </div>
+
+                {/* Keamanan & Password Management */}
+                <div className="space-y-4 pt-4 border-t border-warm-border">
+                  <label className="block text-sm font-semibold text-navy-900 flex items-center gap-1.5">
+                    <Lock className="h-4 w-4 text-accent" /> Pengaturan Keamanan Akun
+                  </label>
+
+                  {securityMsg && (
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+                      {securityMsg}
+                    </div>
+                  )}
+                  {securityErr && (
+                    <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                      {securityErr}
+                    </div>
+                  )}
+
+                  {/* Google registered user: Set Password / Change Password */}
+                  {authProvider === "google" && (
+                    <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-navy-900 block">Metode Login: Google OAuth</span>
+                          <span className="text-[11px] text-slate-600">
+                            {hasPassword ? "Fitur password aktif (Anda dapat merubah password akun Anda)" : "Anda terdaftar dengan Google. Set password di bawah untuk mengaktifkan fitur ganti password."}
+                          </span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase">
+                          Google Login
+                        </span>
+                      </div>
+
+                      <div className="pt-2 flex items-center gap-2">
+                        <Input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder={hasPassword ? "Masukkan password baru (min. 6 karakter)" : "Set password baru (min. 6 karakter)"}
+                          className="text-xs max-w-sm bg-white"
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleUpdatePassword}
+                          disabled={updatingSecurity || !newPassword}
+                          className="text-xs bg-navy-900 text-white font-bold"
+                        >
+                          {hasPassword ? "Ganti Password" : "Set Password"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Email registered user: Change Email & Change Password */}
+                  {authProvider === "email" && (
+                    <div className="space-y-4">
+                      {/* Change Email */}
+                      <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                        <div>
+                          <span className="text-xs font-bold text-navy-900 block">Email Terdaftar</span>
+                          <span className="text-[11px] text-slate-500">{userEmail}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="email"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            placeholder="Email baru..."
+                            className="text-xs max-w-sm bg-white"
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleUpdateEmail}
+                            disabled={updatingSecurity || !newEmail}
+                            className="text-xs bg-navy-900 text-white font-bold"
+                          >
+                            Ganti Email
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Change Password */}
+                      <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                        <div>
+                          <span className="text-xs font-bold text-navy-900 block">Password Akun</span>
+                          <span className="text-[11px] text-slate-500">Ubah password akun email Anda.</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Password baru (min 6 karakter)..."
+                            className="text-xs max-w-sm bg-white"
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleUpdatePassword}
+                            disabled={updatingSecurity || !newPassword}
+                            className="text-xs bg-navy-900 text-white font-bold"
+                          >
+                            Ganti Password
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

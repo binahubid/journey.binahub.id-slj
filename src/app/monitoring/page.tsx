@@ -847,7 +847,7 @@ export default function MonitoringPage() {
                               <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/30 hari` : "Belum Diisi"}</span>
                             </div>
                             <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-slate-500">Biaya / Sedekah</span>
+                              <span className="text-slate-500">Biaya / Anggaran</span>
                               <span className="font-bold text-emerald-700">{rep?.biayaActual ? `Rp ${rep.biayaActual}` : "Belum Diisi"}</span>
                             </div>
                           </div>
@@ -1068,7 +1068,7 @@ export default function MonitoringPage() {
             {/* 2. Real Calculated Success Projection Card */}
             <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-3 text-center">
               <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Proyeksi Kelulusan 90 Hari</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Persentase Konsistensi</span>
                 <p className="text-xs text-slate-500">Estimasi berbasis aktivitas real</p>
               </div>
               <div className="relative py-1">
@@ -1094,7 +1094,7 @@ export default function MonitoringPage() {
                 <div className="bg-slate-50 p-3 rounded-xl space-y-1">
                   <p className="font-bold text-navy-900 flex items-center gap-1.5">
                     <BookOpen className="h-3.5 w-3.5 text-amber-600" />
-                    Pelaporan 4 Dimensi
+                    4 Aspek Pengukuran
                   </p>
                   <p className="text-slate-600 leading-relaxed text-[11px]">
                     Pengisian Kualitas (1–5★), Kuantitas, Waktu, dan Biaya dilakukan pada akhir bulan 1, 2, dan 3.
@@ -1138,6 +1138,14 @@ export default function MonitoringPage() {
 
                 return (
                   <div className="space-y-4 py-2">
+                    {/* User PTP Target Context Banner */}
+                    {rep.targets.mainTarget && (
+                      <div className="bg-amber-50/80 border border-amber-200 p-3 rounded-xl space-y-1">
+                        <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider block">Sasaran Target PTP Anda:</span>
+                        <p className="text-xs font-medium text-navy-900 italic leading-relaxed">&ldquo;{rep.targets.mainTarget}&rdquo;</p>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
                       <span className="text-xs font-bold text-slate-600">Skor Capaian Area:</span>
                       <span className="text-sm font-extrabold text-emerald-600">{overallPct}% Berhasil</span>
@@ -1147,7 +1155,7 @@ export default function MonitoringPage() {
                       {/* 1. Kualitas */}
                       <div className="bg-purple-50/50 p-3.5 rounded-xl border border-purple-200 space-y-2">
                         <label className="font-bold text-purple-800 block">1. Kualitas (Mutu / Kekhusyukan)</label>
-                        <p className="text-[10px] text-slate-500">Target: {rep.targets.kualitas || "Khusyu & Tepat waktu"}</p>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kualitas || "Khusyu & Tepat waktu"}</p>
                         <div className="flex gap-1 py-1">
                           {[1, 2, 3, 4, 5].map(star => (
                             <button
@@ -1165,7 +1173,7 @@ export default function MonitoringPage() {
                       {/* 2. Kuantitas */}
                       <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-200 space-y-2">
                         <label className="font-bold text-blue-800 block">2. Kuantitas (Realisasi)</label>
-                        <p className="text-[10px] text-slate-500">Target: {rep.targets.kuantitas || "Target PTP"}</p>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kuantitas || "Target PTP"}</p>
                         <div className="space-y-1.5">
                           <Input
                             value={rep.kuantitasActual}
@@ -1179,7 +1187,7 @@ export default function MonitoringPage() {
                       {/* 3. Waktu */}
                       <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 space-y-2">
                         <label className="font-bold text-amber-800 block">3. Waktu (Hari Tepat Waktu)</label>
-                        <p className="text-[10px] text-slate-500">Target: {rep.targets.waktu || "Jadwal Tepat Waktu"}</p>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.waktu || "Jadwal Tepat Waktu"}</p>
                         <Input
                           type="number" min={0} max={30}
                           value={rep.waktuActualDays}
@@ -1191,8 +1199,8 @@ export default function MonitoringPage() {
 
                       {/* 4. Biaya */}
                       <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 space-y-2">
-                        <label className="font-bold text-emerald-800 block">4. Biaya / Sedekah (Nominal)</label>
-                        <p className="text-[10px] text-slate-500">Target: {rep.targets.biaya || "Sedekah Rp"}</p>
+                        <label className="font-bold text-emerald-800 block">4. Biaya / Anggaran (Nominal)</label>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.biaya || "Nominal Rp"}</p>
                         <Input
                           value={rep.biayaActual}
                           onChange={e => updateAreaReport(editingAreaModal, "biayaActual", e.target.value)}

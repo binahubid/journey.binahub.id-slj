@@ -12,6 +12,7 @@ interface PrayerTrackerProps {
   userId: string;
   onPrayerToggle?: (dateStr: string, prayerName: string, isCompleted: boolean) => void;
   externalLogs?: Record<string, boolean>;
+  accountCreatedDate?: string; // YYYY-MM-DD format
 }
 
 const MANDATORY_PRAYERS = [
@@ -55,7 +56,7 @@ const DAY_INITIALS: Record<number, string> = {
   6: "S", // Sabtu
 };
 
-export function PrayerTracker({ userId, onPrayerToggle, externalLogs }: PrayerTrackerProps) {
+export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, externalLogs }: PrayerTrackerProps) {
   const supabase = createClient();
   const [logs, setLogs] = useState<Record<string, boolean>>({});
   const [activeSunnahKeys, setActiveSunnahKeys] = useState<string[]>([]);
@@ -261,12 +262,17 @@ export function PrayerTracker({ userId, onPrayerToggle, externalLogs }: PrayerTr
                   </td>
                   {days.map((d) => {
                     const isChecked = !!logs[`${d.dateStr}_${p.key}`];
+                    const isLocked = !!(accountCreatedDate && d.dateStr < accountCreatedDate);
                     return (
                       <td key={d.dateStr} className="text-center py-2.5 px-1 w-9">
                         <Checkbox
                           checked={isChecked}
-                          onCheckedChange={() => togglePrayer(d.dateStr, p.key)}
-                          className="h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto"
+                          disabled={isLocked}
+                          onCheckedChange={() => !isLocked && togglePrayer(d.dateStr, p.key)}
+                          className={`h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto ${
+                            isLocked ? "opacity-30 cursor-not-allowed bg-slate-100" : ""
+                          }`}
+                          title={isLocked ? "Hari sebelum akun dibuat (terkunci)" : ""}
                         />
                       </td>
                     );
@@ -299,12 +305,17 @@ export function PrayerTracker({ userId, onPrayerToggle, externalLogs }: PrayerTr
                       </td>
                       {days.map((d) => {
                         const isChecked = !!logs[`${d.dateStr}_${p.key}`];
+                        const isLocked = !!(accountCreatedDate && d.dateStr < accountCreatedDate);
                         return (
                           <td key={d.dateStr} className="text-center py-2 px-1 w-9">
                             <Checkbox
                               checked={isChecked}
-                              onCheckedChange={() => togglePrayer(d.dateStr, p.key)}
-                              className="h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto"
+                              disabled={isLocked}
+                              onCheckedChange={() => !isLocked && togglePrayer(d.dateStr, p.key)}
+                              className={`h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto ${
+                                isLocked ? "opacity-30 cursor-not-allowed bg-slate-100" : ""
+                              }`}
+                              title={isLocked ? "Hari sebelum akun dibuat (terkunci)" : ""}
                             />
                           </td>
                         );
