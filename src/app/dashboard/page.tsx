@@ -1197,16 +1197,6 @@ export default function DashboardPage() {
             className="cursor-pointer group relative transition-all hover:scale-[1.005]"
             title="Klik untuk membuka Analitik & Tadabbur Hadits"
           >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setHadithAnalyticsOpen(true);
-              }}
-              title="Buka Analitik & Tadabbur Hadits"
-              className="absolute top-4 right-4 z-20 p-1.5 rounded-xl bg-amber-50/90 hover:bg-amber-100 border border-amber-200 text-amber-800 shadow-2xs transition-all opacity-80 group-hover:opacity-100 hover:scale-105 cursor-pointer"
-            >
-              <Maximize2 className="h-4 w-4 text-amber-700" />
-            </button>
             <DailyHadithWidget userId={userId} />
           </div>
         </div>
@@ -1218,9 +1208,9 @@ export default function DashboardPage() {
             <button
               onClick={() => setSholatAnalyticsOpen(true)}
               title="Buka Analitik Sholat"
-              className="absolute top-4 right-4 z-20 p-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 shadow-2xs transition-all cursor-pointer hover:scale-105"
+              className="absolute top-4.5 right-4 z-20 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer p-1"
             >
-              <Maximize2 className="h-4 w-4 text-amber-700" />
+              <Maximize2 className="h-4 w-4" />
             </button>
             <PrayerTracker
               userId={userId}
@@ -1230,15 +1220,12 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Card 2: Tilawah Al-Qur'an */}
-          <div className="relative group">
-            <button
-              onClick={() => setQuranAnalyticsOpen(true)}
-              title="Buka Analitik Tilawah Al-Qur'an"
-              className="absolute top-4 right-4 z-20 p-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 shadow-2xs transition-all cursor-pointer hover:scale-105"
-            >
-              <Maximize2 className="h-4 w-4 text-teal-700" />
-            </button>
+          {/* Card 2: Tilawah Al-Qur'an (Clickable to open Analytics) */}
+          <div
+            onClick={() => setQuranAnalyticsOpen(true)}
+            className="relative group cursor-pointer transition-all hover:scale-[1.005]"
+            title="Klik untuk membuka Analitik Tilawah Al-Qur'an"
+          >
             <QuranTracker userId={userId} onQuranLogged={handleQuranLoggedFromTracker} />
           </div>
         </div>
