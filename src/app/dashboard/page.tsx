@@ -1191,8 +1191,22 @@ export default function DashboardPage() {
             </div>
           </Card>
 
-          {/* Card 3: Hadits Hari Ini */}
-          <div onClick={() => setHadithAnalyticsOpen(true)} className="cursor-pointer">
+          {/* Card 3: Hadits Hari Ini (Clickable to open Analytics) */}
+          <div
+            onClick={() => setHadithAnalyticsOpen(true)}
+            className="cursor-pointer group relative transition-all hover:scale-[1.005]"
+            title="Klik untuk membuka Analitik & Tadabbur Hadits"
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setHadithAnalyticsOpen(true);
+              }}
+              title="Buka Analitik & Tadabbur Hadits"
+              className="absolute top-4 right-4 z-20 p-1.5 rounded-xl bg-amber-50/90 hover:bg-amber-100 border border-amber-200 text-amber-800 shadow-2xs transition-all opacity-80 group-hover:opacity-100 hover:scale-105 cursor-pointer"
+            >
+              <Maximize2 className="h-4 w-4 text-amber-700" />
+            </button>
             <DailyHadithWidget userId={userId} />
           </div>
         </div>
@@ -1203,9 +1217,10 @@ export default function DashboardPage() {
           <div className="relative group">
             <button
               onClick={() => setSholatAnalyticsOpen(true)}
-              className="absolute top-4 right-16 z-20 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+              title="Buka Analitik Sholat"
+              className="absolute top-4 right-4 z-20 p-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 shadow-2xs transition-all cursor-pointer hover:scale-105"
             >
-              Analitik Sholat &rarr;
+              <Maximize2 className="h-4 w-4 text-amber-700" />
             </button>
             <PrayerTracker
               userId={userId}
@@ -1219,9 +1234,10 @@ export default function DashboardPage() {
           <div className="relative group">
             <button
               onClick={() => setQuranAnalyticsOpen(true)}
-              className="absolute top-4 right-4 z-20 text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+              title="Buka Analitik Tilawah Al-Qur'an"
+              className="absolute top-4 right-4 z-20 p-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 shadow-2xs transition-all cursor-pointer hover:scale-105"
             >
-              Analitik Tilawah &rarr;
+              <Maximize2 className="h-4 w-4 text-teal-700" />
             </button>
             <QuranTracker userId={userId} onQuranLogged={handleQuranLoggedFromTracker} />
           </div>

@@ -44,7 +44,7 @@ import {
 // ─── Section Config ─────────────────────────────────────────────
 const SECTIONS = [
   { num: 1, title: "Hasil Muhasabah", subtitle: "Insight terbesar tentang diri Anda" },
-  { num: 2, title: "Niat Perubahan", subtitle: "Landasan komitmen ibadah karena Allah" },
+  { num: 2, title: "Niat Perubahan", subtitle: "Landasan komitmen ibadah karena Allah ﷻ" },
   { num: 3, title: "Area Transformasi", subtitle: "Pilih area fokus dan tetapkan target 90 hari" },
   { num: 4, title: "Action Plan (Habit Engine)", subtitle: "Kebiasaan harian/mingguan yang dipantau" },
   { num: 5, title: "Refleksi Akhir (90 Hari)", subtitle: "Evaluasi akhir perjalanan dan komitmen istiqamah" },
@@ -52,7 +52,7 @@ const SECTIONS = [
 
 // ─── Area List ───────────────────────────────────────────────────
 const AREA_LIST = [
-  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah عَزَّ وَجَلَّ", sel: "border-amber-600 bg-amber-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-amber-300" },
+  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah ﷻ", sel: "border-amber-600 bg-amber-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-amber-300" },
   { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", sel: "border-blue-600 bg-blue-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-blue-300" },
   { id: "Leadership Excellence", icon: Award, label: "Leadership/Profesional Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", sel: "border-[#071A33] bg-[#071A33] text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-slate-400" },
   { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", sel: "border-rose-600 bg-rose-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-rose-300" },
@@ -80,12 +80,12 @@ const SECTION_TIPS: Record<number, { title: string; tips: { icon: string; title:
       { icon: "✦", title: "Fokus pada perubahan", desc: "Tulis hal yang bisa Anda kendalikan dan ubah." },
       { icon: "✦", title: "Spesifik dan mendalam", desc: "Semakin spesifik, semakin mudah diukur progresnya." },
     ],
-    example: "\"Saya sering menunda ibadah penting karena merasa tidak punya waktu. Saya ingin menjadi pribadi yang lebih disiplin dan konsisten dalam beribadah kepada Allah.\"",
+    example: "\"Saya sering menunda ibadah penting karena merasa tidak punya waktu. Saya ingin menjadi pribadi yang lebih disiplin dan konsisten dalam beribadah kepada Allah ﷻ.\"",
   },
   2: {
     title: "Tips Menulis Niat",
     tips: [
-      { icon: "✦", title: "Awali dengan Bismillah", desc: "Mulai niat dengan nama Allah agar terjaga keikhlasannya." },
+      { icon: "✦", title: "Awali dengan Bismillah", desc: "Mulai niat dengan nama Allah ﷻ agar terjaga keikhlasannya." },
       { icon: "✦", title: "Tuliskan motivasi terdalam", desc: "Mengapa perubahan ini penting bagi Anda dan orang sekitar." },
       { icon: "✦", title: "Niat yang spesifik bertahan lebih lama", desc: "Niat yang jelas lebih mudah diingat di saat-saat sulit." },
     ],
@@ -104,6 +104,13 @@ const SECTION_TIPS: Record<number, { title: string; tips: { icon: string; title:
       { icon: "✦", title: "Mulai dari yang kecil", desc: "Kebiasaan kecil yang konsisten lebih efektif dari yang besar tapi tidak dilakukan." },
       { icon: "✦", title: "Harian lebih baik dari mingguan", desc: "Frekuensi tinggi membangun otot kebiasaan lebih cepat." },
       { icon: "✦", title: "Kaitkan dengan area transformasi", desc: "Pilih kebiasaan yang langsung mendukung area yang dipilih." },
+    ],
+  },
+  5: {
+    title: "Tips Refleksi Akhir (90 Hari)",
+    tips: [
+      { icon: "✦", title: "Merangkum 90 Hari", desc: "Tuliskan milestone dan transformasi terbesar yang Anda alami selama 90 hari." },
+      { icon: "✦", title: "Menjaga Istiqamah", desc: "Tetapkan komitmen nyata yang akan terus dijalankan setelah program selesai." },
     ],
   },
 };
@@ -447,13 +454,14 @@ interface BatchMate {
       case 2: return niat.trim().length > 0;
       case 3: return selectedAreas.length > 0 && Object.values(areaTargetsMap).some(t => t.mainTarget && t.mainTarget.trim().length > 0);
       case 4: return actionPlans.length > 0;
+      case 5: return dayCount >= 89;
       default: return false;
     }
   };
 
   const completedCount = SECTIONS.filter((_, i) => isSectionComplete(i + 1)).length;
-  const progressPct = Math.round((completedCount / 4) * 100);
-  const estimatedMinutes = (4 - completedCount) * 8;
+  const progressPct = Math.round((completedCount / SECTIONS.length) * 100);
+  const estimatedMinutes = Math.max(0, (SECTIONS.length - completedCount) * 6);
 
   const getSectionStatus = (num: number): "completed" | "in-progress" | "not-started" => {
     if (isSectionComplete(num)) return "completed";
@@ -495,7 +503,7 @@ interface BatchMate {
   };
 
   const goToNext = () => {
-    if (activeSection < 4) { setActiveSection(activeSection + 1); setMobileView("editor"); }
+    if (activeSection < SECTIONS.length) { setActiveSection(activeSection + 1); setMobileView("editor"); }
     else { setShowCelebration(true); }
   };
 
@@ -1385,7 +1393,7 @@ interface BatchMate {
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">{completedCount} dari 4 langkah selesai</p>
+          <p className="text-[11px] text-slate-400 mt-1">{completedCount} dari {SECTIONS.length} langkah selesai</p>
         </div>
       )}
 
@@ -1490,7 +1498,7 @@ interface BatchMate {
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1.5">{completedCount} dari 4 langkah selesai · Hari ke-{dayCount} dari 90</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">{completedCount} dari {SECTIONS.length} langkah selesai · Hari ke-{dayCount} dari 90</p>
               </div>
             </div>
 
@@ -1559,7 +1567,7 @@ interface BatchMate {
               {/* Step dots */}
               <div className="bg-slate-50 border-t border-warm-border px-4 py-2.5 flex items-center justify-between">
                 <StepDots />
-                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">STEP {activeSection} OF 4</span>
+                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">STEP {activeSection} OF {SECTIONS.length}</span>
               </div>
             </div>
 
@@ -1579,7 +1587,7 @@ interface BatchMate {
                 <ArrowLeft className="h-4 w-4" />Sebelumnya
               </Button>
               <Button onClick={goToNext} className="flex-1 flex items-center justify-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 font-bold shadow-sm">
-                {activeSection === 4 ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
+                {activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -1632,7 +1640,7 @@ interface BatchMate {
                       <ArrowLeft className="h-4 w-4" /><span className="text-sm font-semibold">Sebelumnya</span>
                     </Button>
                     <Button onClick={goToNext} className="flex items-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 font-bold shadow-sm">
-                      <span className="text-sm">{activeSection === 4 ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
+                      <span className="text-sm">{activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
