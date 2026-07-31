@@ -13,10 +13,10 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import {
-  getStoredCompanies,
-  getStoredBatches,
-  INITIAL_COACHES,
-  INITIAL_PARTICIPANTS,
+  fetchCompaniesFromSupabase,
+  fetchBatchesFromSupabase,
+  fetchCoachesFromSupabase,
+  fetchParticipantsFromSupabase,
   Company,
   Batch,
   AdminCoach,
@@ -28,6 +28,7 @@ export default function AdminMonitoringPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [coaches, setCoaches] = useState<AdminCoach[]>([]);
   const [participants, setParticipants] = useState<AdminParticipant[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Drill-down filter states
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
@@ -35,10 +36,25 @@ export default function AdminMonitoringPage() {
   const [selectedCoachId, setSelectedCoachId] = useState<string>("all");
 
   useEffect(() => {
-    setCompanies(getStoredCompanies());
-    setBatches(getStoredBatches());
-    setCoaches(INITIAL_COACHES);
-    setParticipants(INITIAL_PARTICIPANTS);
+    async function loadAllData() {
+      try {
+        const [compList, batchList, coachList, partList] = await Promise.all([
+          fetchCompaniesFromSupabase(),
+          fetchBatchesFromSupabase(),
+          fetchCoachesFromSupabase(),
+          fetchParticipantsFromSupabase(),
+        ]);
+        setCompanies(compList);
+        setBatches(batchList);
+        setCoaches(coachList);
+        setParticipants(partList);
+      } catch (err) {
+        console.error("Error loading admin monitoring data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAllData();
   }, []);
 
   // Filtered batches based on selected Company

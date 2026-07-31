@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { Bell, Send, CheckCircle2, Building2, Layers, UserCheck, Users, ShieldAlert } from "lucide-react";
 import {
-  getStoredCompanies,
-  getStoredBatches,
-  INITIAL_COACHES,
-  INITIAL_PARTICIPANTS,
+  fetchCompaniesFromSupabase,
+  fetchBatchesFromSupabase,
+  fetchCoachesFromSupabase,
+  fetchParticipantsFromSupabase,
+  sendAdminBroadcastNotification,
   INITIAL_NOTIFICATIONS,
   BroadcastNotification,
   Company,
@@ -28,38 +29,60 @@ export default function AdminNotificationsPage() {
   const [scope, setScope] = useState<"all" | "company" | "batch" | "coach" | "participant">("all");
   const [targetId, setTargetId] = useState("");
   const [sentSuccess, setSentSuccess] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    setCompanies(getStoredCompanies());
-    setBatches(getStoredBatches());
-    setCoaches(INITIAL_COACHES);
-    setParticipants(INITIAL_PARTICIPANTS);
+    async function loadTargets() {
+      const [compList, batchList, coachList, partList] = await Promise.all([
+        fetchCompaniesFromSupabase(),
+        fetchBatchesFromSupabase(),
+        fetchCoachesFromSupabase(),
+        fetchParticipantsFromSupabase(),
+      ]);
+      setCompanies(compList);
+      setBatches(batchList);
+      setCoaches(coachList);
+      setParticipants(partList);
+    }
+    loadTargets();
   }, []);
 
-  const handleBroadcast = (e: React.FormEvent) => {
+  const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !message.trim()) return;
 
+    setSending(true);
+
     let targetLabel = "Semua Perusahaan & Peserta";
-    let recipientCount = 487;
+    let recipientCount = participants.length || 10;
 
     if (scope === "company") {
       const comp = companies.find((c) => c.id === targetId) || companies[0];
-      targetLabel = `Perusahaan: ${comp.name}`;
-      recipientCount = comp.participantCount;
+      targetLabel = comp ? `Perusahaan: ${comp.name}` : "Perusahaan";
+      recipientCount = comp ? comp.participantCount : 0;
     } else if (scope === "batch") {
       const b = batches.find((item) => item.id === targetId) || batches[0];
-      targetLabel = `Batch: ${b.companyName} — ${b.name}`;
-      recipientCount = b.participantCount;
+      targetLabel = b ? `Batch: ${b.companyName} — ${b.name}` : "Batch";
+      recipientCount = b ? b.participantCount : 0;
     } else if (scope === "coach") {
       const c = coaches.find((item) => item.id === targetId) || coaches[0];
-      targetLabel = `Kelompok Bimbingan: ${c.name}`;
-      recipientCount = c.participantCount;
+      targetLabel = c ? `Kelompok Bimbingan: ${c.name}` : "Coach";
+      recipientCount = c ? c.participantCount : 0;
     } else if (scope === "participant") {
       const p = participants.find((item) => item.id === targetId) || participants[0];
-      targetLabel = `Peserta Spesifik: ${p.name}`;
+      targetLabel = p ? `Peserta Spesifik: ${p.name}` : "Peserta";
       recipientCount = 1;
     }
+
+    // Call Supabase real broadcast & fan-out function
+    await sendAdminBroadcastNotification({
+      title,
+      message,
+      targetScope: scope,
+      targetId,
+      targetLabel,
+      sentBy: "Super Admin",
+    });
 
     const newNotif: BroadcastNotification = {
       id: `notif-${Date.now()}`,
@@ -76,6 +99,7 @@ export default function AdminNotificationsPage() {
     setSentList([newNotif, ...sentList]);
     setTitle("");
     setMessage("");
+    setSending(false);
     setSentSuccess(true);
     setTimeout(() => setSentSuccess(false), 4000);
   };

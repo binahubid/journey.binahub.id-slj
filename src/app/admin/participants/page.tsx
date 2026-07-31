@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Users, Search, Building2, Layers, ShieldAlert, Sparkles, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getStoredCompanies,
-  getStoredBatches,
+  fetchCompaniesFromSupabase,
+  fetchBatchesFromSupabase,
   Company,
   Batch,
 } from "@/lib/company-store";
@@ -52,8 +52,10 @@ export default function ParticipantsPage() {
         .from("monthly_indicator_reports")
         .select("user_id, score_percentage");
 
-      const compList = getStoredCompanies();
-      const batchList = getStoredBatches();
+      const [compList, batchList] = await Promise.all([
+        fetchCompaniesFromSupabase(),
+        fetchBatchesFromSupabase(),
+      ]);
       setCompanies(compList);
       setBatches(batchList);
 

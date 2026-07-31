@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { UserCheck, ShieldAlert, Building2, Layers, Search, Mail } from "lucide-react";
-import { INITIAL_COACHES, AdminCoach } from "@/lib/company-store";
+import { fetchCoachesFromSupabase, AdminCoach } from "@/lib/company-store";
 
 export default function CoachesPage() {
   const [coaches, setCoaches] = useState<AdminCoach[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    setCoaches(INITIAL_COACHES);
+    async function loadCoaches() {
+      const data = await fetchCoachesFromSupabase();
+      setCoaches(data);
+    }
+    loadCoaches();
   }, []);
 
   const filtered = coaches.filter(

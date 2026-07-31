@@ -258,19 +258,12 @@ export default function BaselinePage() {
 
   useEffect(() => { loadBaselineData(); }, [loadBaselineData]);
 
-  // ── AUTO-SAVE ANSWER ON EVERY SELECTION ───────────────────────────────────
+  const saveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const answersMapRef = useRef<Record<number, number>>({});
+  useEffect(() => { answersMapRef.current = answersMap; }, [answersMap]);
 
-  const handleSelectScore = async (q: QuestionItem, scoreVal: number) => {
-    // 1. Instant local state update
-    const updatedMap = { ...answersMap, [q.id]: scoreVal };
-    setAnswersMap(updatedMap);
-
-    // 2. Instant localStorage cache for offline/reload safety
-    try {
-      localStorage.setItem("baseline_answers_draft", JSON.stringify(updatedMap));
-    } catch {}
-
-    // 3. Save to Supabase DB asynchronously
+  // Batch save current answers map to Supabase
+  const batchSaveAnswersToSupabase = async (mapToSave?: Record<number, number>) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -281,20 +274,50 @@ export default function BaselinePage() {
           .select("id").eq("user_id", user.id).maybeSingle();
         if (assData?.id) currentAssId = assData.id;
       }
-
       if (!currentAssId) return;
 
-      await supabase.from("baseline_answers").upsert({
-        assessment_id: currentAssId,
-        user_id: user.id,
-        question_number: q.id,
-        area: q.area,
-        score: scoreVal,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "assessment_id,question_number" });
+      const targetMap = mapToSave || answersMapRef.current;
+      const allQuestions = BASELINE_STEPS.flatMap(step => step.questions);
+      const answerPayload = Object.entries(targetMap).map(([qNumStr, scoreVal]) => {
+        const qNum = parseInt(qNumStr, 10);
+        const qObj = allQuestions.find(q => q.id === qNum);
+        return {
+          assessment_id: currentAssId,
+          user_id: user.id,
+          question_number: qNum,
+          area: qObj?.area || "baseline",
+          score: scoreVal,
+          updated_at: new Date().toISOString(),
+        };
+      });
+
+      if (answerPayload.length > 0) {
+        await supabase.from("baseline_answers").upsert(answerPayload, {
+          onConflict: "assessment_id,question_number",
+        });
+      }
     } catch (err) {
-      console.error("Autosave score failed:", err);
+      console.error("Batch autosave error:", err);
     }
+  };
+
+  // ── AUTO-SAVE ANSWER WITH DEBOUNCE & BATCH ─────────────────────────────────
+
+  const handleSelectScore = (q: QuestionItem, scoreVal: number) => {
+    // 1. Instant local state update
+    const updatedMap = { ...answersMap, [q.id]: scoreVal };
+    setAnswersMap(updatedMap);
+
+    // 2. Instant localStorage cache for offline/reload safety
+    try {
+      localStorage.setItem("baseline_answers_draft", JSON.stringify(updatedMap));
+    } catch {}
+
+    // 3. Debounced batch save to Supabase (1.5s debounce to minimize DB calls during rapid clicking)
+    if (saveDebounceTimerRef.current) clearTimeout(saveDebounceTimerRef.current);
+    saveDebounceTimerRef.current = setTimeout(() => {
+      batchSaveAnswersToSupabase(updatedMap);
+    }, 1500);
   };
 
   // ── COMPLETE ASSESSMENT ───────────────────────────────────────────────────

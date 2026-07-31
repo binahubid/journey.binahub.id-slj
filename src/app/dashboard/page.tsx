@@ -347,24 +347,13 @@ export default function DashboardPage() {
         } catch {}
 
         // 2. Journey
-        let { data: journey } = await supabase
+        const { data: journey } = await supabase
           .from("journeys")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-
-        if (!journey) {
-          const { data: ptpJourney } = await supabase
-            .from("ptp_journeys")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          journey = ptpJourney;
-        }
 
         if (journey || profile?.start_date) {
           setJourneyStatus(journey?.status || "ACTIVE");
@@ -911,11 +900,10 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsScreenSaver(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all shadow-sm bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-md cursor-pointer"
-                  title="Aktifkan Mode Fullscreen / Screen Saver"
+                  className="inline-flex items-center justify-center p-1.5 rounded-full text-white/70 hover:text-amber-300 hover:bg-white/10 transition-all cursor-pointer"
+                  title="Aktifkan Mode Fullscreen"
                 >
-                  <Maximize2 className="h-3 w-3 text-amber-300" />
-                  <span>Screen Saver</span>
+                  <Maximize2 className="h-4 w-4" />
                 </button>
               </div>
             </div>

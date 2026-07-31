@@ -193,6 +193,30 @@ CREATE TABLE IF NOT EXISTS public.settings (
 -- ========================================================
 -- ENABLE ROW LEVEL SECURITY (RLS) POLICIES
 -- ========================================================
+-- 13. SUPPORT TEAM TABLE
+CREATE TABLE IF NOT EXISTS public.support_team (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  journey_id UUID REFERENCES public.journeys(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  coach_name TEXT,
+  coach_email TEXT,
+  sahabat_safar_name TEXT,
+  sahabat_safar_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- 14. USER NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'reminder',
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.batches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -204,6 +228,8 @@ ALTER TABLE public.journals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.monthly_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.support_team ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- DROP EXISTING POLICIES TO AVOID DUPLICATE POLICY ERRORS
 DROP POLICY IF EXISTS "Public & Auth view companies" ON public.companies;
@@ -240,18 +266,29 @@ DROP POLICY IF EXISTS "Auth manage batches" ON public.batches;
 DROP POLICY IF EXISTS "Allow all for batches" ON public.batches;
 CREATE POLICY "Allow all for batches" ON public.batches FOR ALL TO public USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can view profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can view profile" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (true);
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users manage own journey" ON public.journeys;
 CREATE POLICY "Users manage own journey" ON public.journeys FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users manage own habits" ON public.habits;
 CREATE POLICY "Users manage own habits" ON public.habits FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users manage own habit logs" ON public.habit_logs;
 CREATE POLICY "Users manage own habit logs" ON public.habit_logs FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users manage own action plans" ON public.action_plans;
 CREATE POLICY "Users manage own action plans" ON public.action_plans FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users manage own journals" ON public.journals;
 CREATE POLICY "Users manage own journals" ON public.journals FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users manage own monthly reviews" ON public.monthly_reviews;
 CREATE POLICY "Users manage own monthly reviews" ON public.monthly_reviews FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Public view broadcast notifications" ON public.admin_notifications;
@@ -259,7 +296,14 @@ DROP POLICY IF EXISTS "Auth send notifications" ON public.admin_notifications;
 DROP POLICY IF EXISTS "Allow all for notifications" ON public.admin_notifications;
 CREATE POLICY "Allow all for notifications" ON public.admin_notifications FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users manage own settings" ON public.settings;
 CREATE POLICY "Users manage own settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users manage own support_team" ON public.support_team;
+CREATE POLICY "Users manage own support_team" ON public.support_team FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users manage own notifications" ON public.notifications;
+CREATE POLICY "Users manage own notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
 
 -- TRIGGER TO AUTOMATICALLY CREATE PROFILE ON SIGNUP
 CREATE OR REPLACE FUNCTION public.handle_new_user()

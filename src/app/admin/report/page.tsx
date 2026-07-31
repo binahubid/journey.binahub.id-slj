@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -9,13 +9,6 @@ import {
   Download,
   CheckCircle2,
   Building2,
-  Layers,
-  ArrowUpRight,
-  ShieldCheck,
-  DollarSign,
-  UserCheck,
-  Sparkles,
-  ChevronRight,
   Calendar,
   User,
   Heart,
@@ -24,836 +17,902 @@ import {
   ArrowRight,
   BookOpen,
   FileText,
-  Lock,
-  PieChart as PieIcon,
-  Activity,
-  Check,
-  Star,
+  ShieldCheck,
   Zap,
+  ChevronRight,
+  Target,
+  Sparkles,
+  MessageSquare,
+  Flame,
+  UserCheck,
+  Compass,
+  AlertTriangle,
+  Lightbulb,
+  Check,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { TransformationRadarChart } from "@/components/domain/TransformationRadarChart";
+import { DonutChart } from "@/components/domain/DonutChart";
 
 interface ParticipantReport {
   id: string;
   name: string;
-  productivity: string; // 132%
-  discipline: string; // 92%
-  absenteeism: string; // 6%
-  integrityScore: string; // 98%
-  impactScore: string; // A+, A, A-
-  ratingAtasan: number; // 5
+  role: string;
+  company: string;
+  coach: string;
+  overallScore: number;
   status: "Excellent" | "Very Good" | "Good";
+  topArea: string;
+  productivity: string;
+  discipline: string;
+  ptpProgress: number;
+  habits: { name: string; target: string; completion: number }[];
+  radarData: { area: string; before: number; after: number }[];
+  coachComment: string;
+  safarComment: string;
 }
 
 const MOCK_PARTICIPANTS: ParticipantReport[] = [
-  { id: "1", name: "Ahmad Fauzi", productivity: "132%", discipline: "92%", absenteeism: "6%", integrityScore: "98%", impactScore: "A+", ratingAtasan: 5, status: "Excellent" },
-  { id: "2", name: "Siti Rahayu", productivity: "128%", discipline: "89%", absenteeism: "7%", integrityScore: "96%", impactScore: "A", ratingAtasan: 5, status: "Excellent" },
-  { id: "3", name: "Budi Santoso", productivity: "126%", discipline: "88%", absenteeism: "8%", integrityScore: "95%", impactScore: "A", ratingAtasan: 4, status: "Very Good" },
-  { id: "4", name: "Dewi Lestari", productivity: "124%", discipline: "93%", absenteeism: "5%", integrityScore: "97%", impactScore: "A-", ratingAtasan: 5, status: "Excellent" },
-  { id: "5", name: "Rizky Pratama", productivity: "122%", discipline: "91%", absenteeism: "6%", integrityScore: "94%", impactScore: "A-", ratingAtasan: 4, status: "Excellent" },
-  { id: "6", name: "Hendra Wijaya", productivity: "119%", discipline: "87%", absenteeism: "9%", integrityScore: "92%", impactScore: "B+", ratingAtasan: 4, status: "Very Good" },
-  { id: "7", name: "Maya Putri", productivity: "118%", discipline: "86%", absenteeism: "8%", integrityScore: "91%", impactScore: "B+", ratingAtasan: 4, status: "Good" },
-  { id: "8", name: "Dimas Arjuna", productivity: "135%", discipline: "95%", absenteeism: "4%", integrityScore: "99%", impactScore: "A+", ratingAtasan: 5, status: "Excellent" },
-  { id: "9", name: "Rina Susanti", productivity: "127%", discipline: "90%", absenteeism: "7%", integrityScore: "96%", impactScore: "A", ratingAtasan: 5, status: "Very Good" },
-  { id: "10", name: "Fajar Nugroho", productivity: "121%", discipline: "88%", absenteeism: "8%", integrityScore: "93%", impactScore: "A-", ratingAtasan: 4, status: "Good" },
-  { id: "11", name: "Tri Kurniawan", productivity: "117%", discipline: "85%", absenteeism: "10%", integrityScore: "90%", impactScore: "B+", ratingAtasan: 4, status: "Good" },
-  { id: "12", name: "Eka Saputra", productivity: "129%", discipline: "92%", absenteeism: "5%", integrityScore: "97%", impactScore: "A", ratingAtasan: 5, status: "Excellent" },
-  { id: "13", name: "Nurul Hidayah", productivity: "123%", discipline: "89%", absenteeism: "7%", integrityScore: "95%", impactScore: "A-", ratingAtasan: 4, status: "Very Good" },
-  { id: "14", name: "Agus Setiawan", productivity: "116%", discipline: "84%", absenteeism: "9%", integrityScore: "89%", impactScore: "B+", ratingAtasan: 4, status: "Good" },
-  { id: "15", name: "Indah Permata", productivity: "130%", discipline: "93%", absenteeism: "5%", integrityScore: "98%", impactScore: "A", ratingAtasan: 5, status: "Excellent" },
-  { id: "16", name: "Bayu Skak", productivity: "122%", discipline: "88%", absenteeism: "8%", integrityScore: "93%", impactScore: "A-", ratingAtasan: 4, status: "Very Good" },
-  { id: "17", name: "Dian Sastrowardoyo", productivity: "134%", discipline: "94%", absenteeism: "4%", integrityScore: "99%", impactScore: "A+", ratingAtasan: 5, status: "Excellent" },
-  { id: "18", name: "Gilang Ramadhan", productivity: "118%", discipline: "86%", absenteeism: "9%", integrityScore: "91%", impactScore: "B+", ratingAtasan: 4, status: "Good" },
-  { id: "19", name: "Hana Pertiwi", productivity: "128%", discipline: "91%", absenteeism: "6%", integrityScore: "96%", impactScore: "A", ratingAtasan: 5, status: "Very Good" },
-  { id: "20", name: "Irfan Hakim", productivity: "124%", discipline: "89%", absenteeism: "7%", integrityScore: "95%", impactScore: "A-", ratingAtasan: 4, status: "Excellent" },
-  { id: "21", name: "Joko Widodo", productivity: "136%", discipline: "96%", absenteeism: "3%", integrityScore: "100%", impactScore: "A+", ratingAtasan: 5, status: "Excellent" },
-  { id: "22", name: "Kartika Putri", productivity: "126%", discipline: "90%", absenteeism: "7%", integrityScore: "95%", impactScore: "A", ratingAtasan: 4, status: "Very Good" },
-  { id: "23", name: "Lukman Sardi", productivity: "120%", discipline: "87%", absenteeism: "8%", integrityScore: "92%", impactScore: "A-", ratingAtasan: 4, status: "Good" },
-  { id: "24", name: "Mega Utami", productivity: "117%", discipline: "85%", absenteeism: "9%", integrityScore: "90%", impactScore: "B+", ratingAtasan: 4, status: "Good" },
-  { id: "25", name: "Naufal Samudra", productivity: "129%", discipline: "92%", absenteeism: "6%", integrityScore: "97%", impactScore: "A", ratingAtasan: 5, status: "Excellent" },
+  {
+    id: "1",
+    name: "Ahmad Fauzi",
+    role: "Senior VP Operations",
+    company: "PT Astra International Tbk",
+    coach: "Dr. H. Bambang Setiawan",
+    overallScore: 94,
+    status: "Excellent",
+    topArea: "Leadership Excellence",
+    productivity: "132%",
+    discipline: "94%",
+    ptpProgress: 92,
+    habits: [
+      { name: "Tahajud 4 Rakaat & Istighfar 100x", target: "7x/minggu", completion: 95 },
+      { name: "One-on-One Mentoring Tim Operasional", target: "2x/minggu", completion: 90 },
+      { name: "Membaca Buku Kepemimpinan 15 Mnt", target: "7x/minggu", completion: 88 },
+    ],
+    radarData: [
+      { area: "Spiritual Growth", before: 65, after: 95 },
+      { area: "Personal Development", before: 60, after: 90 },
+      { area: "Leadership Excellence", before: 58, after: 96 },
+      { area: "Relationship & Community", before: 62, after: 88 },
+      { area: "Professional Impact", before: 70, after: 94 },
+    ],
+    coachComment:
+      "Ahmad menunjukkan komitmen istiqamah luar biasa. PTP operasional berjalan sesuai jadwal dan kepemimpinannya kini lebih empatik.",
+    safarComment:
+      "Aktif saling mengingatkan di grup Sahabat Safar. Menginspirasi peserta lain dalam menjaga amalan harian.",
+  },
+  {
+    id: "2",
+    name: "Siti Rahayu",
+    role: "Head of Human Capital",
+    company: "PT Astra International Tbk",
+    coach: "Ust. Ahmad Rifai, M.Pd.",
+    overallScore: 91,
+    status: "Excellent",
+    topArea: "Spiritual Growth",
+    productivity: "128%",
+    discipline: "92%",
+    ptpProgress: 88,
+    habits: [
+      { name: "Sedekah Subuh & Tilawah 1 Juz", target: "7x/minggu", completion: 92 },
+      { name: "Evaluasi Budaya Kerja Islami Tim", target: "1x/minggu", completion: 85 },
+      { name: "Olahraga Ringan 20 Mnt", target: "3x/minggu", completion: 80 },
+    ],
+    radarData: [
+      { area: "Spiritual Growth", before: 60, after: 94 },
+      { area: "Personal Development", before: 62, after: 89 },
+      { area: "Leadership Excellence", before: 55, after: 90 },
+      { area: "Relationship & Community", before: 65, after: 92 },
+      { area: "Professional Impact", before: 68, after: 90 },
+    ],
+    coachComment:
+      "Siti berhasil mengintegrasikan nilai spiritual dalam kebijakan HC perusahaan. Budaya empati meningkat signifikan.",
+    safarComment:
+      "Sangat konsisten mencatat jurnal muhasabah harian dan menguatkan rekan se-kelompok.",
+  },
+  {
+    id: "3",
+    name: "Budi Santoso",
+    role: "General Manager Supply Chain",
+    company: "PT Astra International Tbk",
+    coach: "Dr. H. Bambang Setiawan",
+    overallScore: 87,
+    status: "Very Good",
+    topArea: "Professional Impact",
+    productivity: "126%",
+    discipline: "88%",
+    ptpProgress: 84,
+    habits: [
+      { name: "Shalat Berjamaah di Awal Waktu", target: "5x/hari", completion: 88 },
+      { name: "Review Efisiensi Logistik Berkelanjutan", target: "1x/minggu", completion: 90 },
+      { name: "Diskusi Bebas Stres dengan Tim", target: "2x/minggu", completion: 78 },
+    ],
+    radarData: [
+      { area: "Spiritual Growth", before: 58, after: 88 },
+      { area: "Personal Development", before: 55, after: 84 },
+      { area: "Leadership Excellence", before: 52, after: 86 },
+      { area: "Relationship & Community", before: 58, after: 82 },
+      { area: "Professional Impact", before: 65, after: 94 },
+    ],
+    coachComment:
+      "Perkembangan pesat pada kontrol emosi dan pengelolaan stres kerja di lingkungan logistik yang dinamis.",
+    safarComment:
+      "Disiplin mengisi habit tracker dan selalu hadir dalam pertemuan bulanan.",
+  },
+  {
+    id: "4",
+    name: "Dewi Lestari",
+    role: "Finance Director",
+    company: "PT Astra International Tbk",
+    coach: "Ustz. Hj. Nurjanah, M.Ag.",
+    overallScore: 92,
+    status: "Excellent",
+    topArea: "Relationship & Community",
+    productivity: "124%",
+    discipline: "95%",
+    ptpProgress: 90,
+    habits: [
+      { name: "Dhuha 4 Rakaat & Doa Kelapangan Rezeki", target: "7x/minggu", completion: 96 },
+      { name: "Program CSR & Bina Komunitas Usaha", target: "1x/bulan", completion: 90 },
+      { name: "Waktu Khusus Keluarga (No Gadget)", target: "2x/minggu", completion: 85 },
+    ],
+    radarData: [
+      { area: "Spiritual Growth", before: 62, after: 92 },
+      { area: "Personal Development", before: 60, after: 88 },
+      { area: "Leadership Excellence", before: 58, after: 90 },
+      { area: "Relationship & Community", before: 64, after: 96 },
+      { area: "Professional Impact", before: 72, after: 94 },
+    ],
+    coachComment:
+      "Dewi berhasil menyeimbangkan kepemimpinan keuangan yang tegas dengan ketenangan batin dan kepedulian sosial.",
+    safarComment:
+      "Inisiatif tinggi dalam mengorganisir kegiatan sosial bersama Sahabat Safar.",
+  },
+  {
+    id: "5",
+    name: "Rizky Pratama",
+    role: "IT & Digital Transformation Lead",
+    company: "PT Astra International Tbk",
+    coach: "Ust. Ahmad Rifai, M.Pd.",
+    overallScore: 89,
+    status: "Excellent",
+    topArea: "Personal Development",
+    productivity: "135%",
+    discipline: "91%",
+    ptpProgress: 86,
+    habits: [
+      { name: "Dzikir Pagi-Petang & Tilawah 15 Mnt", target: "7x/minggu", completion: 90 },
+      { name: "Digital Detoks Setelah Jam 9 Malam", target: "7x/minggu", completion: 82 },
+      { name: "Sharing Knowledge Tech & Leadership", target: "2x/bulan", completion: 88 },
+    ],
+    radarData: [
+      { area: "Spiritual Growth", before: 56, after: 88 },
+      { area: "Personal Development", before: 58, after: 92 },
+      { area: "Leadership Excellence", before: 54, after: 86 },
+      { area: "Relationship & Community", before: 55, after: 84 },
+      { area: "Professional Impact", before: 68, after: 95 },
+    ],
+    coachComment:
+      "Perubahan positif pada konsentrasi dan kejernihan pikiran dalam mengambil keputusan arsitektur sistem.",
+    safarComment:
+      "Sangat terbantu dengan reminder otomatis sistem dan rajin berbagi insight digital.",
+  },
 ];
 
-export default function ImpactReportPage() {
-  const [showAllParticipants, setShowAllParticipants] = useState(false);
-  const [showExecModal, setShowExecModal] = useState(false);
+// Area Growth Rankings for Horizontal Bar Chart (Sorted Highest First)
+const AREA_GROWTH_RANKED = [
+  { area: "Leadership Excellence", before: 55, after: 91, delta: 36 },
+  { area: "Spiritual Growth", before: 62, after: 94, delta: 32 },
+  { area: "Personal Development", before: 58, after: 88, delta: 30 },
+  { area: "Professional Impact", before: 64, after: 92, delta: 28 },
+  { area: "Relationship & Community", before: 60, after: 86, delta: 26 },
+];
 
-  const displayedParticipants = showAllParticipants ? MOCK_PARTICIPANTS : MOCK_PARTICIPANTS.slice(0, 5);
-  const handleExportPDF = () => window.print();
+export default function AdminImpactReportPage() {
+  const [viewMode, setViewMode] = useState<"group" | "individual">("group");
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string>("1");
+
+  const currentParticipant =
+    MOCK_PARTICIPANTS.find((p) => p.id === selectedParticipantId) || MOCK_PARTICIPANTS[0];
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div className="space-y-6 w-full pb-16 font-sans text-slate-800">
-      
-      {/* ─── SECTION 1: HEADER ─── */}
+      {/* ─── TOP BAR & MODE SWITCHER (HIDDEN IN PRINT) ─── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#EAE5D9] pb-4 print:hidden">
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-[#C79A3C]" />
-            <h1 className="text-2xl font-black text-[#071A33] tracking-tight">
-              Corporate Impact & ROI Report 2026
+            <h1 className="text-2xl font-black text-[#0F1E3D] tracking-tight">
+              BinaJourney Transformation Impact Report v2.0
             </h1>
           </div>
           <p className="text-xs text-slate-500 font-semibold mt-1">
-            Evaluasi dampak bisnis program SLJ 90 Hari terhadap 25 peserta.
+            Laporan evaluasi dampak 90 hari berbasis data assessment, PTP, habit, &amp; evaluasi Kirkpatrick Level 1-4.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Section 2: Data Verification Panel */}
-          <div className="flex items-center gap-2.5 bg-white border border-[#EAE5D9] rounded-xl px-3 py-1.5 shadow-2xs">
-            <div className="flex -space-x-1.5">
-              <div className="h-6 w-6 rounded-full bg-navy-900 text-amber-400 font-bold text-[9px] flex items-center justify-center border border-white">HR</div>
-              <div className="h-6 w-6 rounded-full bg-emerald-600 text-white font-bold text-[9px] flex items-center justify-center border border-white">SPV</div>
-              <div className="h-6 w-6 rounded-full bg-purple-600 text-white font-bold text-[9px] flex items-center justify-center border border-white">CCH</div>
-            </div>
-            <div className="text-left leading-tight">
-              <span className="text-[10px] font-bold text-slate-500 block">Data Telah Diverifikasi</span>
-              <span className="text-[11px] font-black text-emerald-600">98% Data tervalidasi</span>
-            </div>
-          </div>
-
-          {/* Evaluation Period Selector & Export */}
-          <div className="flex items-center gap-2">
-            <div className="bg-white border border-[#EAE5D9] rounded-xl px-3 py-2 text-xs font-bold text-[#071A33] flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-[#C79A3C]" />
-              <span>Periode Evaluasi: 90 Hari</span>
-            </div>
+          {/* Mode Switcher Tabs */}
+          <div className="flex items-center p-1 bg-slate-100 border border-slate-200 rounded-xl shadow-2xs">
             <button
-              onClick={handleExportPDF}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0B2C6B] hover:bg-[#071A33] text-white text-xs font-bold transition-all shadow-md"
+              onClick={() => setViewMode("group")}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                viewMode === "group"
+                  ? "bg-[#0F1E3D] text-amber-400 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
-              <Download className="h-4 w-4 text-amber-400" /> Export Board Meeting PDF
+              <Building2 className="h-3.5 w-3.5" />
+              <span>Laporan Perusahaan (Group)</span>
+            </button>
+            <button
+              onClick={() => setViewMode("individual")}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                viewMode === "individual"
+                  ? "bg-[#0F1E3D] text-amber-400 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <User className="h-3.5 w-3.5" />
+              <span>Laporan Peserta (Individual)</span>
             </button>
           </div>
+
+          {/* Export PDF Button */}
+          <button
+            onClick={handlePrint}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#C79A3C] hover:bg-[#b08732] text-[#0F1E3D] text-xs font-extrabold shadow-md transition-all cursor-pointer"
+          >
+            <Download className="h-4 w-4" /> Export Board Meeting PDF
+          </button>
         </div>
       </div>
 
-      {/* PRINTABLE CONTAINER */}
-      <div id="print-area" className="space-y-6">
-
-        {/* ─── SECTION 3: HERO EXECUTIVE SUMMARY (FULL NAVY HERO CARD) ─── */}
-        <div className="bg-[#071A33] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-navy-900 relative overflow-hidden">
-          <div className="text-[10px] font-extrabold uppercase text-amber-400 tracking-widest block mb-4">
-            EXECUTIVE BUSINESS IMPACT SUMMARY
+      {/* ─── FILTERS BAR (HIDDEN IN PRINT) ─── */}
+      <div className="bg-white border border-[#EAE5D9] rounded-2xl p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4 print:hidden">
+        <div className="flex flex-wrap items-center gap-3">
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              Perusahaan / Mitra
+            </label>
+            <select className="bg-slate-50 border border-slate-200 text-xs font-bold text-[#0F1E3D] rounded-xl px-3 py-1.5 focus:border-[#C79A3C]">
+              <option>PT Astra International Tbk</option>
+              <option>PT Telekomunikasi Indonesia Tbk</option>
+              <option>PT Bank Syariah Indonesia Tbk</option>
+            </select>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Left Main Value Figures */}
-            <div className="lg:col-span-5 space-y-4 border-b lg:border-b-0 lg:border-r border-blue-900/80 pb-6 lg:pb-0 lg:pr-8">
-              <div>
-                <span className="text-xs text-blue-200 font-semibold block">Investasi Program SLJ (25 Peserta)</span>
-                <div className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-0.5">
-                  Rp 350.000.000
-                </div>
-              </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              Batch Keberangkatan
+            </label>
+            <select className="bg-slate-50 border border-slate-200 text-xs font-bold text-[#0F1E3D] rounded-xl px-3 py-1.5 focus:border-[#C79A3C]">
+              <option>Batch 1 — Executive Umrah (Spring 2026)</option>
+              <option>Batch 2 — Leadership Journey (Winter 2025)</option>
+            </select>
+          </div>
 
-              <div className="pt-1">
-                <div className="text-slate-400 text-xs py-1 flex items-center gap-2">
-                  <span className="h-4 w-0.5 bg-amber-400 rounded-full" />
-                  <span>menghasilkan estimasi efisiensi operasional senilai</span>
-                </div>
-                <div className="text-3xl sm:text-4xl font-black text-emerald-400 tracking-tight mt-0.5">
-                  Rp 970.000.000
-                </div>
-              </div>
-
-              {/* Data Validated Badges */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 text-[10px] font-bold text-slate-300">
-                <span className="bg-white/10 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Data tervalidasi oleh:
-                </span>
-                <span className="bg-white/10 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                  <User className="h-3 w-3 text-blue-300" /> HR Director
-                </span>
-                <span className="bg-white/10 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-amber-300" /> Direct Superior
-                </span>
-                <span className="bg-white/10 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                  <Briefcase className="h-3 w-3 text-purple-300" /> Coach
-                </span>
-              </div>
+          {viewMode === "individual" && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Pilih Peserta
+              </label>
+              <select
+                value={selectedParticipantId}
+                onChange={(e) => setSelectedParticipantId(e.target.value)}
+                className="bg-amber-50/80 border border-amber-300 text-xs font-extrabold text-[#0F1E3D] rounded-xl px-3 py-1.5 focus:border-[#C79A3C]"
+              >
+                {MOCK_PARTICIPANTS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {p.role}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            {/* Right Metric Columns (5 Key Metrics) */}
-            <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-              {/* TOTAL ROI */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-blue-200 font-bold uppercase block">TOTAL ROI</span>
-                <div className="text-2xl sm:text-3xl font-black text-amber-400">277%</div>
-                <span className="text-[9px] text-blue-300 font-medium block">Return on Investment</span>
-                <div className="pt-1 flex justify-center text-amber-400">
-                  <TrendingUp className="h-4 w-4" />
-                </div>
-              </div>
-
-              {/* INVESTASI PROGRAM */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-blue-200 font-bold uppercase block">INVESTASI PROGRAM</span>
-                <div className="text-base sm:text-lg font-black text-white mt-1">Rp 350M</div>
-                <span className="text-[9px] text-blue-300 font-medium block">Total Biaya Execution</span>
-              </div>
-
-              {/* ESTIMASI BENEFIT */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-blue-200 font-bold uppercase block">ESTIMASI BENEFIT</span>
-                <div className="text-base sm:text-lg font-black text-emerald-400 mt-1">Rp 970M</div>
-                <span className="text-[9px] text-blue-300 font-medium block">Total Economic Value</span>
-              </div>
-
-              {/* NET BENEFIT */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-blue-200 font-bold uppercase block">NET BENEFIT</span>
-                <div className="text-base sm:text-lg font-black text-amber-300 mt-1">Rp 620M</div>
-                <span className="text-[9px] text-blue-300 font-medium block">Keuntungan Bersih</span>
-              </div>
-
-              {/* PAYBACK PERIOD */}
-              <div className="space-y-1 col-span-2 sm:col-span-1">
-                <span className="text-[10px] text-blue-200 font-bold uppercase block">PAYBACK PERIOD</span>
-                <div className="text-2xl sm:text-3xl font-black text-amber-400">4.2 Bln</div>
-                <span className="text-[9px] text-blue-300 font-medium block">Modal Kembali</span>
-                <div className="pt-1 flex justify-center text-amber-400">
-                  <Clock className="h-4 w-4" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 pt-4 border-t border-blue-900/60 text-center">
-            <p className="text-xs text-blue-200 font-medium italic">
-              &ldquo;Investasi yang memberikan dampak nyata pada performa tim dan efisiensi operasional perusahaan.&rdquo;
-            </p>
-          </div>
+          )}
         </div>
 
+        <div className="flex items-center gap-2 text-xs text-emerald-600 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+          <CheckCircle2 className="h-4 w-4" />
+          <span>Verified Data (25 Peserta Complete)</span>
+        </div>
+      </div>
 
-        {/* ─── SECTION 4 & 5: ROI TREND & EXECUTIVE SUMMARY ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* SECTION 4: ROI TREND (LINE CHART 3 BULAN) */}
-          <div className="lg:col-span-8 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
-              <div className="space-y-0.5">
-                <h3 className="text-sm font-extrabold text-[#071A33] flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-amber-500" /> ROI Trend (Return on Investment)
-                </h3>
-                <span className="text-[10px] text-slate-400 font-medium">Perkembangan ROI dari bulan ke bulan (Bln 1 s/d Bln 3)</span>
-              </div>
-              <span className="text-xs font-bold bg-[#FAF8F4] border border-[#EAE5D9] px-3 py-1 rounded-xl text-slate-600">
-                3 Bulan (Program 90 Hari)
+      {/* ========================================================================= */}
+      {/* VIEW MODE 1: ORGANIZATION TRANSFORMATION REPORT (GROUP LEVEL)           */}
+      {/* ========================================================================= */}
+      {viewMode === "group" && (
+        <div id="print-area-group" className="space-y-8 print:space-y-6">
+          {/* SECTION 1: GROUP HERO EXECUTIVE DASHBOARD */}
+          <div className="bg-[#0F1E3D] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-navy-900 relative overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-extrabold uppercase text-amber-400 tracking-widest block mb-4">
+              <span>ORGANIZATION TRANSFORMATION REPORT &mdash; 90-DAY FINAL EVALUATION</span>
+              <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-3 py-0.5 rounded-full">
+                PT Astra International Tbk (25 Peserta)
               </span>
             </div>
 
-            {/* SVG Line Chart for ROI Trend (3 Bulan) */}
-            <div className="h-48 w-full pt-4 relative">
-              <svg className="w-full h-full overflow-visible" viewBox="0 0 500 150" preserveAspectRatio="none">
-                {/* Grid Lines */}
-                <line x1="0" y1="30" x2="500" y2="30" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4" />
-                <line x1="0" y1="70" x2="500" y2="70" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4" />
-                <line x1="0" y1="110" x2="500" y2="110" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4" />
-
-                {/* Trend Line Path (Bln 1: 80% -> Bln 2: 175% -> Bln 3: 277%) */}
-                <path
-                  d="M 50 120 L 250 65 L 450 15"
-                  fill="none"
-                  stroke="#d97706"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-
-                {/* Points & Labels */}
-                {[
-                  { x: 50, y: 120, label: "80%", month: "Bulan 1 (Hari 30)" },
-                  { x: 250, y: 65, label: "175%", month: "Bulan 2 (Hari 60)" },
-                  { x: 450, y: 15, label: "277%", month: "Bulan 3 (Hari 90)" },
-                ].map((pt, idx) => (
-                  <g key={idx}>
-                    <circle cx={pt.x} cy={pt.y} r="6" fill="#d97706" stroke="#ffffff" strokeWidth="2" />
-                    <text x={pt.x} y={pt.y - 12} textAnchor="middle" className="text-[11px] font-black fill-[#071A33]">
-                      {pt.label}
-                    </text>
-                    <text x={pt.x} y={145} textAnchor="middle" className="text-[10px] font-bold fill-slate-500">
-                      {pt.month}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-            </div>
-          </div>
-
-          {/* SECTION 5: EXECUTIVE SUMMARY TEXT BOX */}
-          <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4 flex flex-col justify-between">
-            <div className="space-y-3">
-              <h3 className="text-sm font-extrabold text-[#071A33]">Executive Summary</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Selama 90 hari pelaksanaan Program SLJ Batch Executive 2026, terdapat peningkatan signifikan pada seluruh indikator kinerja utama. Program ini menghasilkan estimasi efisiensi operasional senilai <strong className="text-[#071A33]">Rp 970.000.000</strong> dengan <strong className="text-amber-700">ROI 277%</strong> dan payback period <strong className="text-emerald-700">4.2 bulan</strong>.
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowExecModal(true)}
-              className="w-full py-2.5 rounded-xl border border-[#0B2C6B] text-[#0B2C6B] hover:bg-[#0B2C6B] hover:text-white text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5"
-            >
-              <span>Lihat Executive Summary Detail</span> &rarr;
-            </button>
-          </div>
-        </div>
-
-
-        {/* ─── SECTION 6, 7, 8: BEFORE vs AFTER, BUSINESS IMPACT BREAKDOWN, KPI INDICATOR ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* SECTION 6: Baseline Result (Before vs After) */}
-          <div className="bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-[#071A33]">Baseline Result (Before vs After)</h3>
-              <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400">
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300" /> Sebelum</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#071A33]" /> Setelah 90 Hari</span>
-              </div>
-            </div>
-
-            <div className="space-y-3.5 text-xs pt-1">
-              {/* Row 1: Produktivitas */}
-              <div className="space-y-1">
-                <div className="flex justify-between font-bold">
-                  <span className="text-slate-700 flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> Produktivitas</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-[11px]">100%</span>
-                    <span className="text-[#071A33] font-black text-xs">122%</span>
-                    <span className="text-emerald-600 font-bold text-[11px]">+22%</span>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              {/* Left Column: Overall Score & Investment Summary */}
+              <div className="lg:col-span-5 space-y-4 border-b lg:border-b-0 lg:border-r border-blue-900/80 pb-6 lg:pb-0 lg:pr-8">
+                <div>
+                  <span className="text-xs text-blue-200 font-semibold block">Skor Transformasi Organisasi</span>
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <span className="text-4xl sm:text-5xl font-black text-amber-400 tracking-tight">
+                      88.4<span className="text-xl text-blue-200 font-bold">/100</span>
+                    </span>
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-bold">
+                      Kategori: High Impact
+                    </span>
                   </div>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#071A33] rounded-full" style={{ width: "82%" }} />
-                </div>
-              </div>
 
-              {/* Row 2: Tingkat Mangkir */}
-              <div className="space-y-1">
-                <div className="flex justify-between font-bold">
-                  <span className="text-slate-700 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-blue-600" /> Tingkat Mangkir</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-[11px]">15%</span>
-                    <span className="text-[#071A33] font-black text-xs">8%</span>
-                    <span className="text-emerald-600 font-bold text-[11px]">-35%</span>
+                <div className="pt-2 border-t border-blue-900/60">
+                  <div className="text-blue-200 text-xs py-0.5 flex items-center gap-2">
+                    <span className="h-3 w-0.5 bg-amber-400 rounded-full" />
+                    <span>Investasi Program: <strong className="text-white">Rp 350.000.000</strong></span>
+                  </div>
+                  <div className="text-blue-200 text-xs py-0.5 flex items-center gap-2">
+                    <span className="h-3 w-0.5 bg-emerald-400 rounded-full" />
+                    <span>Estimasi Benefit Efisiensi: <strong className="text-emerald-400">Rp 970.000.000</strong></span>
                   </div>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#071A33] rounded-full" style={{ width: "45%" }} />
-                </div>
               </div>
 
-              {/* Row 3: Kedisiplinan & Integritas */}
-              <div className="space-y-1">
-                <div className="flex justify-between font-bold">
-                  <span className="text-slate-700 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-purple-600" /> Kedisiplinan & Integritas</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-[11px]">72%</span>
-                    <span className="text-[#071A33] font-black text-xs">91%</span>
-                    <span className="text-emerald-600 font-bold text-[11px]">+26%</span>
-                  </div>
+              {/* Right Column: 4 KPI Cards Bahasa Direksi */}
+              <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                  <span className="text-[10px] text-blue-200 font-bold uppercase block">TOTAL ROI</span>
+                  <div className="text-2xl font-black text-amber-400">177%</div>
+                  <span className="text-[9px] text-blue-300 font-medium block">Return on Investment</span>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#071A33] rounded-full" style={{ width: "91%" }} />
-                </div>
-              </div>
 
-              {/* Row 4: Kepemimpinan Tim */}
-              <div className="space-y-1">
-                <div className="flex justify-between font-bold">
-                  <span className="text-slate-700 flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-amber-600" /> Kepemimpinan Tim</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-[11px]">68%</span>
-                    <span className="text-[#071A33] font-black text-xs">88%</span>
-                    <span className="text-emerald-600 font-bold text-[11px]">+20%</span>
-                  </div>
+                <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                  <span className="text-[10px] text-blue-200 font-bold uppercase block">NET BENEFIT</span>
+                  <div className="text-lg font-black text-emerald-400 mt-1">Rp 620M</div>
+                  <span className="text-[9px] text-blue-300 font-medium block">Keuntungan Bersih</span>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#071A33] rounded-full" style={{ width: "88%" }} />
-                </div>
-              </div>
 
-              {/* Row 5: Integrity Score */}
-              <div className="space-y-1">
-                <div className="flex justify-between font-bold">
-                  <span className="text-slate-700 flex items-center gap-1.5"><Award className="h-3.5 w-3.5 text-rose-600" /> Integrity Score</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-[11px]">72%</span>
-                    <span className="text-[#071A33] font-black text-xs">100%</span>
-                    <span className="text-emerald-600 font-bold text-[11px]">+28%</span>
-                  </div>
+                <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                  <span className="text-[10px] text-blue-200 font-bold uppercase block">PAYBACK PERIOD</span>
+                  <div className="text-2xl font-black text-amber-300">4.2 Bln</div>
+                  <span className="text-[9px] text-blue-300 font-medium block">Modal Kembali</span>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#071A33] rounded-full" style={{ width: "100%" }} />
-                </div>
-              </div>
-            </div>
-            <span className="text-[9px] text-slate-400 block pt-1 font-medium">*Baseline diambil dari 30 hari sebelum program dimulai</span>
-          </div>
 
-          {/* SECTION 7: Business Impact Breakdown (Donut Chart 1) */}
-          <div className="bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
-            <h3 className="text-sm font-extrabold text-[#071A33]">Business Impact Breakdown</h3>
-            
-            <div className="flex flex-col items-center justify-center space-y-3 py-1">
-              <div className="relative h-32 w-32 flex items-center justify-center">
-                <svg className="h-full w-full transform -rotate-90" viewBox="0 0 36 36">
-                  <path className="text-purple-500" strokeWidth="5" strokeDasharray="48 100" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-[#0B2C6B]" strokeWidth="5" strokeDasharray="22 100" strokeDashoffset="-48" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-amber-500" strokeWidth="5" strokeDasharray="15 100" strokeDashoffset="-70" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-emerald-500" strokeWidth="5" strokeDasharray="15 100" strokeDashoffset="-85" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[10px] font-bold text-slate-400">Total Benefit</span>
-                  <span className="text-base font-black text-[#071A33]">Rp 970JT</span>
-                </div>
-              </div>
-
-              <div className="w-full space-y-1.5 text-xs font-semibold">
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-purple-500 shrink-0" /> Produktivitas Gain</span>
-                  <span className="font-bold text-[#071A33]">48% <span className="text-[10px] font-normal text-slate-400">(Rp 470JT)</span></span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#0B2C6B] shrink-0" /> Reduced Turnover</span>
-                  <span className="font-bold text-[#071A33]">22% <span className="text-[10px] font-normal text-slate-400">(Rp 210JT)</span></span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" /> Lower Absenteeism</span>
-                  <span className="font-bold text-[#071A33]">15% <span className="text-[10px] font-normal text-slate-400">(Rp 150JT)</span></span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" /> Leadership Impact</span>
-                  <span className="font-bold text-[#071A33]">15% <span className="text-[10px] font-normal text-slate-400">(Rp 140JT)</span></span>
+                <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                  <span className="text-[10px] text-blue-200 font-bold uppercase block">PTP COMPLETION</span>
+                  <div className="text-2xl font-black text-emerald-400">92%</div>
+                  <span className="text-[9px] text-blue-300 font-medium block">Target Tercapai</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* SECTION 8: Kinerja per Indikator (After 90 Hari) */}
-          <div className="bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
-            <h3 className="text-sm font-extrabold text-[#071A33]">Kinerja per Indikator (After 90 Hari)</h3>
-            
-            <div className="space-y-4 text-xs pt-1">
-              <div>
-                <div className="flex justify-between font-bold mb-1">
-                  <span className="text-slate-700">Produktivitas</span>
-                  <span className="text-navy-900 font-extrabold">122%</span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-navy-900 rounded-full" style={{ width: "81%" }} />
-                </div>
+          {/* SECTION 2 & 3: RADAR CHART (BEFORE VS AFTER) & AVERAGE GROWTH BAR (SORTED) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* SECTION 2: RADAR CHART 5 AREA TRANSFORMASI */}
+            <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
+              <div className="border-b border-[#EAE5D9] pb-3">
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  RADAR TRANSFORMASI ORGANISASI
+                </span>
+                <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">
+                  Before vs After (5 Area Transformasi)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Perbandingan rata-rata baseline (sebelum berangkat) vs evaluasi akhir 90 hari.
+                </p>
               </div>
 
-              <div>
-                <div className="flex justify-between font-bold mb-1">
-                  <span className="text-slate-700">Leadership</span>
-                  <span className="text-amber-600 font-extrabold">118%</span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-600 rounded-full" style={{ width: "78%" }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between font-bold mb-1">
-                  <span className="text-slate-700">Discipline</span>
-                  <span className="text-emerald-600 font-extrabold">113%</span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-600 rounded-full" style={{ width: "75%" }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between font-bold mb-1">
-                  <span className="text-slate-700">Integrity</span>
-                  <span className="text-purple-600 font-extrabold">132%</span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-purple-600 rounded-full" style={{ width: "88%" }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between font-bold mb-1">
-                  <span className="text-slate-700">Team Collaboration</span>
-                  <span className="text-blue-600 font-extrabold">108%</span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-600 rounded-full" style={{ width: "72%" }} />
-                </div>
+              <div className="pt-2">
+                <TransformationRadarChart />
               </div>
             </div>
 
-            <div className="flex justify-between text-[9px] text-slate-400 font-bold pt-2 border-t border-slate-100">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-              <span>150%</span>
-            </div>
-          </div>
-        </div>
-
-
-        {/* ─── SECTION 9 & 10: FINANCIAL IMPACT WATERFALL & COST SAVING BREAKDOWN ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-          {/* SECTION 9: FINANCIAL IMPACT WATERFALL CHART */}
-          <div className="lg:col-span-7 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
-              <h3 className="text-sm font-extrabold text-[#071A33]">Financial Impact Waterfall</h3>
-              <span className="text-[10px] text-slate-400 font-semibold">Alur terbentuknya nilai bagi perusahaan</span>
-            </div>
-
-            {/* Waterfall Bar Chart Visual */}
-            <div className="h-44 w-full pt-4 relative border-b border-slate-200">
-              <div className="h-full flex items-end justify-between gap-2 px-4">
-                {/* Bar 1: Investasi Program */}
-                <div className="flex flex-col items-center flex-1 h-full justify-end">
-                  <span className="text-[9px] font-bold text-slate-500 mb-1">350 jt</span>
-                  <div className="w-full bg-[#071A33] rounded-t-lg h-[35%]" />
-                  <span className="text-[9px] font-bold text-slate-600 mt-2 text-center">Investasi Program</span>
-                </div>
-
-                {/* Bar 2: Produktivitas Gain */}
-                <div className="flex flex-col items-center flex-1 h-full justify-end">
-                  <span className="text-[9px] font-bold text-emerald-600 mb-1">+470 jt</span>
-                  <div className="w-full bg-emerald-500 rounded-t-lg h-[65%]" />
-                  <span className="text-[9px] font-bold text-slate-600 mt-2 text-center">Produktivitas Gain</span>
-                </div>
-
-                {/* Bar 3: Penurunan Turnover */}
-                <div className="flex flex-col items-center flex-1 h-full justify-end">
-                  <span className="text-[9px] font-bold text-emerald-600 mb-1">+210 jt</span>
-                  <div className="w-full bg-emerald-400 rounded-t-lg h-[45%]" />
-                  <span className="text-[9px] font-bold text-slate-600 mt-2 text-center">Penurunan Turnover</span>
-                </div>
-
-                {/* Bar 4: Penurunan Mangkir */}
-                <div className="flex flex-col items-center flex-1 h-full justify-end">
-                  <span className="text-[9px] font-bold text-emerald-600 mb-1">+150 jt</span>
-                  <div className="w-full bg-emerald-400/80 rounded-t-lg h-[35%]" />
-                  <span className="text-[9px] font-bold text-slate-600 mt-2 text-center">Penurunan Mangkir</span>
-                </div>
-
-                {/* Bar 5: Efisiensi Meeting */}
-                <div className="flex flex-col items-center flex-1 h-full justify-end">
-                  <span className="text-[9px] font-bold text-emerald-600 mb-1">+90 jt</span>
-                  <div className="w-full bg-emerald-300 rounded-t-lg h-[25%]" />
-                  <span className="text-[9px] font-bold text-slate-600 mt-2 text-center">Efisiensi Meeting</span>
-                </div>
-
-                {/* Bar 6: Total Benefit */}
-                <div className="flex flex-col items-center flex-1 h-full justify-end">
-                  <span className="text-[9px] font-black text-amber-600 mb-1">970 jt</span>
-                  <div className="w-full bg-amber-500 rounded-t-lg h-[100%]" />
-                  <span className="text-[9px] font-black text-[#071A33] mt-2 text-center">Total Benefit (90 Hari)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Sub Formula Bar */}
-            <div className="grid grid-cols-4 gap-2 bg-[#FAF8F4] border border-[#EAE5D9] rounded-2xl p-3 text-center text-xs font-bold">
+            {/* SECTION 3: AVERAGE GROWTH BY AREA (HORIZONTAL BAR CHART SORTED HIGHEST FIRST) */}
+            <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4 flex flex-col justify-between">
               <div>
-                <span className="text-[9px] text-slate-400 block uppercase">Investasi Program</span>
-                <span className="text-[#071A33]">Rp 350.000.000</span>
-              </div>
-              <div>
-                <span className="text-[9px] text-emerald-600 block uppercase">Total Benefit</span>
-                <span className="text-emerald-700">Rp 970.000.000</span>
-              </div>
-              <div>
-                <span className="text-[9px] text-amber-700 block uppercase">Net Benefit</span>
-                <span className="text-amber-800">Rp 620.000.000</span>
-              </div>
-              <div className="bg-amber-100 rounded-xl p-1 text-amber-900 font-black">
-                <span className="text-[9px] block uppercase">ROI</span>
-                <span>277%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 10: COST SAVING BREAKDOWN (DONUT CHART 2) */}
-          <div className="lg:col-span-5 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4 flex flex-col justify-between">
-            <h3 className="text-sm font-extrabold text-[#071A33]">Cost Saving Breakdown</h3>
-
-            <div className="flex flex-col items-center justify-center space-y-3 py-1">
-              <div className="relative h-32 w-32 flex items-center justify-center">
-                <svg className="h-full w-full transform -rotate-90" viewBox="0 0 36 36">
-                  <path className="text-[#071A33]" strokeWidth="5" strokeDasharray="48 100" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-amber-500" strokeWidth="5" strokeDasharray="22 100" strokeDashoffset="-48" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-emerald-500" strokeWidth="5" strokeDasharray="15 100" strokeDashoffset="-70" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-purple-500" strokeWidth="5" strokeDasharray="9 100" strokeDashoffset="-85" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-slate-400" strokeWidth="5" strokeDasharray="6 100" strokeDashoffset="-94" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[10px] font-bold text-slate-400">Total Saving</span>
-                  <span className="text-base font-black text-[#071A33]">Rp 970JT</span>
+                <div className="border-b border-[#EAE5D9] pb-3">
+                  <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                    TRANSFORMATION DELTA RANKING
+                  </span>
+                  <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">
+                    Average Growth by Area (Diurutkan dari Tertinggi)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Area transformasi dengan lonjakan pertumbuhan paling signifikan pada peserta.
+                  </p>
                 </div>
-              </div>
 
-              <div className="w-full space-y-1.5 text-xs font-semibold">
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#071A33] shrink-0" /> Produktivitas Gain</span>
-                  <span className="font-bold text-[#071A33]">Rp 470.000.000 (48%)</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" /> Penurunan Turnover</span>
-                  <span className="font-bold text-[#071A33]">Rp 210.000.000 (22%)</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" /> Penurunan Mangkir</span>
-                  <span className="font-bold text-[#071A33]">Rp 150.000.000 (15%)</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-purple-500 shrink-0" /> Efisiensi Meeting</span>
-                  <span className="font-bold text-[#071A33]">Rp 90.000.000 (9%)</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-slate-400 shrink-0" /> Peningkatan Kepemimpinan</span>
-                  <span className="font-bold text-[#071A33]">Rp 50.000.000 (6%)</span>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-[9px] text-slate-400 text-center italic">Estimasi penghematan dihitung berdasarkan data aktual dan asumsi konservatif perusahaan.</p>
-          </div>
-        </div>
-
-
-        {/* ─── SECTION 11 & 12: TOP 5 PESERTA & LEADERSHIP COMPETENCY RADAR ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-          {/* SECTION 11: TOP 5 PERFORMA PESERTA TABLE */}
-          <div className="lg:col-span-8 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-[#071A33]">Top 5 Performa Peserta</h3>
-              <button
-                onClick={() => setShowAllParticipants(!showAllParticipants)}
-                className="text-xs font-bold text-[#0B2C6B] hover:underline flex items-center gap-1 print:hidden"
-              >
-                {showAllParticipants ? "Sembunyikan" : "Lihat Semua 25 Peserta"} &rarr;
-              </button>
-            </div>
-
-            <div className="overflow-x-auto pt-1">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#EAE5D9] text-slate-400 font-bold text-[10px]">
-                    <th className="pb-2 font-semibold">No</th>
-                    <th className="pb-2 font-semibold">Nama Peserta</th>
-                    <th className="pb-2 font-semibold text-center">Produktivitas</th>
-                    <th className="pb-2 font-semibold text-center">Kedisiplinan</th>
-                    <th className="pb-2 font-semibold text-center">Mangkir</th>
-                    <th className="pb-2 font-semibold text-center">Integrity Score</th>
-                    <th className="pb-2 font-semibold text-center">Impact Score</th>
-                    <th className="pb-2 font-semibold text-center">Rating Atasan</th>
-                    <th className="pb-2 font-semibold text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#EAE5D9]">
-                  {displayedParticipants.map((p, i) => (
-                    <tr key={p.id} className="hover:bg-[#FAF8F4]/80 transition-colors">
-                      <td className="py-2.5 font-bold text-slate-400 text-[11px]">{i + 1}</td>
-                      <td className="py-2.5 font-bold text-[#071A33]">{p.name}</td>
-                      <td className="py-2.5 font-bold text-center text-emerald-600">{p.productivity}</td>
-                      <td className="py-2.5 font-bold text-center text-slate-700">{p.discipline}</td>
-                      <td className="py-2.5 font-bold text-center text-blue-600">{p.absenteeism}</td>
-                      <td className="py-2.5 font-bold text-center text-purple-600">{p.integrityScore}</td>
-                      <td className="py-2.5 font-black text-center text-[#0B2C6B]">{p.impactScore}</td>
-                      <td className="py-2.5 text-center text-amber-500 font-bold">
-                        {"★".repeat(p.ratingAtasan)}
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                            p.status === "Excellent"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-blue-50 text-blue-700 border border-blue-200"
-                          }`}
-                        >
-                          {p.status}
+                <div className="space-y-4 pt-4">
+                  {AREA_GROWTH_RANKED.map((item, index) => (
+                    <div key={item.area} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-[#0F1E3D] flex items-center gap-2">
+                          <span className="h-5 w-5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black flex items-center justify-center">
+                            #{index + 1}
+                          </span>
+                          {item.area}
                         </span>
-                      </td>
-                    </tr>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 font-semibold">{item.before}% &rarr; {item.after}%</span>
+                          <span className="text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                            +{item.delta}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar Container */}
+                      <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-slate-400 transition-all"
+                          style={{ width: `${item.before}%` }}
+                        />
+                        <div
+                          className="h-full bg-[#C79A3C] transition-all"
+                          style={{ width: `${item.delta}%` }}
+                        />
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50/60 border border-amber-200/70 rounded-2xl text-xs text-amber-900 flex items-center gap-2.5 mt-4">
+                <Lightbulb className="h-5 w-5 text-amber-600 shrink-0" />
+                <p className="font-medium">
+                  <strong>Insight Utama:</strong> Leadership Excellence dan Spiritual Growth mengalami lonjakan tertinggi (+36% &amp; +32%), mengonfirmasi keberhasilan integrasi ibadah dengan gaya kepemimpinan.
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* SECTION 12: LEADERSHIP COMPETENCY RADAR CHART */}
-          <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-[#071A33]">Leadership Competency Radar</h3>
-              <div className="flex items-center gap-2 text-[9px] font-bold text-slate-500">
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#071A33]" /> Sebelum</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Setelah</span>
+          {/* SECTION 4 & 5: READINESS INDEX & PTP COMPLETION DONUT */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* SECTION 4: TRANSFORMATION READINESS INDEX */}
+            <div className="lg:col-span-5 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
+              <div className="border-b border-[#EAE5D9] pb-3">
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  KEBERLANJUTAN BUDAYA
+                </span>
+                <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">
+                  Transformation Readiness Index
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Tingkat kesiapan organisasi menjaga budaya transformasi pasca 90 hari.
+                </p>
+              </div>
+
+              <div className="text-center py-4 space-y-3">
+                <div className="inline-flex items-center justify-center p-4 rounded-full bg-amber-50 border-4 border-[#C79A3C]/30 shadow-inner">
+                  <div className="text-center">
+                    <span className="text-4xl font-black text-[#0F1E3D]">89%</span>
+                    <span className="text-[10px] font-extrabold text-[#C79A3C] uppercase block tracking-widest">High Readiness</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-600 font-medium max-w-xs mx-auto">
+                  89% alumni siap menjadi <em>Change Champion</em> untuk menyebarkan budaya kepemimpinan di unit kerja masing-masing.
+                </p>
               </div>
             </div>
 
-            {/* SVG Radar Polygon Visual */}
-            <div className="h-48 w-full flex items-center justify-center relative">
-              <svg className="h-44 w-44 overflow-visible" viewBox="0 0 200 200">
-                {/* Radar Grid Circles / Hexagons */}
-                <polygon points="100,20 170,60 170,140 100,180 30,140 30,60" fill="none" stroke="#e2e8f0" strokeWidth="1" />
-                <polygon points="100,45 145,70 145,130 100,155 55,130 55,70" fill="none" stroke="#f1f5f9" strokeWidth="1" />
-                <polygon points="100,70 120,85 120,115 100,130 80,115 80,85" fill="none" stroke="#f1f5f9" strokeWidth="1" />
+            {/* SECTION 5: PTP COMPLETION DONUT CHART */}
+            <div className="lg:col-span-7 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
+              <div className="border-b border-[#EAE5D9] pb-3">
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  CUMULATIVE PROGRESS
+                </span>
+                <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">
+                  PTP Completion Rate (3 Kategori Status)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Proporsi penyelesaian Personal Transformation Project dari 25 peserta.
+                </p>
+              </div>
 
-                {/* Axis Lines */}
-                <line x1="100" y1="100" x2="100" y2="20" stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="100" y1="100" x2="170" y2="60" stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="100" y1="100" x2="170" y2="140" stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="100" y1="100" x2="100" y2="180" stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="100" y1="100" x2="30" y2="140" stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="100" y1="100" x2="30" y2="60" stroke="#cbd5e1" strokeWidth="1" />
-
-                {/* Polygon 1: Sebelum Program (Navy Solid) */}
-                <polygon points="100,55 135,80 135,120 100,140 65,120 65,80" fill="#071A33" fillOpacity="0.2" stroke="#071A33" strokeWidth="2" />
-
-                {/* Polygon 2: Setelah 90 Hari (Amber Gold) */}
-                <polygon points="100,25 160,65 160,135 100,170 40,135 40,65" fill="#f59e0b" fillOpacity="0.3" stroke="#f59e0b" strokeWidth="2.5" />
-
-                {/* Axis Labels */}
-                <text x="100" y="12" textAnchor="middle" className="text-[9px] font-bold fill-[#071A33]">Leadership</text>
-                <text x="180" y="60" textAnchor="start" className="text-[9px] font-bold fill-slate-500">Collaboration</text>
-                <text x="180" y="145" textAnchor="start" className="text-[9px] font-bold fill-slate-500">Productivity</text>
-                <text x="100" y="195" textAnchor="middle" className="text-[9px] font-bold fill-slate-500">Discipline</text>
-                <text x="20" y="145" textAnchor="end" className="text-[9px] font-bold fill-slate-500">Spiritual Growth</text>
-                <text x="20" y="60" textAnchor="end" className="text-[9px] font-bold fill-[#071A33]">Integrity</text>
-              </svg>
-            </div>
-
-            <span className="text-[9px] text-slate-400 text-center block">Perkembangan 6 kompetensi karakter kepemimpinan secara menyeluruh.</span>
-          </div>
-
-        </div>
-
-
-        {/* ─── SECTION 13: EXECUTIVE RECOMMENDATION (NAVY FOOTER BANNER) ─── */}
-        <div className="bg-[#071A33] text-white rounded-3xl p-6 shadow-xl border border-navy-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-              <Star className="h-6 w-6 fill-amber-400" />
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-white">Executive Recommendation</h3>
-              <p className="text-xs text-blue-200 mt-0.5 max-w-xl leading-relaxed">
-                Program SLJ 90 Hari Batch Executive 2026 memberikan dampak bisnis yang signifikan dan terukur. Dari sisi finansial, program ini menghasilkan ROI 277% dengan payback period 4.2 bulan.
-              </p>
+              <div className="pt-2">
+                <DonutChart />
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 border-t md:border-t-0 md:border-l border-blue-900/80 pt-4 md:pt-0 md:pl-6 shrink-0">
-            {/* Box 1: ROI Positif */}
-            <div className="space-y-0.5 text-center">
-              <span className="text-[9px] text-blue-200 font-bold uppercase block">ROI Positif</span>
-              <span className="text-sm font-black text-amber-400 block">277% dalam 90 hari</span>
-            </div>
-
-            {/* Box 2: Produktivitas Naik */}
-            <div className="space-y-0.5 text-center">
-              <span className="text-[9px] text-blue-200 font-bold uppercase block">Produktivitas Naik</span>
-              <span className="text-sm font-black text-emerald-400 block">+22% dari baseline</span>
-            </div>
-
-            {/* Box 3: Mangkir Turun */}
-            <div className="space-y-0.5 text-center">
-              <span className="text-[9px] text-blue-200 font-bold uppercase block">Mangkir Turun</span>
-              <span className="text-sm font-black text-emerald-400 block">-35% dari baseline</span>
-            </div>
-
-            {/* Box 4: Integrity Naik */}
-            <div className="space-y-0.5 text-center">
-              <span className="text-[9px] text-blue-200 font-bold uppercase block">Integrity Naik</span>
-              <span className="text-sm font-black text-purple-300 block">98% integrity score</span>
-            </div>
-
-            {/* Box 5: Layak Dilanjutkan */}
-            <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-2xl px-4 py-2 text-center text-emerald-300">
-              <span className="text-[9px] font-bold block uppercase">Layak Dilanjutkan</span>
-              <span className="text-xs font-black block">Rekomendasi: YES</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* ─── MODAL EXECUTIVE SUMMARY DETAIL ─── */}
-      {showExecModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-[#EAE5D9] relative animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-4">
+          {/* SECTION 6: KIRKPATRICK DASHBOARD (4 SCORE CARDS LEVEL 1-4) */}
+          <div className="bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-5">
+            <div className="border-b border-[#EAE5D9] pb-3 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase text-[#C79A3C] tracking-wider block">Official Executive Briefing</span>
-                <h3 className="text-lg font-black text-[#071A33]">Detail Ringkasan Eksekutif Program SLJ 90 Hari</h3>
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  STANDAR EVALUASI GLOBAL
+                </span>
+                <h3 className="text-lg font-bold text-[#0F1E3D]">
+                  Kirkpatrick Evaluation Dashboard (Level 1 &ndash; 4)
+                </h3>
               </div>
-              <button
-                onClick={() => setShowExecModal(false)}
-                className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold flex items-center justify-center text-xs"
-              >
-                ✕
-              </button>
+              <span className="text-xs font-bold text-[#0F1E3D] bg-amber-100 border border-amber-300 px-3 py-1 rounded-xl">
+                Integrated Framework
+              </span>
             </div>
 
-            <div className="space-y-4 text-xs text-slate-600 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
-              <p>
-                <strong>Ringkasan Eksekutif Board Meeting 2026:</strong><br />
-                Pelaksanaan Program Spiritual Leadership Journey (SLJ) 90 Hari untuk 25 karyawan Executive PT Mitra Sejahtera telah berhasil diselesaikan dengan hasil bisnis yang sangat memuaskan melebihi ekspektasi awal.
-              </p>
-              
-              <div className="bg-[#FAF8F4] border border-[#EAE5D9] rounded-2xl p-4 space-y-2">
-                <h4 className="font-extrabold text-[#071A33]">Poin Kunci Keputusan Direksi:</h4>
-                <ul className="list-disc list-inside space-y-1 font-semibold text-slate-700">
-                  <li><strong>Total Penghematan Efisiensi (Cost Saving)</strong>: Rp 970.000.000.</li>
-                  <li><strong>Investasi Program Execution</strong>: Rp 350.000.000.</li>
-                  <li><strong>Nett Financial Profit</strong>: Rp 620.000.000 (ROI 277%).</li>
-                  <li><strong>Payback Period</strong>: Modal investasi kembali sepenuhnya dalam 4.2 bulan.</li>
-                </ul>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Level 1 */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                    LEVEL 1
+                  </span>
+                  <Award className="h-4 w-4 text-[#C79A3C]" />
+                </div>
+                <h4 className="font-extrabold text-[#0F1E3D] text-sm">Reaction &amp; Experience</h4>
+                <div className="text-2xl font-black text-[#0F1E3D]">94%</div>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-normal">
+                  Kepuasan peserta terhadap kualitas materi, pembinaan coach, dan aplikasi digital.
+                </p>
               </div>
 
-              <p>
-                <strong>Rekomendasi Lanjutan:</strong><br />
-                Berdasarkan validasi atasan (rating 4.8/5.0) dan skor integritas 100%, disarankan kepada jajaran Direksi untuk menyetujui alokasi anggaran peluncuran SLJ Batch 2 & 3 bagi level Manager & Supervisor.
-              </p>
+              {/* Level 2 */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                    LEVEL 2
+                  </span>
+                  <BookOpen className="h-4 w-4 text-[#C79A3C]" />
+                </div>
+                <h4 className="font-extrabold text-[#0F1E3D] text-sm">Learning &amp; Awareness</h4>
+                <div className="text-2xl font-black text-[#0F1E3D]">89%</div>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-normal">
+                  Peningkatan pemahaman nilai kepemimpinan, amanah, dan kesadaran spiritual.
+                </p>
+              </div>
+
+              {/* Level 3 */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                    LEVEL 3
+                  </span>
+                  <CheckCircle2 className="h-4 w-4 text-[#C79A3C]" />
+                </div>
+                <h4 className="font-extrabold text-[#0F1E3D] text-sm">Behavior &amp; Habit</h4>
+                <div className="text-2xl font-black text-[#0F1E3D]">86%</div>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-normal">
+                  Konsistensi pelaksanaan habit rutin harian/pekanan di rumah dan tempat kerja.
+                </p>
+              </div>
+
+              {/* Level 4 */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                    LEVEL 4
+                  </span>
+                  <TrendingUp className="h-4 w-4 text-[#C79A3C]" />
+                </div>
+                <h4 className="font-extrabold text-[#0F1E3D] text-sm">Business Results</h4>
+                <div className="text-2xl font-black text-[#0F1E3D]">92%</div>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-normal">
+                  Pencapaian KPI bisnis, disiplin kerja, efisiensi operasional, &amp; budaya tim.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 7: BUSINESS IMPACT KPI CARDS (BAHASA DIREKSI) */}
+          <div className="bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-5">
+            <div className="border-b border-[#EAE5D9] pb-3">
+              <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                BAHASA DIREKSI (EXECUTIVE METRICS)
+              </span>
+              <h3 className="text-lg font-bold text-[#0F1E3D]">
+                Business Impact Summary
+              </h3>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-[#EAE5D9]">
-              <button
-                onClick={() => setShowExecModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-[#0B2C6B] text-white text-xs font-bold hover:bg-[#071A33]"
-              >
-                Tutup Ringkasan
-              </button>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Kedisiplinan Kerja</span>
+                <div className="text-3xl font-black text-[#0F1E3D]">94%</div>
+                <span className="text-[11px] font-semibold text-emerald-600">+12% dibanding baseline</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Pencapaian KPI Tim</span>
+                <div className="text-3xl font-black text-[#0F1E3D]">128%</div>
+                <span className="text-[11px] font-semibold text-emerald-600">Melampaui target tahunan</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Retensi &amp; Employee Engagement</span>
+                <div className="text-3xl font-black text-[#0F1E3D]">96%</div>
+                <span className="text-[11px] font-semibold text-emerald-600">Turnover mendekati 0%</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Indeks Kolaborasi Lintas Unit</span>
+                <div className="text-3xl font-black text-[#0F1E3D]">92%</div>
+                <span className="text-[11px] font-semibold text-emerald-600">Komunikasi antar-divisi lancar</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 8: TOP PERFORMERS & TRANSFORMATION STORIES */}
+          <div className="bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-5">
+            <div className="border-b border-[#EAE5D9] pb-3 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  ALUMNI BERPRESTASI &amp; KISAH SUKSES
+                </span>
+                <h3 className="text-lg font-bold text-[#0F1E3D]">
+                  Top Performers &amp; Transformation Stories
+                </h3>
+              </div>
+              <span className="text-xs font-bold text-amber-900 bg-amber-100 px-3 py-1 rounded-xl">
+                5 Peserta Terbaik (Skor &gt; 85)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {MOCK_PARTICIPANTS.map((p, idx) => (
+                <div key={p.id} className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#EAE5D9] space-y-3 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-6 w-6 rounded-full bg-[#0F1E3D] text-amber-400 font-extrabold text-xs flex items-center justify-center shrink-0">
+                        #{idx + 1}
+                      </span>
+                      <div>
+                        <h4 className="font-extrabold text-[#0F1E3D] text-sm leading-snug">{p.name}</h4>
+                        <span className="text-[10px] text-slate-500 font-medium block">{p.role}</span>
+                      </div>
+                    </div>
+                    <span className="text-emerald-700 font-black text-xs bg-emerald-100 px-2 py-0.5 rounded-md">
+                      {p.overallScore}/100
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] font-semibold text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200/80 italic">
+                    &ldquo;{p.coachComment}&rdquo;
+                  </div>
+
+                  <div className="pt-1 flex items-center justify-between text-[10px] font-bold text-slate-500 border-t border-slate-200/60">
+                    <span>Produktivitas: <strong className="text-[#0F1E3D]">{p.productivity}</strong></span>
+                    <span>Disiplin: <strong className="text-[#0F1E3D]">{p.discipline}</strong></span>
+                    <span className="text-emerald-600 font-black">{p.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SECTION 9: MANAGEMENT RECOMMENDATIONS (TIDAK DIUKUR, REKOMENDASI OTOMATIS) */}
+          <div className="bg-amber-50/40 rounded-3xl p-6 border border-amber-200 shadow-xs space-y-5">
+            <div className="border-b border-amber-200 pb-3 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-widest block">
+                  ACTIONABLE NEXT STEPS FOR MANAGEMENT
+                </span>
+                <h3 className="text-lg font-bold text-[#0F1E3D]">
+                  Management Recommendations
+                </h3>
+              </div>
+              <span className="text-xs font-bold text-amber-900 bg-amber-100 px-3 py-1 rounded-xl">
+                Rekomendasi Berbasis Sistem
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl bg-white border border-amber-200/80 space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                  <UserCheck className="h-4 w-4 text-[#C79A3C]" />
+                  <span>1. Coaching Lanjutan Periodic</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Menjadwalkan sesi coaching 1-on-1 berkala tiap 3 bulan untuk menjaga ritme istiqamah alumni.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-amber-200/80 space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                  <Sparkles className="h-4 w-4 text-[#C79A3C]" />
+                  <span>2. Penugasan Change Champion</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Menunjuk 5 lulusan terbaik (skor &gt;90) sebagai perintis budaya di divisi masing-masing.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-amber-200/80 space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                  <Building2 className="h-4 w-4 text-[#C79A3C]" />
+                  <span>3. Culture Reinforcement</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Mendorong ritual Shalat Berjamaah tepat waktu dan sesi sharing mingguan di level unit kerja.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-amber-200/80 space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                  <Users className="h-4 w-4 text-[#C79A3C]" />
+                  <span>4. Superior 90-Day Monitoring</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Atasan langsung memantau ketercapaian target PTP dalam penilaian kinerja semesteran.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-amber-200/80 space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                  <Zap className="h-4 w-4 text-[#C79A3C]" />
+                  <span>5. Refreshment Program</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Mengadakan Re-union Gathering &amp; Refreshment Session pada bulan ke-6 pasca umrah.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Print CSS Fix for Board Deck Export */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #print-area, #print-area * {
-            visibility: visible;
-          }
-          #print-area {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 8px;
-          }
-          .print\\:hidden {
-            display: none !important;
-          }
-        }
-      `}</style>
+      {/* ========================================================================= */}
+      {/* VIEW MODE 2: INDIVIDUAL TRANSFORMATION REPORT (PARTICIPANT LEVEL)        */}
+      {/* ========================================================================= */}
+      {viewMode === "individual" && (
+        <div id="print-area-individual" className="space-y-8 print:space-y-6">
+          {/* SECTION 1: INDIVIDUAL COVER & IDENTITY HERO */}
+          <div className="bg-[#0F1E3D] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-navy-900 relative overflow-hidden">
+            <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-amber-400 tracking-widest block mb-4">
+              <span>INDIVIDUAL TRANSFORMATION REPORT &mdash; 90 DAYS</span>
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-3 py-0.5 rounded-full">
+                Status: {currentParticipant.status}
+              </span>
+            </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              <div className="lg:col-span-7 space-y-3">
+                <span className="text-xs text-blue-200 font-semibold block">{currentParticipant.company}</span>
+                <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                  {currentParticipant.name}
+                </h2>
+                <p className="text-sm text-amber-300 font-bold">{currentParticipant.role}</p>
+
+                <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-amber-400" /> Coach: {currentParticipant.coach}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Heart className="h-3.5 w-3.5 text-amber-400" /> Sahabat Safar Assigned
+                  </span>
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 bg-white/10 p-5 rounded-2xl border border-white/10 text-center space-y-2">
+                <span className="text-xs text-blue-200 font-bold uppercase tracking-wider block">Skor Transformasi Akhir</span>
+                <div className="text-4xl font-black text-amber-400">{currentParticipant.overallScore}/100</div>
+                <span className="text-xs text-emerald-300 font-semibold block">Top Growth: {currentParticipant.topArea}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 2 & 3: INDIVIDUAL RADAR CHART & DELTA BAR */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
+              <div className="border-b border-[#EAE5D9] pb-3">
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  RADAR TRANSFORMASI INDIVIDU
+                </span>
+                <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">
+                  Before vs After ({currentParticipant.name})
+                </h3>
+              </div>
+              <TransformationRadarChart data={currentParticipant.radarData} />
+            </div>
+
+            <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
+              <div className="border-b border-[#EAE5D9] pb-3">
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  PERTUMBUHAN AREA
+                </span>
+                <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">
+                  Transformation Delta (Urut dari Tertinggi)
+                </h3>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                {currentParticipant.radarData
+                  .map((item) => ({ ...item, delta: item.after - item.before }))
+                  .sort((a, b) => b.delta - a.delta)
+                  .map((item, idx) => (
+                    <div key={item.area} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-[#0F1E3D]">{item.area}</span>
+                        <span className="text-emerald-600 font-black">+{item.delta}%</span>
+                      </div>
+                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                        <div className="h-full bg-slate-400" style={{ width: `${item.before}%` }} />
+                        <div className="h-full bg-[#C79A3C]" style={{ width: `${item.delta}%` }} />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 6 & 7: PTP & HABIT PROGRESS */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
+              <div className="border-b border-[#EAE5D9] pb-3">
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  PERSONAL TRANSFORMATION PROJECT
+                </span>
+                <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">PTP Progress</h3>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-slate-600">Pencapaian Milestone 90 Hari</span>
+                  <span className="text-[#0F1E3D] font-black">{currentParticipant.ptpProgress}% Completed</span>
+                </div>
+                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#C79A3C]" style={{ width: `${currentParticipant.ptpProgress}%` }} />
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-normal pt-2">
+                  Proyek transformasi personal telah dilaksanakan sesuai kesepakatan dengan Coach dan disetujui oleh Atasan Langsung.
+                </p>
+              </div>
+            </div>
+
+            <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-[#EAE5D9] shadow-xs space-y-4">
+              <div className="border-b border-[#EAE5D9] pb-3">
+                <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                  MONITORING KEBIASAAN
+                </span>
+                <h3 className="text-base font-bold text-[#0F1E3D] mt-0.5">Habit Progress</h3>
+              </div>
+
+              <div className="space-y-3">
+                {currentParticipant.habits.map((h, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-[#0F1E3D]">{h.name} ({h.target})</span>
+                      <span className="text-amber-700">{h.completion}%</span>
+                    </div>
+                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500" style={{ width: `${h.completion}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 8: COACH & SAHABAT SAFAR FEEDBACK */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 rounded-3xl bg-white border border-[#EAE5D9] shadow-xs space-y-2">
+              <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                INSIGHT COACH PERSONAL
+              </span>
+              <h4 className="font-bold text-[#0F1E3D] text-sm">{currentParticipant.coach}</h4>
+              <p className="text-xs text-slate-600 italic leading-relaxed">
+                &ldquo;{currentParticipant.coachComment}&rdquo;
+              </p>
+            </div>
+
+            <div className="p-5 rounded-3xl bg-white border border-[#EAE5D9] shadow-xs space-y-2">
+              <span className="text-[10px] font-extrabold uppercase text-[#C79A3C] tracking-widest block">
+                CATATAN SAHABAT SAFAR
+              </span>
+              <h4 className="font-bold text-[#0F1E3D] text-sm">Peer Accountability Partner</h4>
+              <p className="text-xs text-slate-600 italic leading-relaxed">
+                &ldquo;{currentParticipant.safarComment}&rdquo;
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

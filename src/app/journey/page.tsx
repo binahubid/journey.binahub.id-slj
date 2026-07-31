@@ -32,15 +32,21 @@ import {
   Clock,
   Edit3,
   Heart,
+  MessageSquare,
+  Trash2,
+  ChevronLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Calendar,
+  Lightbulb,
 } from "lucide-react";
 
 // ─── Section Config ─────────────────────────────────────────────
 const SECTIONS = [
   { num: 1, title: "Hasil Muhasabah", subtitle: "Insight terbesar tentang diri Anda" },
   { num: 2, title: "Niat Perubahan", subtitle: "Landasan komitmen ibadah karena Allah" },
-  { num: 3, title: "Area Transformasi", subtitle: "Pilih maksimal 3 area fokus pertumbuhan" },
-  { num: 4, title: "Sasaran & Indikator Capaian", subtitle: "Sasaran 90 hari & 4 dimensi indikator terukur" },
-  { num: 5, title: "Action Plan (Habit Engine)", subtitle: "Kebiasaan harian/mingguan yang dipantau" },
+  { num: 3, title: "Area Transformasi", subtitle: "Pilih area fokus dan tetapkan target 90 hari" },
+  { num: 4, title: "Action Plan (Habit Engine)", subtitle: "Kebiasaan harian/mingguan yang dipantau" },
 ];
 
 // ─── Area List ───────────────────────────────────────────────────
@@ -84,22 +90,14 @@ const SECTION_TIPS: Record<number, { title: string; tips: { icon: string; title:
     ],
   },
   3: {
-    title: "Tips Memilih Area",
+    title: "Tips Area & Sasaran",
     tips: [
       { icon: "✦", title: "Fokus adalah kunci", desc: "3 area maksimal agar energi tidak tersebar terlalu luas." },
-      { icon: "✦", title: "Pilih yang relevan sekarang", desc: "Pilih area yang paling berdampak pada kondisi Anda saat ini." },
-      { icon: "✦", title: "Area bisa berubah tiap batch", desc: "Setiap siklus 90 hari Anda bisa memilih area yang berbeda." },
+      { icon: "✦", title: "Target SMART", desc: "Specific · Measurable · Achievable · Relevant · Time-bound." },
+      { icon: "✦", title: "Indikator 4 Dimensi", desc: "Lengkapi Kualitas, Kuantitas, Waktu, dan Biaya untuk hasil terukur." },
     ],
   },
   4: {
-    title: "Tips Target & Indikator",
-    tips: [
-      { icon: "✦", title: "1 target besar, bukan banyak", desc: "Satu target utama yang jelas lebih powerful dari banyak target kabur." },
-      { icon: "✦", title: "Indikator harus bisa diukur", desc: "Gunakan angka, frekuensi, atau periode waktu yang konkret." },
-      { icon: "✦", title: "Target SMART", desc: "Specific · Measurable · Achievable · Relevant · Time-bound." },
-    ],
-  },
-  5: {
     title: "Tips Habit Engine",
     tips: [
       { icon: "✦", title: "Mulai dari yang kecil", desc: "Kebiasaan kecil yang konsisten lebih efektif dari yang besar tapi tidak dilakukan." },
@@ -107,7 +105,6 @@ const SECTION_TIPS: Record<number, { title: string; tips: { icon: string; title:
       { icon: "✦", title: "Kaitkan dengan area transformasi", desc: "Pilih kebiasaan yang langsung mendukung area yang dipilih." },
     ],
   },
-
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -136,6 +133,11 @@ export default function JourneyPage() {
   const [activeSection, setActiveSection] = useState(1);
   const [mobileView, setMobileView] = useState<"navigator" | "editor" | "tips">("navigator");
   const [showCelebration, setShowCelebration] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [hadithOpen, setHadithOpen] = useState(false);
+  const [openAreaEditor, setOpenAreaEditor] = useState<string>("");
+  const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
+  const [recsOpen, setRecsOpen] = useState(false);
 
   // Autosave
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -160,7 +162,7 @@ interface BatchMate {
   const muhasabahRef = useRef("");
   const niatRef = useRef("");
   const niatAlasanRef = useRef("");
-  const selectedAreasRef = useRef<string[]>(["Spiritual Growth"]);
+  const selectedAreasRef = useRef<string[]>([]);
   const areaTargetsMapRef = useRef<Record<string, AreaTargetData>>({});
   const actionPlansRef = useRef<{ id?: string; title: string; frequency: string; quantity: number; area_category: string }[]>([]);
   const sahabatSafarRef = useRef("");
@@ -175,13 +177,11 @@ interface BatchMate {
   const [niatAlasan, setNiatAlasan] = useState("");
 
   // Section 3
-  const [selectedAreas, setSelectedAreas] = useState<string[]>(["Spiritual Growth"]);
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
 
   // Section 4 (Tab Per Area)
-  const [activeAreaTab, setActiveAreaTab] = useState<string>("Spiritual Growth");
-  const [areaTargetsMap, setAreaTargetsMap] = useState<Record<string, AreaTargetData>>({
-    "Spiritual Growth": { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" }
-  });
+  const [activeAreaTab, setActiveAreaTab] = useState<string>("");
+  const [areaTargetsMap, setAreaTargetsMap] = useState<Record<string, AreaTargetData>>({});
 
   // SMART Tooltip State
   const [showSmartTooltip, setShowSmartTooltip] = useState(false);
@@ -366,34 +366,73 @@ interface BatchMate {
         case 2:
           await supabase.from("journeys").update({ niat: JSON.stringify({ niat: niatRef.current, alasan: niatAlasanRef.current }), updated_at: new Date().toISOString() }).eq("id", _journeyId);
           break;
-        case 3:
-          await supabase.from("journeys").update({ area_transformasi: selectedAreasRef.current, updated_at: new Date().toISOString() }).eq("id", _journeyId);
-          break;
-        case 4: {
+        case 3: {
+          // Save area selection + target indicators together (merged step)
           const targetsObj = areaTargetsMapRef.current;
           const jsonStr = JSON.stringify(targetsObj);
           const allIndicators = Object.values(targetsObj).flatMap(t => [t.kualitas, t.kuantitas, t.waktu, t.biaya].filter(b => b && b.trim() !== ""));
-          await supabase.from("journeys").update({ main_target: jsonStr, success_indicators: allIndicators, updated_at: new Date().toISOString() }).eq("id", _journeyId);
+          await supabase.from("journeys").update({
+            area_transformasi: selectedAreasRef.current,
+            main_target: jsonStr,
+            success_indicators: allIndicators,
+            updated_at: new Date().toISOString()
+          }).eq("id", _journeyId);
           break;
         }
-        case 5: {
+        case 4: {
           const _plans = actionPlansRef.current;
-          await supabase.from("action_plans").delete().eq("journey_id", _journeyId);
+          // Fetch existing action_plans for this journey
+          const { data: existingPlans } = await supabase.from("action_plans").select("id, title").eq("journey_id", _journeyId);
+          const existingTitles = new Set((existingPlans || []).map((p) => p.title));
+          const currentTitles = new Set(_plans.map((p) => p.title));
+
+          // Delete only plans that were removed by user
+          const toDelete = (existingPlans || []).filter((p) => !currentTitles.has(p.title));
+          if (toDelete.length > 0) {
+            await supabase.from("action_plans").delete().in("id", toDelete.map((p) => p.id));
+          }
+
+          // Insert or update remaining plans
           for (const ap of _plans) {
-            const { data: apData } = await supabase.from("action_plans").insert({ journey_id: _journeyId, user_id: user.id, title: ap.title, category: ap.area_category || "Spiritual Growth", frequency: ap.frequency, quantity: ap.quantity || 1 }).select().maybeSingle();
-            const { data: existing } = await supabase.from("habits").select("id").eq("user_id", user.id).eq("title", ap.title).eq("is_archived", false).maybeSingle();
-            if (!existing) await supabase.from("habits").insert({ user_id: user.id, action_plan_id: apData?.id || null, title: ap.title, category: ap.area_category || "Spiritual Growth", frequency: ap.frequency, quantity: ap.quantity || 1, source: "action_plan", effective_from: todayStr, is_archived: false });
+            const match = (existingPlans || []).find((p) => p.title === ap.title);
+            let apId = match?.id;
+
+            if (match) {
+              await supabase.from("action_plans").update({
+                category: ap.area_category || "Spiritual Growth",
+                frequency: ap.frequency,
+                quantity: ap.quantity || 1,
+              }).eq("id", match.id);
+            } else {
+              const { data: inserted } = await supabase.from("action_plans").insert({
+                journey_id: _journeyId,
+                user_id: user.id,
+                title: ap.title,
+                category: ap.area_category || "Spiritual Growth",
+                frequency: ap.frequency,
+                quantity: ap.quantity || 1,
+              }).select().maybeSingle();
+              apId = inserted?.id;
+            }
+
+            // Sync with habits table
+            const { data: existingHabit } = await supabase.from("habits").select("id").eq("user_id", user.id).eq("title", ap.title).eq("is_archived", false).maybeSingle();
+            if (!existingHabit) {
+              await supabase.from("habits").insert({
+                user_id: user.id,
+                action_plan_id: apId || null,
+                title: ap.title,
+                category: ap.area_category || "Spiritual Growth",
+                frequency: ap.frequency,
+                quantity: ap.quantity || 1,
+                source: "action_plan",
+                effective_from: todayStr,
+                is_archived: false,
+              });
+            }
           }
           break;
         }
-        case 6:
-          await supabase.from("support_team").upsert({
-            journey_id: _journeyId,
-            user_id: user.id,
-            sahabat_safar_name: sahabatSafarRef.current,
-            sahabat_safar_user_id: sahabatSafarUserIdRef.current,
-          });
-          break;
       }
       setSaveStatus("saved");
       setLastSaved(new Date());
@@ -405,16 +444,15 @@ interface BatchMate {
     switch (num) {
       case 1: return muhasabah.trim().length > 0;
       case 2: return niat.trim().length > 0;
-      case 3: return selectedAreas.length > 0;
-      case 4: return Object.values(areaTargetsMap).some(t => t.mainTarget && t.mainTarget.trim().length > 0);
-      case 5: return actionPlans.length > 0;
+      case 3: return selectedAreas.length > 0 && Object.values(areaTargetsMap).some(t => t.mainTarget && t.mainTarget.trim().length > 0);
+      case 4: return actionPlans.length > 0;
       default: return false;
     }
   };
 
   const completedCount = SECTIONS.filter((_, i) => isSectionComplete(i + 1)).length;
-  const progressPct = Math.round((completedCount / 5) * 100);
-  const estimatedMinutes = (5 - completedCount) * 8;
+  const progressPct = Math.round((completedCount / 4) * 100);
+  const estimatedMinutes = (4 - completedCount) * 8;
 
   const getSectionStatus = (num: number): "completed" | "in-progress" | "not-started" => {
     if (isSectionComplete(num)) return "completed";
@@ -445,18 +483,18 @@ interface BatchMate {
     setActionPlans(next);
     setNewActionTitle("");
     setShowAddHabit(false);
-    scheduleAutosave(5);
+    scheduleAutosave(4);
   };
 
   const removeActionPlan = (idx: number) => {
     if (ptpStatus === "LOCKED") return;
     const next = actionPlans.filter((_, i) => i !== idx);
     setActionPlans(next);
-    scheduleAutosave(5);
+    scheduleAutosave(4);
   };
 
   const goToNext = () => {
-    if (activeSection < 5) { setActiveSection(activeSection + 1); setMobileView("editor"); }
+    if (activeSection < 4) { setActiveSection(activeSection + 1); setMobileView("editor"); }
     else { setShowCelebration(true); }
   };
 
@@ -485,32 +523,38 @@ interface BatchMate {
       case 1:
         return (
           <div className="space-y-4">
-            <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-500">✦</span>
-                  <span className="text-sm font-bold text-amber-800">Reflection Guide</span>
-                </div>
+            {/* Collapsible Reflection Guide */}
+            <button
+              type="button"
+              onClick={() => setGuideOpen(v => !v)}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-left hover:bg-amber-100/60 transition-colors group"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-amber-500 text-sm">✦</span>
+                <span className="text-sm font-bold text-amber-800">Reflection Guide</span>
               </div>
-              <ul className="text-sm text-amber-900 space-y-1">
-                <li>• Apa hal terpenting yang paling ingin Anda ubah dalam 90 hari?</li>
-                <li>• Apa kebiasaan yang paling sering menghambat potensi Anda?</li>
-                <li>• Apa yang ingin Allah lihat berubah dari diri Anda?</li>
-              </ul>
-            </div>
+              <ChevronRight className={`h-4 w-4 text-amber-500 transition-transform duration-200 ${guideOpen ? "rotate-90" : ""}`} />
+            </button>
+            {guideOpen && (
+              <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-3 -mt-2">
+                <ul className="text-sm text-amber-900 space-y-1.5">
+                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5 shrink-0">•</span> Apa hal terpenting yang paling ingin Anda ubah dalam 90 hari?</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5 shrink-0">•</span> Apa kebiasaan yang paling sering menghambat potensi Anda?</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5 shrink-0">•</span> Apa yang ingin Allah lihat berubah dari diri Anda?</li>
+                </ul>
+              </div>
+            )}
             <div>
-              <p className="text-sm text-slate-700 mb-2 font-medium">Tuliskan Muhasabah diri Anda secara jujur dan mendalam.</p>
-              <Textarea disabled={locked} value={muhasabah} onChange={e => { setMuhasabah(e.target.value); scheduleAutosave(1); }} placeholder="Tulis di sini..." className="min-h-[160px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={2000} />
+              <p className="text-xs text-slate-500 mb-2 font-medium">Tuliskan Muhasabah diri Anda secara jujur dan mendalam.</p>
+              <Textarea disabled={locked} value={muhasabah} onChange={e => { setMuhasabah(e.target.value); scheduleAutosave(1); }} placeholder="Tulis di sini..." className="min-h-[180px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={2000} />
               <div className="text-right text-xs text-slate-400 mt-1">{muhasabah.length} / 2000</div>
             </div>
-            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-slate-400">💬</span>
-                <span className="text-xs font-bold text-slate-600">Catatan untuk Coach (opsional)</span>
+            <div className="border border-slate-100 rounded-xl p-3.5 bg-slate-50">
+              <div className="flex items-center gap-2 mb-1">
+                <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
+                <span className="text-xs font-bold text-slate-500">Catatan untuk Coach (opsional)</span>
               </div>
-              <p className="text-xs text-slate-400 mb-2">Catatan ini hanya dapat dilihat oleh Coach dan Admin.</p>
-              <Textarea disabled={locked} placeholder="Tulis catatan untuk Coach..." className="min-h-[80px] text-sm resize-none border-slate-200 rounded-lg bg-white" maxLength={500} />
-              <div className="text-right text-xs text-slate-400 mt-1">0 / 500</div>
+              <Textarea disabled={locked} placeholder="Tulis catatan untuk Coach..." className="min-h-[72px] text-sm resize-none border-slate-200 rounded-lg bg-white text-xs" maxLength={500} />
             </div>
           </div>
         );
@@ -518,631 +562,612 @@ interface BatchMate {
       case 2:
         return (
           <div className="space-y-4">
-            <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl p-4">
-              <div className="flex items-start gap-2">
-                <span className="text-amber-400 text-xl leading-none mt-0.5">&ldquo;</span>
-                <div>
-                  <p className="text-sm text-amber-900 italic leading-relaxed font-medium">Sesungguhnya amal itu bergantung pada niatnya, dan sesungguhnya setiap orang akan mendapatkan sesuai dengan apa yang ia niatkan.</p>
-                  <p className="text-xs text-amber-700 mt-1.5 font-semibold">(HR. Bukhari & Muslim)</p>
-                </div>
+            {/* Collapsible Hadith */}
+            <button
+              type="button"
+              onClick={() => setHadithOpen(v => !v)}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-left hover:bg-amber-100/60 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-amber-600 text-base leading-none">&ldquo;</span>
+                <span className="text-sm font-bold text-amber-800">Hadith tentang Niat</span>
               </div>
-            </div>
+              <ChevronRight className={`h-4 w-4 text-amber-500 transition-transform duration-200 ${hadithOpen ? "rotate-90" : ""}`} />
+            </button>
+            {hadithOpen && (
+              <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-3 -mt-2">
+                <p className="text-sm text-amber-900 italic leading-relaxed font-medium">
+                  Sesungguhnya amal itu bergantung pada niatnya, dan sesungguhnya setiap orang akan mendapatkan sesuai dengan apa yang ia niatkan.
+                </p>
+                <p className="text-xs text-amber-700 mt-1.5 font-semibold">(HR. Bukhari & Muslim)</p>
+              </div>
+            )}
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-1.5">Tulis niat perubahan Anda dengan jelas.</p>
-              <Textarea disabled={locked} value={niat} onChange={e => { setNiat(e.target.value); scheduleAutosave(2); }} placeholder="Tulis niat Anda di sini..." className="min-h-[120px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={1000} />
+              <p className="text-xs text-slate-500 mb-2 font-medium">Tulis niat perubahan Anda dengan jelas.</p>
+              <Textarea disabled={locked} value={niat} onChange={e => { setNiat(e.target.value); scheduleAutosave(2); }} placeholder="Tulis niat Anda di sini..." className="min-h-[140px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={1000} />
               <div className="text-right text-xs text-slate-400 mt-1">{niat.length} / 1000</div>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-1.5">Mengapa niat ini penting bagi Anda?</p>
+              <p className="text-xs text-slate-500 mb-2 font-medium">Mengapa niat ini penting bagi Anda?</p>
               <Textarea disabled={locked} value={niatAlasan} onChange={e => { setNiatAlasan(e.target.value); scheduleAutosave(2); }} placeholder="Tulis alasan Anda..." className="min-h-[80px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={500} />
               <div className="text-right text-xs text-slate-400 mt-1">{niatAlasan.length} / 500</div>
             </div>
           </div>
         );
 
-      case 3:
-        return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-600">Pilih maksimal <span className="font-bold text-amber-600">3 area</span> fokus pertumbuhan.</p>
-              <span className={`text-xs font-bold px-2 py-1 rounded-full ${selectedAreas.length >= 3 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>{selectedAreas.length}/3</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {AREA_LIST.map(area => {
-                const Icon = area.icon;
-                const isSelected = selectedAreas.includes(area.id);
-                return (
-                  <button key={area.id} onClick={() => toggleArea(area.id)} disabled={locked || (!isSelected && selectedAreas.length >= 3)}
-                    className={`relative flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200 ${isSelected ? area.sel : area.base} ${!isSelected && selectedAreas.length >= 3 ? "opacity-40 cursor-not-allowed" : "cursor-pointer hover:shadow-sm"}`}>
-                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="font-bold text-sm block">{area.label}</span>
-                      <span className={`text-xs block mt-0.5 ${isSelected ? "text-white/90" : "text-slate-500 opacity-70"}`}>{area.desc}</span>
-                    </div>
-                    {isSelected && (
-                      <div className="absolute top-2.5 right-2.5 h-5 w-5 bg-white/30 rounded-full flex items-center justify-center text-white">
-                        <Check className="h-3 w-3 stroke-[3]" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-
-      case 4: {
-        const currentTargetData = areaTargetsMap[activeAreaTab] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", waktu: "", biaya: "" };
-        const updateField = (field: keyof AreaTargetData, value: string) => {
-          const updated = {
-            ...areaTargetsMap,
-            [activeAreaTab]: {
-              ...currentTargetData,
-              [field]: value,
-            }
-          };
+      case 3: {
+        // Merged: Area selection + inline target editor per area
+        const updateField = (areaId: string, field: keyof AreaTargetData, value: string) => {
+          const prev = areaTargetsMap[areaId] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
+          const updated = { ...areaTargetsMap, [areaId]: { ...prev, [field]: value } };
           setAreaTargetsMap(updated);
-          scheduleAutosave(4);
+          scheduleAutosave(3);
+        };
+
+        const shortcutsByArea: Record<string, { kualitas: string[]; kuantitas: string[]; waktu: string[]; biaya: string[] }> = {
+          "Spiritual Growth": {
+            kualitas: ["Khusyu, tumakninah & dzikir sesudah salam", "Meresapi makna ayat Al-Qur'an yang dibaca", "Menjaga wudhu dan niat ikhlas karena Allah", "Menghindari perkataan sia-sia dan ghibah", "Hadir Hati saat berdoa & istighfar harian"],
+            kuantitas: ["Khatam 1 Juz / minggu (90 hari 13 Juz)", "Sholat 5 waktu berjamaah di masjid", "Sholat Tahajud 4 rakaat + Witir 3x/minggu", "Sholat Dhuha 4 rakaat setiap pagi", "Membaca Al-Matsurat pagi & petang 7x/minggu"],
+            waktu: ["Hadir di masjid 10 menit sebelum adzan", "Tahajud jam 04:00 - 04:30 sebelum Subuh", "Tilawah Al-Qur'an 20 menit setelah Subuh", "Dzikir pagi jam 06:30 - 06:45", "Evaluasi muhasabah malam jam 21:30"],
+            biaya: ["Budget Rp 10.000 / hari via transfer", "Budget Rp 20.000 / hari via transfer", "Budget Rp 50.000 / hari via transfer", "Infak rutin Rp 100.000 / minggu ke panti/masjid", "Wakaf Quran Rp 150.000 / bulan"]
+          },
+          "Personal Development": {
+            kualitas: ["Merespon masalah secara tenang tanpa emosi meluap", "Mampu berpikir jernih saat di bawah tekanan", "Disiplin menjalankan rencana harian tanpa menunda", "Jujur mengakui kesalahan dan langsung memperbaiki", "Fokus mengerjakan 1 tugas hingga tuntas (deep work)"],
+            kuantitas: ["Maksimal 2 jam screen time non-produktif/hari", "Membaca 1 buku pengembangan diri / bulan", "Menulis jurnal refleksi 1x setiap malam", "Menyelesaikan 1 modul kursus/skill baru per minggu", "Evaluasi habit harian 7x / minggu"],
+            waktu: ["Alokasi membaca jam 20:00 - 20:30 setiap malam", "Deep work jam 08:30 - 10:30 tanpa distraksi", "Bangun pagi jam 04:30 secara konsisten", "Review mingguan setiap hari Minggu jam 16:00", "Digital detox jam 21:00 - 05:00"],
+            biaya: ["Budget pembelian buku Rp 150.000 / bulan", "Budget pelatihan / webinar Rp 300.000 / bulan", "Budget langganan platform edukasi Rp 100.000 / bulan", "Budget alat pendukung belajar Rp 200.000 / bulan", "Budget tabungan pengembangan diri Rp 500.000 / bulan"]
+          },
+          "Leadership Excellence": {
+            kualitas: ["Memberikan arahan tugas yang jelas & konstruktif", "Menjadi teladan etos kerja & kedisiplinan tim", "Aktif mendengarkan dan menghargai masukan tim", "Mengambil keputusan berbasis data & nilai etika", "Memberikan feedback positif & membangun secara berkala"],
+            kuantitas: ["100% KPI proyek selesai sebelum deadline", "1-on-1 coaching dengan anggota tim 2x / minggu", "Melakukan pembinaan / mentoring tim 1x / minggu", "Menyelesaikan 3 milestone strategis dalam 90 hari", "Nol keluhan keterlambatan laporan dari manajemen"],
+            waktu: ["Hadir 15 menit sebelum rapat/meeting dimulai", "Session 1-on-1 coaching setiap Senin jam 10:00", "Daily standup meeting jam 09:00 - 09:15", "Review kinerja tim setiap hari Jumat jam 15:00", "Penyelesaian laporan mingguan setiap Kamis jam 16:00"],
+            biaya: ["Budget apresiasi tim Rp 300.000 / bulan", "Budget makan siang / coaching tim Rp 500.000 / bulan", "Budget sertifikasi profesional Rp 1.000.000 / batch", "Budget fasilitasi alat kerja tim Rp 250.000 / bulan", "Budget kegiatan keakraban tim Rp 400.000 / bulan"]
+          },
+          "Relationship": {
+            kualitas: ["Mendengarkan cerita keluarga tanpa terdistraksi HP", "Berbicara dengan nada lembut, sabar & empati tinggi", "Mudah memaafkan & meminta maaf saat ada khilaf", "Menunjukkan apresiasi & rasa terima kasih setiap hari", "Menciptakan suasana hangat & aman di rumah/lingkungan"],
+            kuantitas: ["Makan malam bersama keluarga tanpa gadget 5x/minggu", "Quality time khusus pasangan/keluarga 1x / minggu", "Menghubungi orang tua / saudara via telp 3x / minggu", "Silaturahim dengan sahabat / teman 2x / bulan", "Family gathering weekend 4x / bulan"],
+            waktu: ["No-gadget hour jam 18:30 - 20:00 bersama keluarga", "Family time Sabtu pagi jam 08:00 - 11:00", "Telepon orang tua setiap Minggu jam 19:30", "Ngobrol santai sebelum tidur jam 21:00 - 21:30", "Jalan bersama pasangan setiap Jumat malam jam 19:00"],
+            biaya: ["Budget rekreasi & makan keluarga Rp 500.000 / bulan", "Budget rekreasi & makan keluarga Rp 1.000.000 / bulan", "Budget nafkah / bakti orang tua Rp 500.000 / bulan", "Budget hadiah / kejutan keluarga Rp 300.000 / bulan", "Budget tabungan liburan keluarga Rp 750.000 / bulan"]
+          },
+          "Community Impact": {
+            kualitas: ["Memberikan pendampingan warga secara tulus & ikhlas", "Aktif mencari solusi masalah lingkungan sekitar", "Ramah & peduli terhadap tetangga serta masyarakat", "Berbagi ilmu & pengalaman dengan niat memberi manfaat", "Menjadi penggerak kebaikan di lingkungan tempat tinggal"],
+            kuantitas: ["Mengajar / bakti sosial 4 jam setiap akhir pekan", "Mengikuti kegiatan gotong royong / RT 2x / bulan", "Berbagi makanan / sembako ke tetangga 2x / bulan", "Menjadi relawan program pemberdayaan 1x / bulan", "Mengisi materi / edukasi komunitas 1x / bulan"],
+            waktu: ["Bakti sosial setiap hari Sabtu jam 09:00 - 11:00", "Kerja bakti lingkungan Minggu pagi jam 07:00 - 09:00", "Pengajian / majelis warga Minggu malam jam 19:30", "Rapat RT / komunitas setiap awal bulan jam 20:00", "Aktivitas relawan Sabtu sore jam 15:30 - 17:30"],
+            biaya: ["Donasi rutin kegiatan warga Rp 100.000 / bulan", "Donasi rutin program masyarakat Rp 250.000 / bulan", "Donasi rutin program masyarakat Rp 500.000 / bulan", "Budget santunan anak yatim Rp 300.000 / bulan", "Budget kas kegiatan dakwah/sosial Rp 200.000 / bulan"]
+          }
         };
 
         return (
-          <div className="space-y-5">
-            {/* Area Tabs Header */}
-            <div>
-              <p className="text-xs font-bold text-slate-500 mb-2">PILIH AREA BANYAK TARGET:</p>
-              <div className="flex flex-wrap gap-2">
-                {selectedAreas.map((areaId) => {
-                  const areaObj = AREA_LIST.find(a => a.id === areaId);
-                  const isActive = activeAreaTab === areaId;
-                  return (
-                    <button
-                      key={areaId}
-                      onClick={() => setActiveAreaTab(areaId)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
-                        isActive
-                          ? "bg-[#0B2C6B] text-white border-[#0B2C6B] shadow-sm"
-                          : "bg-white text-slate-700 border-slate-200 hover:border-amber-300"
-                      }`}
-                    >
-                      {areaObj?.label || areaId}
-                    </button>
-                  );
-                })}
-              </div>
+          <div className="space-y-3">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-600">Pilih area & tetapkan target <span className="font-bold text-amber-600">(maks. 3 area)</span></p>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${selectedAreas.length >= 3 ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500"}`}>{selectedAreas.length}/3</span>
             </div>
 
-            {/* Area Target & Indicators Editor */}
-            {(() => {
-              const shortcutsByArea: Record<string, {
-                kualitas: string[];
-                kuantitas: string[];
-                waktu: string[];
-                biaya: string[];
-              }> = {
-                "Spiritual Growth": {
-                  kualitas: [
-                    "Khusyu, tumakninah & dzikir sesudah salam",
-                    "Meresapi makna ayat Al-Qur'an yang dibaca",
-                    "Menjaga wudhu dan niat ikhlas karena Allah",
-                    "Menghindari perkataan sia-sia dan ghibah",
-                    "Hadir Hati saat berdoa & istighfar harian"
-                  ],
-                  kuantitas: [
-                    "Khatam 1 Juz / minggu (90 hari 13 Juz)",
-                    "Sholat 5 waktu berjamaah di masjid",
-                    "Sholat Tahajud 4 rakaat + Witir 3x/minggu",
-                    "Sholat Dhuha 4 rakaat setiap pagi",
-                    "Membaca Al-Matsurat pagi & petang 7x/minggu"
-                  ],
-                  waktu: [
-                    "Hadir di masjid 10 menit sebelum adzan",
-                    "Tahajud jam 04:00 - 04:30 sebelum Subuh",
-                    "Tilawah Al-Qur'an 20 menit setelah Subuh",
-                    "Dzikir pagi jam 06:30 - 06:45",
-                    "Evaluasi muhasabah malam jam 21:30"
-                  ],
-                  biaya: [
-                    "Budget Rp 10.000 / hari via transfer",
-                    "Budget Rp 20.000 / hari via transfer",
-                    "Budget Rp 50.000 / hari via transfer",
-                    "Infak rutin Rp 100.000 / minggu ke panti/masjid",
-                    "Wakaf Quran Rp 150.000 / bulan"
-                  ]
-                },
-                "Personal Development": {
-                  kualitas: [
-                    "Merespon masalah secara tenang tanpa emosi meluap",
-                    "Mampu berpikir jernih saat di bawah tekanan",
-                    "Disiplin menjalankan rencana harian tanpa menunda",
-                    "Jujur mengakui kesalahan dan langsung memperbaiki",
-                    "Fokus mengerjakan 1 tugas hingga tuntas (deep work)"
-                  ],
-                  kuantitas: [
-                    "Maksimal 2 jam screen time non-produktif/hari",
-                    "Membaca 1 buku pengembangan diri / bulan",
-                    "Menulis jurnal refleksi 1x setiap malam",
-                    "Menyelesaikan 1 modul kursus/skill baru per minggu",
-                    "Evaluasi habit harian 7x / minggu"
-                  ],
-                  waktu: [
-                    "Alokasi membaca jam 20:00 - 20:30 setiap malam",
-                    "Deep work jam 08:30 - 10:30 tanpa distraksi",
-                    "Bangun pagi jam 04:30 secara konsisten",
-                    "Review mingguan setiap hari Minggu jam 16:00",
-                    "Digital detox jam 21:00 - 05:00"
-                  ],
-                  biaya: [
-                    "Budget pembelian buku Rp 150.000 / bulan",
-                    "Budget pelatihan / webinar Rp 300.000 / bulan",
-                    "Budget langganan platform edukasi Rp 100.000 / bulan",
-                    "Budget alat pendukung belajar Rp 200.000 / bulan",
-                    "Budget tabungan pengembangan diri Rp 500.000 / bulan"
-                  ]
-                },
-                "Leadership Excellence": {
-                  kualitas: [
-                    "Memberikan arahan tugas yang jelas & konstruktif",
-                    "Menjadi teladan etos kerja & kedisiplinan tim",
-                    "Aktif mendengarkan dan menghargai masukan tim",
-                    "Mengambil keputusan berbasis data & nilai etika",
-                    "Memberikan feedback positif & membangun secara berkala"
-                  ],
-                  kuantitas: [
-                    "100% KPI proyek selesai sebelum deadline",
-                    "1-on-1 coaching dengan anggota tim 2x / minggu",
-                    "Melakukan pembinaan / mentoring tim 1x / minggu",
-                    "Menyelesaikan 3 milestone strategis dalam 90 hari",
-                    "Nol keluhan keterlambatan laporan dari manajemen"
-                  ],
-                  waktu: [
-                    "Hadir 15 menit sebelum rapat/meeting dimulai",
-                    "Session 1-on-1 coaching setiap Senin jam 10:00",
-                    "Daily standup meeting jam 09:00 - 09:15",
-                    "Review kinerja tim setiap hari Jumat jam 15:00",
-                    "Penyelesaian laporan mingguan setiap Kamis jam 16:00"
-                  ],
-                  biaya: [
-                    "Budget apresiasi tim Rp 300.000 / bulan",
-                    "Budget makan siang / coaching tim Rp 500.000 / bulan",
-                    "Budget sertifikasi profesional Rp 1.000.000 / batch",
-                    "Budget fasilitasi alat kerja tim Rp 250.000 / bulan",
-                    "Budget kegiatan keakraban tim Rp 400.000 / bulan"
-                  ]
-                },
-                "Relationship": {
-                  kualitas: [
-                    "Mendengarkan cerita keluarga tanpa terdistraksi HP",
-                    "Berbicara dengan nada lembut, sabar & empati tinggi",
-                    "Mudah memaafkan & meminta maaf saat ada khilaf",
-                    "Menunjukkan apresiasi & rasa terima kasih setiap hari",
-                    "Menciptakan suasana hangat & aman di rumah/lingkungan"
-                  ],
-                  kuantitas: [
-                    "Makan malam bersama keluarga tanpa gadget 5x/minggu",
-                    "Quality time khusus pasangan/keluarga 1x / minggu",
-                    "Menghubungi orang tua / saudara via telp 3x / minggu",
-                    "Silaturahim dengan sahabat / teman 2x / bulan",
-                    "Family gathering weekend 4x / bulan"
-                  ],
-                  waktu: [
-                    "No-gadget hour jam 18:30 - 20:00 bersama keluarga",
-                    "Family time Sabtu pagi jam 08:00 - 11:00",
-                    "Telepon orang tua setiap Minggu jam 19:30",
-                    "Ngobrol santai sebelum tidur jam 21:00 - 21:30",
-                    "Jalan bersama pasangan setiap Jumat malam jam 19:00"
-                  ],
-                  biaya: [
-                    "Budget rekreasi & makan keluarga Rp 500.000 / bulan",
-                    "Budget rekreasi & makan keluarga Rp 1.000.000 / bulan",
-                    "Budget nafkah / bakti orang tua Rp 500.000 / bulan",
-                    "Budget hadiah / kejutan keluarga Rp 300.000 / bulan",
-                    "Budget tabungan liburan keluarga Rp 750.000 / bulan"
-                  ]
-                },
-                "Community Impact": {
-                  kualitas: [
-                    "Memberikan pendampingan warga secara tulus & ikhlas",
-                    "Aktif mencari solusi masalah lingkungan sekitar",
-                    "Ramah & peduli terhadap tetangga serta masyarakat",
-                    "Berbagi ilmu & pengalaman dengan niat memberi manfaat",
-                    "Menjadi penggerak kebaikan di lingkungan tempat tinggal"
-                  ],
-                  kuantitas: [
-                    "Mengajar / bakti sosial 4 jam setiap akhir pekan",
-                    "Mengikuti kegiatan gotong royong / RT 2x / bulan",
-                    "Berbagi makanan / sembako ke tetangga 2x / bulan",
-                    "Menjadi relawan program pemberdayaan 1x / bulan",
-                    "Mengisi materi / edukasi komunitas 1x / bulan"
-                  ],
-                  waktu: [
-                    "Bakti sosial setiap hari Sabtu jam 09:00 - 11:00",
-                    "Kerja bakti lingkungan Minggu pagi jam 07:00 - 09:00",
-                    "Pengajian / majelis warga Minggu malam jam 19:30",
-                    "Rapat RT / komunitas setiap awal bulan jam 20:00",
-                    "Aktivitas relawan Sabtu sore jam 15:30 - 17:30"
-                  ],
-                  biaya: [
-                    "Donasi rutin kegiatan warga Rp 100.000 / bulan",
-                    "Donasi rutin program masyarakat Rp 250.000 / bulan",
-                    "Donasi rutin program masyarakat Rp 500.000 / bulan",
-                    "Budget santunan anak yatim Rp 300.000 / bulan",
-                    "Budget kas kegiatan dakwah/sosial Rp 200.000 / bulan"
-                  ]
-                }
-              };
+            {/* Area List with inline target editor */}
+            <div className="space-y-2">
+              {AREA_LIST.map(area => {
+                const Icon = area.icon;
+                const isSelected = selectedAreas.includes(area.id);
+                const isOpen = isSelected && openAreaEditor === area.id;
+                const targetData = areaTargetsMap[area.id] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
+                const hasTarget = targetData.mainTarget && targetData.mainTarget.trim().length > 0;
+                const shortcuts = shortcutsByArea[area.id] || shortcutsByArea["Spiritual Growth"];
 
-              const currentShortcuts = shortcutsByArea[activeAreaTab] || shortcutsByArea["Spiritual Growth"];
-
-              return (
-                <div className="bg-[#FAF8F4] border border-[#EAE5D9] rounded-2xl p-4 sm:p-5 space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-3">
-                    <span className="text-xs font-extrabold text-[#0B2C6B] uppercase tracking-wider">
-                      Target & Indikator: {activeAreaTab}
-                    </span>
-                  </div>
-
-                  {/* Sasaran Utama with SMART Tooltip */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5 relative">
-                      <p className="text-sm font-bold text-slate-700">Sasaran Utama (90 Hari)</p>
-                      <button
-                        type="button"
-                        onMouseEnter={() => setShowSmartTooltip(true)}
-                        onMouseLeave={() => setShowSmartTooltip(false)}
-                        onClick={() => setShowSmartTooltip(v => !v)}
-                        className="h-5 w-5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 flex items-center justify-center transition-colors shrink-0"
-                      >
-                        <Info className="h-3 w-3" />
-                      </button>
-                      {showSmartTooltip && (
-                        <div className="absolute left-0 top-7 z-50 bg-navy-900 text-white text-xs rounded-xl p-3.5 shadow-xl w-64 border border-amber-400/30">
-                          <p className="font-extrabold text-amber-300 mb-1">💡 Panduan Formulasi SMART:</p>
-                          <p className="opacity-90 leading-relaxed text-[11px]">
-                            <strong>S</strong>specific · <strong>M</strong>easurable · <strong>A</strong>chievable · <strong>R</strong>elevant · <strong>T</strong>ime-bound.
-                          </p>
-                          <p className="mt-2 text-[10px] text-amber-200 italic">Contoh: &ldquo;Meningkatkan kedisiplinan sholat tepat waktu 5x sehari selama 90 hari.&rdquo;</p>
-                        </div>
-                      )}
-                    </div>
-                    <Textarea
-                      disabled={locked}
-                      value={currentTargetData.mainTarget}
-                      onChange={e => updateField("mainTarget", e.target.value)}
-                      placeholder="Contoh: Konsisten sholat 5 waktu berjamaah di masjid & khatam Al-Qur'an..."
-                      className="min-h-[90px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:text-slate-400 placeholder:italic p-3"
-                      maxLength={500}
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-bold text-slate-700 mb-1.5">Mengapa sasaran ini penting?</p>
-                    <Textarea
-                      disabled={locked}
-                      value={currentTargetData.targetAlasan}
-                      onChange={e => updateField("targetAlasan", e.target.value)}
-                      placeholder="Apa motivasi terdalam Anda mencapai sasaran ini?"
-                      className="min-h-[70px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:text-slate-400 placeholder:italic p-3"
-                      maxLength={300}
-                    />
-                  </div>
-
-                  {/* 4 Dimension Structured Indicators (Quality, Quantity, Time, Cost) */}
-                  <div className="space-y-4 pt-2">
-                    <div className="border-t border-[#EAE5D9] pt-3">
-                      <p className="text-sm font-bold text-[#071A33]">Indikator Keberhasilan (4 Dimensi):</p>
-                      <p className="text-xs text-slate-500">Pilih 5 contoh shortcut di bawah atau ketik langsung indikator Anda.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* 1. Kualitas */}
-                      <div className="bg-white p-3.5 rounded-xl border border-purple-100 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-purple-800">1. Indikator Kualitas</span>
-                          <div className="group relative cursor-pointer">
-                            <Info className="h-4 w-4 text-purple-400 hover:text-purple-600 transition-colors" />
-                            <div className="absolute right-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-52 border border-purple-400/30">
-                              <p className="font-bold text-purple-300 mb-0.5">Rumus Skor Kualitas:</p>
-                              <p className="opacity-90 leading-tight">Diukur dengan Rating 1–5 Bintang pada Monitoring. <span className="font-mono text-purple-200 block mt-1">Skor % = Bintang × 20%</span></p>
-                            </div>
-                          </div>
-                        </div>
-                        <Textarea
-                          disabled={locked}
-                          value={currentTargetData.kualitas}
-                          onChange={e => updateField("kualitas", e.target.value)}
-                          placeholder="Misal: Sholat khusyu, tumakninah & selesai dzikir..."
-                          className="min-h-[64px] w-full text-xs border-slate-200 focus:border-purple-400 rounded-lg p-2.5 resize-y placeholder:text-slate-400 placeholder:italic"
-                        />
-                        {/* 5 Shortcut Examples */}
-                        {!locked && (
-                          <div className="space-y-1 pt-1">
-                            <span className="text-[10px] font-bold text-purple-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
-                            <div className="flex flex-wrap gap-1">
-                              {currentShortcuts.kualitas.map((ex, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => updateField("kualitas", ex)}
-                                  className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
-                                >
-                                  + {ex}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                return (
+                  <div key={area.id} className={`rounded-2xl border-2 overflow-hidden transition-all duration-200 ${
+                    isOpen ? "border-amber-300 shadow-sm" :
+                    isSelected ? "border-slate-200" :
+                    "border-slate-100"
+                  }`}>
+                    {/* Area row — click row to open editor, click checkbox to select/unselect */}
+                    <div
+                      onClick={() => {
+                        if (locked) return;
+                        if (!isSelected) {
+                          if (selectedAreas.length >= 3) return;
+                          toggleArea(area.id);
+                          setOpenAreaEditor(area.id);
+                          if (!areaTargetsMap[area.id]) {
+                            setAreaTargetsMap(prev => ({ ...prev, [area.id]: { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" } }));
+                          }
+                        } else {
+                          setOpenAreaEditor(isOpen ? "" : area.id);
+                        }
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
+                        isSelected ? "bg-white" : "bg-white"
+                      } ${!isSelected && selectedAreas.length >= 3 ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                      <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                        isSelected ? `${area.sel.includes("amber") ? "bg-amber-600" : area.sel.includes("blue") ? "bg-blue-600" : area.sel.includes("navy") || area.sel.includes("071A33") ? "bg-[#071A33]" : area.sel.includes("rose") ? "bg-rose-600" : "bg-emerald-600"} text-white` :
+                        "bg-slate-100 text-slate-500"
+                      }`}>
+                        <Icon className="h-4 w-4" />
                       </div>
-
-                      {/* 2. Kuantitas */}
-                      <div className="bg-white p-3.5 rounded-xl border border-blue-100 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-blue-800">2. Indikator Kuantitas</span>
-                          <div className="group relative cursor-pointer">
-                            <Info className="h-4 w-4 text-blue-400 hover:text-blue-600 transition-colors" />
-                            <div className="absolute right-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-blue-400/30">
-                              <p className="font-bold text-blue-300 mb-0.5">Rumus Skor Kuantitas:</p>
-                              <p className="opacity-90 leading-tight">Perbandingan progres dari posisi awal (Baseline) ke Target 90 hari. <span className="font-mono text-blue-200 block mt-1">Skor % = \|Realisasi - Baseline\| ÷ \|Target - Baseline\| × 100%</span></p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Baseline (Awal)</label>
-                            <Input
-                              disabled={locked}
-                              value={currentTargetData.kuantitasBaseline || ""}
-                              onChange={e => updateField("kuantitasBaseline", e.target.value)}
-                              placeholder="Kondisi awal..."
-                              className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-9 bg-slate-50/50 placeholder:text-slate-400 placeholder:italic w-full"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-blue-600 block mb-0.5">Target Akhir (90 Hari)</label>
-                            <Input
-                              disabled={locked}
-                              value={currentTargetData.kuantitas}
-                              onChange={e => updateField("kuantitas", e.target.value)}
-                              placeholder="Target 90 hari..."
-                              className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-9 placeholder:text-slate-400 placeholder:italic w-full"
-                            />
-                          </div>
-                        </div>
-                        {/* 5 Shortcut Examples */}
-                        {!locked && (
-                          <div className="space-y-1 pt-1">
-                            <span className="text-[10px] font-bold text-blue-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
-                            <div className="flex flex-wrap gap-1">
-                              {currentShortcuts.kuantitas.map((ex, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => updateField("kuantitas", ex)}
-                                  className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
-                                >
-                                  + {ex}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-bold text-sm ${isSelected ? "text-navy-900" : "text-slate-600"}`}>{area.label}</p>
+                        {hasTarget && isSelected
+                          ? <p className="text-xs text-slate-400 mt-0.5 truncate">{targetData.mainTarget}</p>
+                          : <p className={`text-xs mt-0.5 ${isSelected ? "text-slate-400" : "text-slate-400 opacity-70"}`}>{area.desc}</p>
+                        }
                       </div>
-
-                      {/* 3. Waktu */}
-                      <div className="bg-white p-3.5 rounded-xl border border-amber-100 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-amber-800">3. Indikator Waktu</span>
-                          <div className="group relative cursor-pointer">
-                            <Info className="h-4 w-4 text-amber-400 hover:text-amber-600 transition-colors" />
-                            <div className="absolute right-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-52 border border-amber-400/30">
-                              <p className="font-bold text-amber-300 mb-0.5">Rumus Skor Waktu:</p>
-                              <p className="opacity-90 leading-tight">Persentase jumlah hari konsistensi jadwal tepat waktu dalam 30 hari. <span className="font-mono text-amber-200 block mt-1">Skor % = Hari Tepat Waktu ÷ 30 × 100%</span></p>
-                            </div>
-                          </div>
-                        </div>
-                        <Textarea
-                          disabled={locked}
-                          value={currentTargetData.waktu}
-                          onChange={e => updateField("waktu", e.target.value)}
-                          placeholder="Misal: Hadir 10 menit sebelum jadwal..."
-                          className="min-h-[64px] w-full text-xs border-slate-200 focus:border-amber-400 rounded-lg p-2.5 resize-y placeholder:text-slate-400 placeholder:italic"
-                        />
-                        {/* 5 Shortcut Examples */}
-                        {!locked && (
-                          <div className="space-y-1 pt-1">
-                            <span className="text-[10px] font-bold text-amber-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
-                            <div className="flex flex-wrap gap-1">
-                              {currentShortcuts.waktu.map((ex, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => updateField("waktu", ex)}
-                                  className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
-                                >
-                                  + {ex}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        {isSelected && hasTarget && <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">✓ Target</span>}
+                        {isSelected && !hasTarget && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Isi target</span>}
+                        
+                        {/* Interactive Checkbox Toggle (Click to uncheck when selected) */}
+                        {isSelected ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (locked) return;
+                              toggleArea(area.id);
+                              if (openAreaEditor === area.id) setOpenAreaEditor("");
+                            }}
+                            title="Klik untuk uncheck / batal pilih area ini"
+                            className="h-6 w-6 rounded-md bg-emerald-600 hover:bg-red-500 text-white flex items-center justify-center transition-colors shadow-2xs group"
+                          >
+                            <Check className="h-3.5 w-3.5 stroke-[3] group-hover:hidden" />
+                            <X className="h-3.5 w-3.5 stroke-[3] hidden group-hover:block" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (locked || selectedAreas.length >= 3) return;
+                              toggleArea(area.id);
+                              setOpenAreaEditor(area.id);
+                            }}
+                            disabled={locked || selectedAreas.length >= 3}
+                            title="Pilih area ini"
+                            className="h-6 w-6 rounded-md border-2 border-slate-300 hover:border-amber-500 flex items-center justify-center transition-colors bg-white"
+                          />
                         )}
-                      </div>
 
-                      {/* 4. Biaya */}
-                      <div className="bg-white p-3.5 rounded-xl border border-emerald-100 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-emerald-800">4. Indikator Biaya</span>
-                          <div className="group relative cursor-pointer">
-                            <Info className="h-4 w-4 text-emerald-400 hover:text-emerald-600 transition-colors" />
-                            <div className="absolute right-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-52 border border-emerald-400/30">
-                              <p className="font-bold text-emerald-300 mb-0.5">Rumus Skor Biaya:</p>
-                              <p className="opacity-90 leading-tight">Capaian nominal realisasi dibanding nominal target. <span className="font-mono text-emerald-200 block mt-1">Skor % = Realisasi ÷ Target × 100%</span></p>
-                            </div>
-                          </div>
-                        </div>
-                        <Textarea
-                          disabled={locked}
-                          value={currentTargetData.biaya}
-                          onChange={e => updateField("biaya", e.target.value)}
-                          placeholder="Misal: Budget Rp 20.000 / hari via transfer..."
-                          className="min-h-[64px] w-full text-xs border-slate-200 focus:border-emerald-400 rounded-lg p-2.5 resize-y placeholder:text-slate-400 placeholder:italic"
-                        />
-                        {/* 5 Shortcut Examples */}
-                        {!locked && (
-                          <div className="space-y-1 pt-1">
-                            <span className="text-[10px] font-bold text-emerald-700 block">💡 5 Contoh Shortcut (Klik untuk pilih):</span>
-                            <div className="flex flex-wrap gap-1">
-                              {currentShortcuts.biaya.map((ex, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => updateField("biaya", ex)}
-                                  className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-full px-2 py-0.5 text-left transition-colors font-medium"
-                                >
-                                  + {ex}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+                        {isSelected && (
+                          <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`} />
                         )}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Formula & Monitoring Integration Banner */}
-                  <div className="bg-gradient-to-r from-navy-900 to-slate-800 text-white rounded-xl p-3.5 text-xs flex items-center justify-between gap-3 shadow-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
-                        <Activity className="h-4 w-4" />
+                    {/* Inline target editor — only for selected + open area */}
+                    {isOpen && (
+                      <div className="border-t border-amber-100 bg-[#FAF8F4] px-4 py-4 space-y-4">
+                        <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                          <p className="text-xs font-extrabold text-[#0B2C6B] uppercase tracking-wider">Target & Indikator: {area.label}</p>
+                          {!locked && (
+                            <button
+                              type="button"
+                              onClick={() => { toggleArea(area.id); setOpenAreaEditor(""); }}
+                              className="text-[11px] font-semibold text-slate-500 hover:text-red-600 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 hover:bg-red-50"
+                            >
+                              <X className="h-3.5 w-3.5 text-slate-400 hover:text-red-600" />
+                              Batal Pilih Area
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Main target */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5 relative">
+                            <p className="text-sm font-bold text-slate-700">Sasaran Utama (90 Hari)</p>
+                            <button type="button" onMouseEnter={() => setShowSmartTooltip(true)} onMouseLeave={() => setShowSmartTooltip(false)} onClick={() => setShowSmartTooltip(v => !v)} className="h-5 w-5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 flex items-center justify-center shrink-0">
+                              <Info className="h-3 w-3" />
+                            </button>
+                            {showSmartTooltip && (
+                              <div className="absolute left-0 top-7 z-50 bg-navy-900 text-white text-xs rounded-xl p-3.5 shadow-xl w-64 border border-amber-400/30">
+                                <p className="font-extrabold text-amber-300 mb-1">💡 Panduan SMART:</p>
+                                <p className="opacity-90 leading-relaxed text-[11px]"><strong>S</strong>pecific · <strong>M</strong>easurable · <strong>A</strong>chievable · <strong>R</strong>elevant · <strong>T</strong>ime-bound.</p>
+                              </div>
+                            )}
+                          </div>
+                          <Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(area.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah..." className="min-h-[80px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:italic p-3" maxLength={500} />
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-bold text-slate-700 mb-1.5">Mengapa sasaran ini penting?</p>
+                          <Textarea disabled={locked} value={targetData.targetAlasan} onChange={e => updateField(area.id, "targetAlasan", e.target.value)} placeholder="Apa motivasi terdalam Anda?" className="min-h-[60px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:italic p-3" maxLength={300} />
+                        </div>
+
+                        {/* 4 Dimension indicators (Flexible / Optional per relevance) */}
+                        <div className="space-y-3 pt-1">
+                          <div className="border-t border-[#EAE5D9] pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan (4 Dimensi)</p>
+                            <p className="text-[11px] text-slate-500 italic">Isi dimensi yang paling relevan dengan sasaran Anda (opsional)</p>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* 1. Kualitas */}
+                            <div className="bg-white p-3.5 rounded-xl border border-purple-100 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-extrabold text-purple-800">1. Indikator Kualitas</span>
+                                  <div className="group relative cursor-pointer">
+                                    <Info className="h-3.5 w-3.5 text-purple-400 hover:text-purple-600 transition-colors" />
+                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-purple-400/30">
+                                      <p className="font-bold text-purple-300 mb-0.5">Rumus Skor Kualitas:</p>
+                                      <p className="opacity-90 leading-tight">Diukur dengan Rating 1–5 Bintang pada Monitoring.<br/><span className="font-mono text-purple-200 block mt-1">Skor % = Bintang × 20%</span></p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60">Rating 1–5 Bintang</span>
+                              </div>
+                              <Textarea disabled={locked} value={targetData.kualitas} onChange={e => updateField(area.id, "kualitas", e.target.value)} placeholder="Contoh: Sholat khusyu, tumakninah & selesai dzikir..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-purple-400 rounded-lg p-2.5 resize-y placeholder:italic" />
+                            </div>
+
+                            {/* 2. Kuantitas */}
+                            <div className="bg-white p-3.5 rounded-xl border border-blue-100 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-extrabold text-blue-800">2. Indikator Kuantitas</span>
+                                  <div className="group relative cursor-pointer">
+                                    <Info className="h-3.5 w-3.5 text-blue-400 hover:text-blue-600 transition-colors" />
+                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-60 border border-blue-400/30">
+                                      <p className="font-bold text-blue-300 mb-0.5">Rumus Skor Kuantitas:</p>
+                                      <p className="opacity-90 leading-tight">Perbandingan progres dari posisi awal (Baseline) ke Target 90 hari.<br/><span className="font-mono text-blue-200 block mt-1">Skor % = |Realisasi - Baseline| ÷ |Target - Baseline| × 100%</span></p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">Baseline ➔ Target</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Baseline (Awal)</label>
+                                  <Input disabled={locked} value={targetData.kuantitasBaseline || ""} onChange={e => updateField(area.id, "kuantitasBaseline", e.target.value)} placeholder="Contoh: 1 Juz / bln" className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-8 bg-slate-50/50 placeholder:italic w-full" />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-blue-600 block mb-0.5">Target 90 Hari</label>
+                                  <Input disabled={locked} value={targetData.kuantitas} onChange={e => updateField(area.id, "kuantitas", e.target.value)} placeholder="Contoh: 13 Juz (Khatam)" className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-8 placeholder:italic w-full" />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3. Waktu */}
+                            <div className="bg-white p-3.5 rounded-xl border border-amber-100 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-extrabold text-amber-800">3. Indikator Waktu</span>
+                                  <div className="group relative cursor-pointer">
+                                    <Info className="h-3.5 w-3.5 text-amber-400 hover:text-amber-600 transition-colors" />
+                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-amber-400/30">
+                                      <p className="font-bold text-amber-300 mb-0.5">Rumus Skor Waktu:</p>
+                                      <p className="opacity-90 leading-tight">Persentase jumlah hari konsistensi jadwal tepat waktu dalam 30 hari.<br/><span className="font-mono text-amber-200 block mt-1">Skor % = Hari Tepat Waktu ÷ 30 × 100%</span></p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">Jadwal & Konsistensi</span>
+                              </div>
+                              <Textarea disabled={locked} value={targetData.waktu} onChange={e => updateField(area.id, "waktu", e.target.value)} placeholder="Contoh: Hadir di masjid 10 menit sebelum adzan..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-amber-400 rounded-lg p-2.5 resize-y placeholder:italic" />
+                            </div>
+
+                            {/* 4. Biaya */}
+                            <div className="bg-white p-3.5 rounded-xl border border-emerald-100 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-extrabold text-emerald-800">4. Indikator Biaya / Finansial</span>
+                                  <div className="group relative cursor-pointer">
+                                    <Info className="h-3.5 w-3.5 text-emerald-400 hover:text-emerald-600 transition-colors" />
+                                    <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-emerald-400/30">
+                                      <p className="font-bold text-emerald-300 mb-0.5">Rumus Skor Biaya:</p>
+                                      <p className="opacity-90 leading-tight">Capaian nominal realisasi dibanding nominal target.<br/><span className="font-mono text-emerald-200 block mt-1">Skor % = Realisasi ÷ Target × 100%</span></p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">Nominal Anggaran (Rp)</span>
+                              </div>
+                              <Textarea disabled={locked} value={targetData.biaya} onChange={e => updateField(area.id, "biaya", e.target.value)} placeholder="Contoh: Budget Rp 20.000 / hari via transfer infak..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-emerald-400 rounded-lg p-2.5 resize-y placeholder:italic" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Deselect area */}
+                        {!locked && (
+                          <button type="button" onClick={() => { toggleArea(area.id); setOpenAreaEditor(""); }} className="text-xs text-slate-500 hover:text-red-600 font-medium transition-colors">
+                            ✕ Batal pilih area ini
+                          </button>
+                        )}
                       </div>
-                      <div>
-                        <p className="font-bold text-amber-300">Integrasi Langsung ke Monitoring</p>
-                        <p className="opacity-80 text-[11px]">Baseline & Target di atas akan otomatis dimuat ke halaman Monitoring untuk pelaporan bulanan.</p>
-                      </div>
-                    </div>
-                    <Badge className="bg-amber-400/20 text-amber-200 border-amber-400/30 text-[10px] shrink-0">Auto-Synced</Badge>
+                    )}
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })}
+            </div>
           </div>
         );
       }
 
-      case 5:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600">Kebiasaan harian/pekanan yang akan Anda jalankan per area.</p>
-            {!locked && (
-              <button onClick={() => setShowAddHabit(v => !v)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-amber-300 text-amber-600 font-bold text-sm rounded-xl hover:bg-amber-50 transition-colors">
-                <Plus className="h-4 w-4" />
-                Tambah Action Plan Baru
-              </button>
-            )}
-            {showAddHabit && !locked && (
-              <div className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 mb-1 block">Nama Kebiasaan / Action Plan</label>
-                  <Input value={newActionTitle} onChange={e => setNewActionTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && addActionPlan()} placeholder="Misal: Tahajud 4 Rakaat, Sedekah Subuh..." className="text-sm border-amber-200 focus:border-amber-400 rounded-lg h-10 bg-white" autoFocus />
+      case 4: {
+        if (selectedAreas.length === 0) {
+          return (
+            <div className="space-y-4">
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-6 text-center space-y-3 shadow-2xs">
+                <div className="h-12 w-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-2xs border border-amber-200/60">
+                  <Lock className="h-6 w-6" />
                 </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-navy-900">Area Transformasi Belum Dipilih</h3>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+                    Untuk menyusun Action Plan (Habit Engine), Anda wajib memilih minimal 1 Area Transformasi terlebih dahulu di Step 3.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => setActiveSection(3)}
+                  className="bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 text-xs font-bold shadow-sm inline-flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4 text-amber-400" />
+                  <span>Kembali ke Step 3 (Area Transformasi)</span>
+                </Button>
+              </div>
+            </div>
+          );
+        }
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 mb-1 block">Frekuensi</label>
-                    <select value={newActionFreq} onChange={e => setNewActionFreq(e.target.value)} className="w-full border border-amber-200 rounded-lg px-3 text-xs font-bold text-slate-700 bg-white focus:border-amber-400 h-10">
-                      <option value="Harian">Harian (Per Hari)</option>
-                      <option value="Pekanan">Pekanan (Per Minggu)</option>
-                    </select>
-                  </div>
+        const habitRecommendations: Record<string, { title: string; freq: string; qty: number }[]> = {
+          "Spiritual Growth": [
+            { title: "Tilawah Al-Qur'an", freq: "Harian", qty: 1 },
+            { title: "Sholat Tahajud", freq: "Pekanan", qty: 2 },
+            { title: "Dzikir Pagi & Petang", freq: "Harian", qty: 1 },
+            { title: "Sedekah Subuh", freq: "Harian", qty: 1 },
+          ],
+          "Personal Development": [
+            { title: "Membaca Buku 15 Mnt", freq: "Harian", qty: 1 },
+            { title: "Olahraga 30 Mnt", freq: "Pekanan", qty: 3 },
+            { title: "Digital Detox (Jam 21:00)", freq: "Harian", qty: 1 },
+          ],
+          "Leadership Excellence": [
+            { title: "Daily Standup & Check-in Tim", freq: "Harian", qty: 1 },
+            { title: "Review Target & Evaluasi Pekanan", freq: "Pekanan", qty: 1 },
+            { title: "Belajar Skill / Reading Report", freq: "Pekanan", qty: 2 },
+          ],
+          "Relationship": [
+            { title: "Quality Time Keluarga", freq: "Pekanan", qty: 1 },
+            { title: "Sapa & Silaturahim Sahabat", freq: "Pekanan", qty: 1 },
+            { title: "Mendengar & Apresiasi Keluarga", freq: "Harian", qty: 1 },
+          ],
+          "Community Impact": [
+            { title: "Sedekah Berbagi / Infak Jumat", freq: "Pekanan", qty: 1 },
+            { title: "Mengajar / Sharing Edukasi Komunitas", freq: "Pekanan", qty: 1 },
+          ],
+        };
 
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 mb-1 block">Kuantitas Target</label>
-                    <div className="flex items-center gap-2">
+        const activeAreasList = selectedAreas;
+
+        return (
+          <div className="space-y-5">
+            <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-4">
+              <h3 className="text-sm font-black text-navy-900 flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-500 fill-amber-400" />
+                Action Plan & Habit Engine
+              </h3>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Tetapkan kebiasaan rutin yang akan Anda jalankan. Kebiasaan ini akan dipantau secara berkala dalam sistem Monitoring 90 Hari.
+              </p>
+            </div>
+
+            {/* Custom Action Plan Form Toggle */}
+            {!locked && (
+              <div>
+                {!showAddHabit ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddHabit(true);
+                      if (activeAreasList.length > 0 && !newActionArea) {
+                        setNewActionArea(activeAreasList[0]);
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-amber-300 text-amber-800 font-bold text-xs sm:text-sm rounded-2xl hover:bg-amber-50/70 transition-colors bg-white shadow-2xs"
+                  >
+                    <Plus className="h-4 w-4 text-amber-600" />
+                    <span>Buat Action Plan Custom Baru</span>
+                  </button>
+                ) : (
+                  <div className="border border-amber-200/80 bg-[#FAF8F4] rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                      <p className="text-xs font-extrabold text-[#0B2C6B] uppercase tracking-wider">Form Action Plan Custom</p>
                       <button
                         type="button"
-                        onClick={() => setNewActionQty(Math.max(1, newActionQty - 1))}
-                        className="h-10 w-10 rounded-lg border border-amber-200 bg-white hover:bg-amber-100 text-amber-900 font-bold text-base flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-2xs"
+                        onClick={() => { setShowAddHabit(false); setNewActionTitle(""); }}
+                        className="text-xs text-slate-400 hover:text-slate-600"
                       >
-                        -
+                        <X className="h-4 w-4" />
                       </button>
+                    </div>
+
+                    {/* Title */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 mb-1.5 block">Nama Kebiasaan / Action Plan</label>
                       <Input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={newActionQty === 0 ? "" : newActionQty}
-                        onChange={e => {
-                          const val = e.target.value;
-                          if (val === "") {
-                            setNewActionQty(0);
-                          } else {
-                            const parsed = parseInt(val, 10);
-                            if (!isNaN(parsed)) setNewActionQty(Math.max(0, parsed));
-                          }
-                        }}
-                        onBlur={() => {
-                          if (!newActionQty || newActionQty < 1) setNewActionQty(1);
-                        }}
-                        className="text-sm border-amber-200 focus:border-amber-400 rounded-lg h-10 bg-white font-extrabold text-center w-full min-w-[50px]"
+                        value={newActionTitle}
+                        onChange={e => setNewActionTitle(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && addActionPlan()}
+                        placeholder="Contoh: Tahajud 4 Rakaat, Sedekah Subuh, Baca Buku 15 Mnt..."
+                        className="text-xs sm:text-sm border-slate-200 focus:border-amber-400 rounded-xl h-10 bg-white placeholder:italic"
+                        autoFocus
                       />
-                      <button
-                        type="button"
-                        onClick={() => setNewActionQty(newActionQty + 1)}
-                        className="h-10 w-10 rounded-lg border border-amber-200 bg-white hover:bg-amber-100 text-amber-900 font-bold text-base flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-2xs"
-                      >
-                        +
-                      </button>
-                      <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-                        {newActionFreq === "Harian" ? "x / hari" : "x / minggu"}
-                      </span>
+                    </div>
+
+                    {/* Grid Options */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Target Kuantitas */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 mb-1.5 block">Target Kuantitas</label>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setNewActionQty(Math.max(1, newActionQty - 1))}
+                            className="h-10 w-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-base flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-2xs"
+                          >
+                            -
+                          </button>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={newActionQty === 0 ? "" : newActionQty}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (val === "") setNewActionQty(0);
+                              else {
+                                const parsed = parseInt(val, 10);
+                                if (!isNaN(parsed)) setNewActionQty(Math.max(0, parsed));
+                              }
+                            }}
+                            onBlur={() => { if (!newActionQty || newActionQty < 1) setNewActionQty(1); }}
+                            className="text-xs sm:text-sm border-slate-200 focus:border-amber-400 rounded-xl h-10 bg-white font-extrabold text-center w-full min-w-[45px]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setNewActionQty(newActionQty + 1)}
+                            className="h-10 w-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-base flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-2xs"
+                          >
+                            +
+                          </button>
+                          <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap pl-1">
+                            {newActionFreq === "Harian" ? "x/hari" : "x/minggu"}
+                          </span>
+                        </div>
+                        {/* Quick quantity shortcuts directly under Target Kuantitas */}
+                        <div className="flex items-center gap-1 pt-2 flex-wrap">
+                          <span className="text-[10px] font-bold text-slate-400">Pilih Cepat:</span>
+                          {[1, 2, 3, 5, 7].map(num => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setNewActionQty(num)}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
+                                newActionQty === num
+                                  ? "bg-amber-500 text-white border-amber-500"
+                                  : "bg-white text-slate-600 border-slate-200 hover:border-amber-300"
+                              }`}
+                            >
+                              {num}x
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Frequency Pill Selection */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 mb-1.5 block">Frekuensi Target</label>
+                        <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setNewActionFreq("Harian")}
+                            className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                              newActionFreq === "Harian" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            <Sun className="h-3.5 w-3.5" />
+                            <span>Harian</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewActionFreq("Pekanan")}
+                            className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                              newActionFreq === "Pekanan" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span>Pekanan</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Area Category */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 mb-1.5 block">Kategori Area</label>
+                        <select
+                          value={newActionArea || activeAreasList[0]}
+                          onChange={e => setNewActionArea(e.target.value)}
+                          className="w-full border border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 rounded-xl px-3 text-xs font-bold text-navy-900 bg-white h-10 shadow-2xs cursor-pointer"
+                        >
+                          {activeAreasList.map(a => (
+                            <option key={a} value={a}>{a}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200/50">
+                      <Button variant="outline" type="button" onClick={() => { setShowAddHabit(false); setNewActionTitle(""); }} className="rounded-xl h-9 px-4 border-slate-200 text-xs font-semibold">
+                        Batal
+                      </Button>
+                      <Button type="button" onClick={addActionPlan} className="bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-9 px-5 font-bold text-xs shadow-sm flex items-center gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Simpan Action Plan</span>
+                      </Button>
                     </div>
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 mb-1 block">Kategori Area</label>
-                    <select value={newActionArea} onChange={e => setNewActionArea(e.target.value)} className="w-full border border-amber-200 rounded-lg px-2 text-xs font-bold text-slate-700 bg-white focus:border-amber-400 h-10">
-                      {selectedAreas.map(a => (
-                        <option key={a} value={a}>{a}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <Button variant="outline" onClick={() => { setShowAddHabit(false); setNewActionTitle(""); }} className="rounded-lg h-9 px-3 border-amber-200 text-xs">
-                    Batal
-                  </Button>
-                  <Button onClick={addActionPlan} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg h-9 px-4 font-bold text-xs">
-                    Simpan Action Plan
-                  </Button>
-                </div>
+                )}
               </div>
             )}
-            <div className="space-y-2">
+
+            {/* List of Registered Action Plans */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-700">Daftar Action Plan Terdaftar ({actionPlans.length})</p>
+                {actionPlans.length > 0 && (
+                  <Badge variant="success" className="text-[11px] font-bold py-0.5 px-2.5">
+                    ✓ {actionPlans.length} kebiasaan siap dipantau
+                  </Badge>
+                )}
+              </div>
+
               {actionPlans.length === 0 && (
-                <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">
-                  Belum ada action plan. Tambahkan action plan pertama Anda!
+                <div className="text-center py-10 px-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl space-y-2">
+                  <div className="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-2xs border border-amber-200/60">
+                    <Zap className="h-5 w-5 text-amber-500 fill-amber-400" />
+                  </div>
+                  <p className="text-sm font-bold text-navy-900">Belum ada action plan yang ditambahkan</p>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                    Klik tombol &quot;Buat Action Plan Custom Baru&quot; di atas untuk menambahkan kebiasaan Anda.
+                  </p>
                 </div>
               )}
+
               {actionPlans.map((ap, idx) => {
                 const { bg, iconColor, Icon } = getHabitStyle(ap.title);
+                const areaCategory = ap.area_category || "Spiritual Growth";
                 return (
-                  <div key={idx} className="flex items-center gap-3 p-3.5 bg-white border border-warm-border rounded-xl shadow-2xs hover:border-amber-200 transition-colors group">
-                    <div className={`h-9 w-9 rounded-xl ${bg} ${iconColor} flex items-center justify-center shrink-0`}><Icon className="h-4 w-4" /></div>
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3.5 p-3.5 bg-white border border-warm-border rounded-2xl shadow-2xs hover:border-amber-300 transition-all group"
+                  >
+                    <div className={`h-10 w-10 rounded-xl ${bg} ${iconColor} flex items-center justify-center shrink-0 shadow-2xs`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-navy-900 truncate">{ap.title}</p>
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
-                          {ap.area_category || "Spiritual Growth"}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-bold text-navy-900 leading-tight">{ap.title}</p>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                          areaCategory.includes("Spiritual") ? "bg-amber-50 text-amber-800 border-amber-200/80" :
+                          areaCategory.includes("Personal") ? "bg-blue-50 text-blue-800 border-blue-200/80" :
+                          areaCategory.includes("Leadership") ? "bg-navy-50 text-navy-900 border-navy-200/80" :
+                          areaCategory.includes("Relationship") ? "bg-rose-50 text-rose-800 border-rose-200/80" :
+                          "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+                        }`}>
+                          {areaCategory}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {ap.quantity || 1}x {ap.frequency?.toLowerCase() === "pekanan" ? "per minggu (Pekanan)" : "per hari (Harian)"}
+                      <p className="text-xs text-slate-500 mt-1 font-medium">
+                        Target: <span className="font-extrabold text-navy-900">{ap.quantity || 1}x</span> {ap.frequency?.toLowerCase() === "pekanan" ? "per minggu (Pekanan)" : "per hari (Harian)"}
                       </p>
                     </div>
+
                     {!locked && (
-                      <button onClick={() => removeActionPlan(idx)} className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100">
-                        <X className="h-3.5 w-3.5" />
+                      <button
+                        type="button"
+                        onClick={() => removeActionPlan(idx)}
+                        title="Hapus action plan ini"
+                        className="h-8 w-8 rounded-xl bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 flex items-center justify-center transition-colors border border-slate-100 hover:border-red-200 shrink-0"
+                      >
+                        <X className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -1151,6 +1176,7 @@ interface BatchMate {
             </div>
           </div>
         );
+      }
     }
   };
 
@@ -1184,7 +1210,7 @@ interface BatchMate {
             <button className="mt-3 text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1">Lihat Contoh Lain <ChevronRight className="h-3 w-3" /></button>
           </div>
         )}
-        {sectionNum === 5 && actionPlans.length > 0 && (
+        {sectionNum === 4 && actionPlans.length > 0 && (
           <div className="bg-navy-900 text-white rounded-2xl p-4 shadow-2xs">
             <p className="text-xs font-bold mb-0.5">Preview Dashboard Harian</p>
             <p className="text-xs opacity-50 mb-3">Kebiasaan yang akan muncul</p>
@@ -1219,8 +1245,9 @@ interface BatchMate {
   // ─── Celebration ───────────────────────────────────────────────
   const renderCelebration = () => (
     <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-      <div className="text-7xl mb-2">📖</div>
-      <div className="text-3xl mb-3">✨✨</div>
+      <div className="h-16 w-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mb-4 shadow-2xs">
+        <Sparkles className="h-8 w-8 text-amber-500" />
+      </div>
       <h2 className="text-2xl font-black text-navy-900 mb-2">Journey Setup Selesai!</h2>
       <p className="text-slate-500 text-sm mb-5 max-w-xs">Personal Transformation Project perjalanan Anda telah selesai disimpan.</p>
       <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold mb-2 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700 border border-navy-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
@@ -1231,7 +1258,7 @@ interface BatchMate {
       <div className="w-full max-w-sm bg-white border border-warm-border rounded-2xl p-4 shadow-2xs mb-6 text-left">
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ringkasan Personal Transformation Project Anda</p>
         <div className="space-y-2.5">
-          <div className="flex justify-between items-center"><span className="text-sm text-slate-600">5 Bagian</span><span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Selesai</span></div>
+          <div className="flex justify-between items-center"><span className="text-sm text-slate-600">4 Bagian</span><span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Selesai</span></div>
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Terakhir diubah</span><span className="text-sm font-semibold text-navy-900">{lastSaved ? `Hari ini, ${lastSaved.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}` : "Baru saja"}</span></div>
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Coach</span><span className="text-sm font-semibold text-navy-900 truncate max-w-[150px]">{coachName}</span></div>
         </div>
@@ -1286,44 +1313,63 @@ interface BatchMate {
   // ─── Desktop Section Navigator ─────────────────────────────────
   const renderDesktopNav = () => (
     <div className="flex flex-col h-full bg-white overflow-y-auto">
-      <div className="p-5 border-b border-warm-border">
-        <h2 className="text-base font-black text-navy-900">Journey Setup</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Personal Transformation Project 90 Hari</p>
-        <div className="mt-4">
+      <div className={`p-4 border-b border-warm-border flex items-center ${desktopNavCollapsed ? "justify-center" : "justify-between"} gap-2`}>
+        {!desktopNavCollapsed && (
+          <div>
+            <h2 className="text-base font-black text-navy-900 leading-tight">Journey Setup</h2>
+            <p className="text-xs text-slate-400 mt-0.5">PTP 90 Hari</p>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setDesktopNavCollapsed(v => !v)}
+          title={desktopNavCollapsed ? "Perluas Panel Sidebar" : "Kecilkan Sidebar (Lebih Luas)"}
+          className="p-1.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-800 transition-colors shrink-0"
+        >
+          {desktopNavCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {!desktopNavCollapsed && (
+        <div className="p-4 border-b border-warm-border">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-sm font-bold text-navy-900">{progressPct}% Complete</span>
-            {estimatedMinutes > 0 && <span className="text-xs text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" />~{estimatedMinutes} mnt</span>}
+            <span className="text-xs font-bold text-navy-900">{progressPct}% Selesai</span>
+            {estimatedMinutes > 0 && <span className="text-[11px] text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" />~{estimatedMinutes} mnt</span>}
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
-          <p className="text-xs text-slate-400 mt-1">{completedCount} dari 5 bagian selesai</p>
+          <p className="text-[11px] text-slate-400 mt-1">{completedCount} dari 4 langkah selesai</p>
         </div>
-      </div>
-      <div className="flex-1 p-3">
+      )}
+
+      <div className="flex-1 p-2 space-y-1">
         {SECTIONS.map(sec => {
           const status = getSectionStatus(sec.num);
           const isActive = activeSection === sec.num;
           return (
-            <button key={sec.num} onClick={() => setActiveSection(sec.num)}
-              className={`w-full flex items-start gap-3 p-3 rounded-xl text-left mb-1.5 transition-all ${isActive ? "bg-amber-50 border-2 border-amber-300 shadow-sm" : "hover:bg-slate-50 border-2 border-transparent"}`}>
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 font-bold text-sm transition-colors ${status === "completed" || isActive ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-400"}`}>
+            <button
+              key={sec.num}
+              onClick={() => setActiveSection(sec.num)}
+              title={desktopNavCollapsed ? `${sec.num}. ${sec.title}` : undefined}
+              className={`w-full flex items-center ${desktopNavCollapsed ? "justify-center px-0 py-3" : "gap-3 p-3 text-left"} rounded-xl transition-all ${
+                isActive ? "bg-amber-50 border-2 border-amber-300 shadow-xs" : "hover:bg-slate-50 border-2 border-transparent"
+              }`}
+            >
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 font-bold text-xs transition-colors ${
+                status === "completed" || isActive ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-400"
+              }`}>
                 {status === "completed" ? <Check className="h-4 w-4" /> : sec.num}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-bold leading-tight ${isActive ? "text-amber-700" : "text-navy-900"}`}>{sec.title}</p>
-                <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{sec.subtitle}</p>
-                {status !== "completed" && (
-                  <div className="mt-1.5">
-                    {isActive ? (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full">● In Progress</span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-full">Not Started</span>
-                    )}
+              {!desktopNavCollapsed && (
+                <>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-bold leading-tight ${isActive ? "text-amber-700" : "text-navy-900"}`}>{sec.title}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{sec.subtitle}</p>
                   </div>
-                )}
-              </div>
-              <ChevronRight className={`h-4 w-4 shrink-0 mt-2 ${isActive ? "text-amber-500" : "text-slate-300"}`} />
+                  <ChevronRight className={`h-4 w-4 shrink-0 ${isActive ? "text-amber-500" : "text-slate-300"}`} />
+                </>
+              )}
             </button>
           );
         })}
@@ -1363,79 +1409,86 @@ interface BatchMate {
 
         {/* MOBILE: Navigator */}
         {!showCelebration && mobileView === "navigator" && (
-          <div className="flex flex-col h-full overflow-hidden">
-            {/* FIXED TOP HEADER (Kembali ke Home s/d Hari ke-X & Progress — TIDAK BISA DI-SCROLL) */}
+          <div className="flex flex-col h-full overflow-hidden bg-white">
+            {/* FIXED TOP HEADER */}
             <div className="shrink-0 bg-white border-b border-warm-border">
-              {/* Page header with Back to Home button */}
-              <div className="px-4 pt-3 pb-2.5">
+              <div className="px-4 pt-3.5 pb-3">
                 <button
                   onClick={() => router.push("/dashboard")}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-navy-900 mb-1.5 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-navy-900 mb-2.5 transition-colors"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5 text-amber-600" />
+                  <ArrowLeft className="h-3.5 w-3.5 text-amber-500" />
                   <span>Kembali ke Home</span>
                 </button>
-                <h1 className="text-xl font-black text-navy-900 leading-tight">Journey Setup</h1>
-                <p className="text-xs text-slate-400 mt-0.5">Personal Transformation Project 90 Hari</p>
-              </div>
-
-              {/* Info bar */}
-              <div className="bg-slate-50 border-t border-b border-warm-border px-4 py-2 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-600 font-bold">HARI KE-{dayCount}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-500 font-medium">{dayCount} DARI 90</span>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h1 className="text-xl font-black text-navy-900 leading-tight">Journey Setup</h1>
+                    <p className="text-xs text-slate-400 mt-0.5">Personal Transformation Project 90 Hari</p>
+                  </div>
+                  <span className={`shrink-0 font-bold px-2.5 py-1 rounded-full text-[11px] mt-0.5 inline-flex items-center gap-1 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
+                    {ptpStatus === "LOCKED" ? <><Lock className="h-3 w-3" />Locked</> : <><Edit3 className="h-3 w-3" />Editable</>}
+                  </span>
                 </div>
-                <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
-                  {ptpStatus} {ptpStatus === "LOCKED" ? "🔒" : "✏️"}
-                </span>
               </div>
 
               {/* Progress */}
-              <div className="px-4 pt-3 pb-3 bg-white">
+              <div className="px-4 pb-3">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-navy-900">{progressPct}% Complete</span>
+                  <span className="text-xs font-bold text-navy-900">{progressPct}% Selesai</span>
                   {estimatedMinutes > 0 && (
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                      <Clock className="h-3 w-3" />~{estimatedMinutes} mnt
+                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />~{estimatedMinutes} mnt tersisa
                     </span>
                   )}
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">{completedCount} dari 5 bagian selesai</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">{completedCount} dari 4 langkah selesai · Hari ke-{dayCount} dari 90</p>
               </div>
             </div>
 
-            {/* SCROLLABLE SECTION LIST (BISA DI-SCROLL) */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 relative bg-white">
-              <div className="absolute left-[35px] sm:left-[36px] top-6 bottom-8 w-0.5 bg-slate-200 z-0" />
-              {SECTIONS.map(sec => {
-                const status = getSectionStatus(sec.num);
-                return (
-                  <button
-                    key={sec.num}
-                    onClick={() => { setActiveSection(sec.num); setMobileView("editor"); }}
-                    className="relative z-10 w-full flex items-start gap-3.5 py-3 text-left group"
-                  >
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm border-2 transition-all ${status === "completed" ? "bg-amber-500 border-amber-500 text-white shadow-sm" : status === "in-progress" ? "bg-amber-500 border-amber-500 text-white shadow-sm ring-4 ring-amber-100" : "bg-white border-slate-200 text-slate-400 group-hover:border-amber-300"}`}>
-                      {status === "completed" ? <Check className="h-4 w-4" /> : sec.num}
-                    </div>
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <p className="text-sm font-bold text-navy-900 group-hover:text-amber-700 transition-colors">{sec.title}</p>
-                      <p className="text-xs text-slate-400 mt-0.5 leading-snug">{sec.subtitle}</p>
-                      {status !== "completed" && (
-                        <div className="mt-1.5">
-                          {status === "in-progress" && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">● In Progress</span>}
-                          {status === "not-started" && <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">Not Started</span>}
-                        </div>
-                      )}
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-300 shrink-0 mt-3 group-hover:text-amber-500 transition-colors" />
-                  </button>
-                );
-              })}
+            {/* SCROLLABLE SECTION LIST */}
+            <div className="flex-1 overflow-y-auto bg-white">
+              <div className="px-4 pt-3 pb-6 space-y-2">
+                {SECTIONS.map(sec => {
+                  const status = getSectionStatus(sec.num);
+                  const isCompleted = status === "completed";
+                  const isInProgress = status === "in-progress";
+                  return (
+                    <button
+                      key={sec.num}
+                      onClick={() => { setActiveSection(sec.num); setMobileView("editor"); }}
+                      className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left transition-all border-2 ${
+                        isInProgress
+                          ? "bg-amber-50 border-amber-300 shadow-sm"
+                          : isCompleted
+                          ? "bg-white border-slate-200 hover:border-amber-200"
+                          : "bg-white border-slate-100 hover:border-slate-200"
+                      }`}
+                    >
+                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm transition-all ${
+                        isCompleted ? "bg-amber-500 text-white" :
+                        isInProgress ? "bg-amber-500 text-white ring-4 ring-amber-100" :
+                        "bg-slate-100 text-slate-400"
+                      }`}>
+                        {isCompleted ? <Check className="h-4 w-4" /> : sec.num}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-bold leading-tight ${
+                          isInProgress ? "text-amber-800" : isCompleted ? "text-slate-700" : "text-navy-900"
+                        }`}>{sec.title}</p>
+                        <p className="text-xs text-slate-400 mt-0.5 leading-snug line-clamp-1">{sec.subtitle}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isCompleted && <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">✓</span>}
+                        {isInProgress && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Aktif</span>}
+                        <ChevronRight className={`h-4 w-4 ${isInProgress ? "text-amber-500" : "text-slate-300"}`} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -1447,11 +1500,11 @@ interface BatchMate {
             <div className="shrink-0 bg-white border-b border-warm-border">
               {/* Mobile editor top bar */}
               <div className="px-4 py-3 flex items-center justify-between">
-                <button onClick={() => setMobileView("navigator")} className="flex items-center gap-1.5 text-sm text-slate-700 font-bold hover:text-navy-900">
-                  <ArrowLeft className="h-4 w-4 text-amber-600" />
-                  <span>Journey Setup</span>
+                <button onClick={() => setMobileView("navigator")} className="flex items-center gap-1.5 text-sm text-slate-600 font-semibold hover:text-navy-900">
+                  <ArrowLeft className="h-4 w-4 text-amber-500" />
+                  <span>Semua Langkah</span>
                 </button>
-                <button onClick={() => setMobileView("tips")} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200/60">
+                <button onClick={() => setMobileView("tips")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
                   <Info className="h-3.5 w-3.5" />
                   <span>Tips</span>
                 </button>
@@ -1460,7 +1513,7 @@ interface BatchMate {
               {/* Step dots */}
               <div className="bg-slate-50 border-t border-warm-border px-4 py-2.5 flex items-center justify-between">
                 <StepDots />
-                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">STEP {activeSection} OF 5</span>
+                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">STEP {activeSection} OF 4</span>
               </div>
             </div>
 
@@ -1480,7 +1533,7 @@ interface BatchMate {
                 <ArrowLeft className="h-4 w-4" />Sebelumnya
               </Button>
               <Button onClick={goToNext} className="flex-1 flex items-center justify-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 font-bold shadow-sm">
-                {activeSection === 5 ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
+                {activeSection === 4 ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -1504,8 +1557,8 @@ interface BatchMate {
       <div className="hidden lg:flex flex-col h-[calc(100vh-64px)] bg-white">
         {renderStatsBar()}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left panel: Section Navigator */}
-          <div className="w-72 xl:w-80 border-r border-warm-border shrink-0 overflow-y-auto bg-white">
+          {/* Left panel: Section Navigator (Collapsible) */}
+          <div className={`border-r border-warm-border shrink-0 overflow-y-auto bg-white transition-all duration-300 ${desktopNavCollapsed ? "w-16" : "w-72 xl:w-80"}`}>
             {renderDesktopNav()}
           </div>
           {/* Middle panel: Editor */}
@@ -1533,7 +1586,7 @@ interface BatchMate {
                       <ArrowLeft className="h-4 w-4" /><span className="text-sm font-semibold">Sebelumnya</span>
                     </Button>
                     <Button onClick={goToNext} className="flex items-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 font-bold shadow-sm">
-                      <span className="text-sm">{activeSection === 5 ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
+                      <span className="text-sm">{activeSection === 4 ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

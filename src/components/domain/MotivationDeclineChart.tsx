@@ -6,12 +6,12 @@ export function MotivationDeclineChart() {
   return (
     <div className="w-full flex flex-col justify-between space-y-6 h-full min-h-[340px] py-2">
       {/* Inline Header / Title */}
-      <div className="flex items-center justify-between border-b border-[#C79A3C]/20 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#C79A3C]/20 pb-3">
         <span className="text-xs font-extrabold uppercase tracking-widest text-[#0F1E3D]">
           Grafik Penurunan Semangat (Hari 1 &ndash; 90)
         </span>
-        <span className="text-[11px] font-medium text-slate-500 tracking-normal">
-          (Skenario Tanpa Pendampingan)
+        <span className="text-[10px] font-bold text-[#C79A3C] bg-[#C79A3C]/10 border border-[#C79A3C]/30 px-2.5 py-0.5 rounded-full tracking-tight">
+          Skenario Ilustratif, Tanpa Pendampingan
         </span>
       </div>
 
@@ -106,10 +106,14 @@ export function MotivationDeclineChart() {
         </div>
       </div>
 
-      {/* Caption di bawah grafik */}
-      <div className="pt-3 text-center border-t border-[#C79A3C]/20">
-        <p className="text-xs sm:text-sm font-semibold italic text-slate-600">
+      {/* Caption & Keterangan di bawah grafik */}
+      <div className="pt-3 text-center border-t border-[#C79A3C]/20 space-y-1.5">
+        <p className="text-xs sm:text-sm font-semibold italic text-slate-700">
           &ldquo;Tanpa sistem, semangat perlahan menurun.&rdquo;
+        </p>
+        <p className="text-[10px] text-slate-400 font-normal leading-relaxed max-w-lg mx-auto">
+          * Grafik ini adalah ilustrasi pola motivasi yang umum terjadi tanpa sistem pendampingan terstruktur.
+          Angka bukan data empiris peserta SLJ.
         </p>
       </div>
     </div>

@@ -78,7 +78,7 @@ export default function LandingPage() {
     {
       question: "Mengapa pendampingan berlangsung selama 90 hari?",
       answer:
-        "90 hari adalah rentang yang cukup untuk mengubah niat menjadi kebiasaan yang bertahan — bukan sekadar euforia sesaat setelah pulang dari Tanah Suci. Program dibagi ke tiga checkpoint bulanan agar perubahan berjalan bertahap dan terukur, bukan sekaligus.",
+        "90 hari bukan angka acak. Riset habit formation dari University College London (Lally et al., 2010) menemukan rata-rata 66 hari dibutuhkan untuk sebuah kebiasaan baru menjadi otomatis (dengan rentang 18–254 hari). Kami memilih 90 hari sebagai margin yang cukup panjang untuk mengakomodasi variasi tersebut, sekaligus cukup terstruktur untuk tetap fokus. Program dibagi ke tiga checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur.",
     },
     {
       question: "Apakah saya akan didampingi oleh coach?",
@@ -315,7 +315,10 @@ export default function LandingPage() {
                   <span className="text-2xl sm:text-3xl font-extrabold text-[#C79A3C] font-serif block">04</span>
                   <h4 className="font-bold text-[#0F1E3D] text-sm sm:text-base">Tidak Ada Accountability</h4>
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                    Tidak ada coach, tidak ada partner, tidak ada yang mengingatkan ketika mulai turun.
+                    Tidak ada coach, tidak ada partner, tidak ada yang mengingatkan ketika mulai turun. Bahkan secara struktural, pemerintah hanya menyediakan pembinaan sebelum keberangkatan, tanpa program resmi pasca-kepulangan.<sup className="text-[#C79A3C]">1</sup>
+                  </p>
+                  <p className="text-[10px] text-slate-400 italic pt-1.5 leading-tight">
+                    <sup>1</sup> Sumber: kajian akademik tentang pembinaan pasca-haji Indonesia
                   </p>
                 </div>
               </div>
@@ -947,7 +950,7 @@ export default function LandingPage() {
               </div>
 
               {/* Right Side: Sains Pembentukan Kebiasaan (60% / lg:col-span-7) */}
-              <div className="lg:col-span-7 space-y-3 sm:space-y-4">
+              <div className="lg:col-span-7 space-y-4 sm:space-y-5">
                 <span className="text-[10px] sm:text-xs font-extrabold text-[#C79A3C] uppercase tracking-[0.25em] block">
                   SAINS PEMBENTUKAN KEBIASAAN
                 </span>
@@ -955,7 +958,16 @@ export default function LandingPage() {
                   Kenapa 90 Hari?
                 </h2>
                 <p className="text-xs sm:text-base text-slate-200 leading-relaxed font-normal">
-                  90 hari bukan angka acak. Riset kebiasaan menunjukkan perubahan butuh waktu untuk berpindah dari niat menjadi kebiasaan yang menetap, cukup singkat untuk tetap fokus, cukup panjang untuk benar-benar melekat. Program dibagi ke tiga checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur, bukan sekaligus.
+                  90 hari bukan angka acak. Riset habit formation dari University College London
+                  (Lally et al., 2010) menemukan rata-rata <strong className="text-white">66 hari</strong> dibutuhkan
+                  untuk sebuah kebiasaan baru menjadi otomatis, dengan rentang 18 hingga 254 hari
+                  tergantung jenis kebiasaan dan individunya.
+                </p>
+                <p className="text-xs sm:text-base text-slate-300 leading-relaxed font-normal">
+                  Kami memilih 90 hari sebagai margin yang cukup panjang untuk mengakomodasi variasi
+                  tersebut, sekaligus cukup terstruktur untuk tetap fokus. Program dibagi ke tiga
+                  checkpoint bulanan (Hari 30, 60, 90) agar perubahan berjalan bertahap dan terukur,
+                  bukan sekaligus.
                 </p>
               </div>
             </div>

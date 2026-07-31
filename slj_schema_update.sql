@@ -278,4 +278,38 @@ BEGIN
     END IF;
 END $$;
 
+-- 8. Support Team Table
+CREATE TABLE IF NOT EXISTS public.support_team (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    journey_id UUID REFERENCES public.journeys(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    coach_name TEXT,
+    coach_email TEXT,
+    sahabat_safar_name TEXT,
+    sahabat_safar_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. User Notifications Table
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'reminder',
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.support_team ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users manage own support_team" ON public.support_team;
+CREATE POLICY "Users manage own support_team" ON public.support_team FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users manage own notifications" ON public.notifications;
+CREATE POLICY "Users manage own notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+
+
 
