@@ -71,10 +71,17 @@ export default function JourneySetupPage() {
       if (user) {
         setUserId(user.id);
         try {
-          const { data: bAnswers } = await supabase
-            .from("baseline_answers")
-            .select("area, score")
-            .eq("user_id", user.id);
+          const { data: assessment, error: assessmentError } = await supabase
+            .from("baseline_assessments")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("completed", true)
+            .maybeSingle();
+          if (assessmentError) throw assessmentError;
+          const { data: bAnswers, error: answersError } = assessment
+            ? await supabase.from("baseline_answers").select("area, score").eq("assessment_id", assessment.id)
+            : { data: [], error: null };
+          if (answersError) throw answersError;
 
           if (bAnswers && bAnswers.length > 0) {
             const areaSums: Record<string, { sum: number; count: number }> = {};
@@ -116,13 +123,43 @@ export default function JourneySetupPage() {
     }
   };
 
+  const canContinue = (currentStep: number) => {
+    if (currentStep === 1) return muhasabah.trim().length > 0;
+    if (currentStep === 2) return niat.trim().length > 0;
+    if (currentStep === 3) return selectedAreas.length === 3;
+    if (currentStep === 4) return mainTarget.trim().length > 0;
+    if (currentStep === 5) return actionPlans.length > 0;
+    return true;
+  };
+
+  const continueTo = (nextStep: number) => {
+    if (!canContinue(step)) {
+      const messages: Record<number, string> = {
+        1: "Isi Muhasabah sebelum melanjutkan.",
+        2: "Isi Niat Perubahan sebelum melanjutkan.",
+        3: "Pilih tepat 3 area transformasi sebelum melanjutkan.",
+        4: "Isi Target Utama 90 Hari sebelum melanjutkan.",
+        5: "Tambahkan minimal satu Action Plan sebelum melanjutkan.",
+      };
+      setCommitError(messages[step] || "Lengkapi bagian ini sebelum melanjutkan.");
+      return;
+    }
+    setCommitError(null);
+    setStep(nextStep);
+  };
+
   const addActionPlan = () => {
-    if (newActionTitle.trim()) {
+    if (newActionTitle.trim() && selectedAreas.length > 0) {
+      if (actionPlans.some(plan => plan.title.trim().toLowerCase() === newActionTitle.trim().toLowerCase())) {
+        setCommitError("Action Plan dengan nama yang sama sudah ada.");
+        return;
+      }
       setActionPlans([
         ...actionPlans,
         { id: String(Date.now()), title: newActionTitle.trim(), frequency: newActionFreq, areaCategory: newActionArea || selectedAreas[0] || "Spiritual Growth" },
       ]);
       setNewActionTitle("");
+      setCommitError(null);
     }
   };
 
@@ -143,10 +180,29 @@ export default function JourneySetupPage() {
         return;
       }
 
-      // 1. Upsert Profile
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(startDate.getDate() + 90);
+      if (selectedAreas.length !== 3) {
+        setCommitError("Pilih tepat 3 area transformasi sebelum memulai Journey.");
+        return;
+      }
+      if (!muhasabah.trim() || !niat.trim() || !mainTarget.trim()) {
+        setCommitError("Lengkapi Muhasabah, Niat Perubahan, dan Target Utama sebelum memulai Journey.");
+        return;
+      }
+      if (actionPlans.length === 0 || actionPlans.some(plan => !selectedAreas.includes(plan.areaCategory))) {
+        setCommitError("Tambahkan minimal satu Action Plan dan pastikan setiap Action Plan menggunakan area yang dipilih.");
+        return;
+      }
+
+      const { data: existingProfile, error: existingProfileError } = await supabase
+        .from("profiles")
+        .select("start_date, end_date")
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+      if (existingProfileError) throw existingProfileError;
+
+      const startDate = existingProfile?.start_date ? new Date(existingProfile.start_date) : new Date();
+      const endDate = existingProfile?.end_date ? new Date(existingProfile.end_date) : new Date(startDate);
+      if (!existingProfile?.end_date) endDate.setDate(startDate.getDate() + 89);
 
       const { error: profileErr } = await supabase.from("profiles").upsert({
         user_id: currentUserId,
@@ -155,25 +211,9 @@ export default function JourneySetupPage() {
         end_date: endDate.toISOString(),
         role: "participant",
       });
-      if (profileErr) {
-        console.error("Error upsert profile:", profileErr);
-        setCommitError(`Gagal menyimpan profil: ${profileErr.message}`);
-        setCommitting(false);
-        return;
-      }
-
-      if (selectedAreas.length !== 3) {
-        setCommitError("Pilih tepat 3 area transformasi sebelum memulai Journey.");
-        return;
-      }
+      if (profileErr) throw profileErr;
 
       // 1b. Ensure profile start_date is set to TODAY if not already
-      await supabase
-        .from("profiles")
-        .update({ start_date: new Date().toISOString() })
-        .eq("user_id", currentUserId)
-        .is("start_date", null);
-
       // 2. Save Journey (ACTIVE + EDITABLE) — with onConflict to prevent duplicates
       const { data: journey, error: journeyErr } = await supabase.from("journeys").upsert({
         user_id: currentUserId,
@@ -203,6 +243,9 @@ export default function JourneySetupPage() {
       // 3. Save Action Plans & Habits
       if (journey) {
         const errors: string[] = [];
+
+        const { error: clearPlansError } = await supabase.from("action_plans").delete().eq("journey_id", journey.id);
+        if (clearPlansError) throw clearPlansError;
 
         for (const ap of actionPlans) {
           const { data: apData, error: apErr } = await supabase.from("action_plans").insert({
@@ -282,10 +325,10 @@ export default function JourneySetupPage() {
 
         if (errors.length > 0) {
           setCommitError(`Journey berhasil dibuat, tapi beberapa item gagal tersimpan:\n${errors.join("; ")}`);
+          return;
         }
       }
 
-      // Hanya set committed jika journey berhasil dibuat
       setIsCommitted(true);
     } catch (err) {
       console.error("Error saving journey to Supabase:", err);
@@ -338,6 +381,16 @@ export default function JourneySetupPage() {
             </div>
           </div>
 
+          {commitError && step < 8 && (
+            <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+              <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">{commitError}</span>
+              <button type="button" onClick={() => setCommitError(null)} className="text-rose-400 hover:text-rose-700" aria-label="Tutup pesan">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* ─── STEP 1: MUHASABAH ─── */}
           {step === 1 && (
             <div className="space-y-6 py-2">
@@ -376,7 +429,7 @@ export default function JourneySetupPage() {
                   Kembali
                 </Button>
                 <Button
-                  onClick={() => setStep(2)}
+                  onClick={() => continueTo(2)}
                   className="bg-navy-900 hover:bg-black text-white font-bold text-xs gap-2 px-6 py-2.5 rounded-full"
                 >
                   Lanjut ke Niat <ArrowRight className="h-4 w-4 text-amber-400" />
@@ -416,7 +469,7 @@ export default function JourneySetupPage() {
                   Kembali
                 </Button>
                 <Button
-                  onClick={() => setStep(3)}
+                  onClick={() => continueTo(3)}
                   className="bg-navy-900 hover:bg-black text-white font-bold text-xs gap-2 px-6 py-2.5 rounded-full"
                 >
                   Lanjut ke Area <ArrowRight className="h-4 w-4 text-amber-400" />
@@ -531,7 +584,7 @@ export default function JourneySetupPage() {
                   Kembali
                 </Button>
                 <Button
-                  onClick={() => setStep(4)}
+                  onClick={() => continueTo(4)}
                   className="bg-navy-900 hover:bg-black text-white font-bold text-xs gap-2 px-6 py-2.5 rounded-full"
                 >
                   Lanjut ke Target <ArrowRight className="h-4 w-4 text-amber-400" />
@@ -615,7 +668,7 @@ export default function JourneySetupPage() {
                   Kembali
                 </Button>
                 <Button
-                  onClick={() => setStep(5)}
+                  onClick={() => continueTo(5)}
                   className="bg-navy-900 hover:bg-black text-white font-bold text-xs gap-2 px-6 py-2.5 rounded-full"
                 >
                   Lanjut ke Habits <ArrowRight className="h-4 w-4 text-amber-400" />
@@ -684,7 +737,7 @@ export default function JourneySetupPage() {
                   Kembali
                 </Button>
                 <Button
-                  onClick={() => setStep(6)}
+                  onClick={() => continueTo(6)}
                   className="bg-navy-900 hover:bg-black text-white font-bold text-xs gap-2 px-6 py-2.5 rounded-full"
                 >
                   Lanjut ke Tim Pendukung <ArrowRight className="h-4 w-4 text-amber-400" />
@@ -735,7 +788,7 @@ export default function JourneySetupPage() {
                   Kembali
                 </Button>
                 <Button
-                  onClick={() => setStep(7)}
+                  onClick={() => continueTo(7)}
                   className="bg-navy-900 hover:bg-black text-white font-bold text-xs gap-2 px-6 py-2.5 rounded-full"
                 >
                   Review PTP <ArrowRight className="h-4 w-4 text-amber-400" />
@@ -816,7 +869,7 @@ export default function JourneySetupPage() {
                   Kembali & Edit
                 </Button>
                 <Button
-                  onClick={() => setStep(8)}
+                  onClick={() => continueTo(8)}
                   className="bg-navy-900 hover:bg-black text-white font-bold text-xs gap-2 px-6 py-2.5 rounded-full"
                 >
                   Lanjut ke Komitmen <ArrowRight className="h-4 w-4 text-amber-400" />

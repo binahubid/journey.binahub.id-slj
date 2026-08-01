@@ -46,6 +46,7 @@ export function ParticipantLayout({
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userName, setUserName] = useState("Peserta SLJ");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     if (mobileMenuOpen) {
@@ -73,6 +74,13 @@ export function ParticipantLayout({
         } else if (user.email) {
           setUserName(user.email.split("@")[0]);
         }
+
+        const { count } = await supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("is_read", false);
+        setUnreadNotifications(count || 0);
       }
     }
     loadUser();
@@ -158,6 +166,14 @@ export function ParticipantLayout({
             <Settings className="h-4 w-4 text-gray-400" />
             <span>Pengaturan</span>
           </Link>
+          <Link
+            href="/terms"
+            target="_blank"
+            className="flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors hover:bg-warm-bg hover:text-navy-900"
+          >
+            <ShieldCheck className="h-4 w-4 text-gray-400" />
+            <span>Syarat &amp; Ketentuan</span>
+          </Link>
           <button
             onClick={handleLogout}
             className="flex items-center space-x-3 w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors text-left"
@@ -188,8 +204,9 @@ export function ParticipantLayout({
         </div>
 
         <div className="flex items-center space-x-2">
-          <Link href="/notifications" className="p-2 text-slate-600 hover:text-navy-900">
+          <Link href="/notifications" className="relative p-2 text-slate-600 hover:text-navy-900" aria-label={`Notifikasi${unreadNotifications ? `, ${unreadNotifications} belum dibaca` : ""}`}>
             <Bell className="h-5 w-5" />
+            {unreadNotifications > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black text-white ring-2 ring-white">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span>}
           </Link>
           <Link href="/profile" className="flex items-center space-x-2 pl-1">
             <div className="h-7 w-7 rounded-full bg-navy-900 text-accent font-bold flex items-center justify-center text-xs border border-accent">
@@ -275,6 +292,14 @@ export function ParticipantLayout({
                 <Settings className="h-4 w-4 text-slate-400" />
                 <span>Pengaturan</span>
               </Link>
+              <Link
+                href="/terms"
+                target="_blank"
+                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-warm-bg"
+              >
+                <ShieldCheck className="h-4 w-4 text-slate-400" />
+                <span>Syarat &amp; Ketentuan</span>
+              </Link>
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
@@ -302,7 +327,7 @@ export function ParticipantLayout({
               title="Notifikasi"
             >
               <Bell className="h-4 w-4" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white"></span>
+               {unreadNotifications > 0 && <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white"></span>}
             </Link>
             <Link
               href="/profile"

@@ -21,6 +21,8 @@ import { PrayerTracker } from "@/components/domain/PrayerTracker";
 import { QuranTracker } from "@/components/domain/QuranTracker";
 import { DailyHadithWidget } from "@/components/domain/DailyHadithWidget";
 import { createClient } from "@/lib/supabase/client";
+import { parseJournalContent } from "@/lib/journal";
+import { getActiveProgramMonth, getProgramDay } from "@/lib/program-timeline";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import {
   Compass,
@@ -44,6 +46,8 @@ import {
   Maximize2,
   Minimize2,
   X,
+  Edit3,
+  Lock,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -68,6 +72,7 @@ export default function DashboardPage() {
   >([]);
   const [journalSearch, setJournalSearch] = useState("");
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [journalSaveError, setJournalSaveError] = useState<string | null>(null);
 
   // Habits
   const [habits, setHabits] = useState<
@@ -96,6 +101,9 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [safarRemindedToday, setSafarRemindedToday] = useState(false);
+  const [safarPartnerName, setSafarPartnerName] = useState<string | null>(null);
+  const [safarRemindLoading, setSafarRemindLoading] = useState(false);
+  const [safarRemindError, setSafarRemindError] = useState<string | null>(null);
   const [isScreenSaver, setIsScreenSaver] = useState(false);
 
   useEffect(() => {
@@ -343,6 +351,7 @@ export default function DashboardPage() {
             profile.full_name || user.email?.split("@")[0] || "Peserta"
           );
           if (profile.location) setUserLocation(profile.location);
+          setSafarPartnerName(profile.sahabat_safar_user_id ? profile.sahabat_safar_name || "Sahabat Safar" : null);
           const cDate = profile.created_at ? new Date(profile.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
           setAccountCreatedDate(cDate);
         } else {
@@ -350,16 +359,21 @@ export default function DashboardPage() {
         }
 
         // Check if reminded safar today
-        const safarTodayStr = new Date().toISOString().split("T")[0];
-        try {
-          const { data: safarData } = await supabase
+        const safarTodayStr = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Jakarta",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date());
+        const { data: safarData, error: safarError } = await supabase
             .from("safar_reminders")
             .select("id")
             .eq("user_id", user.id)
             .eq("date", safarTodayStr)
+            .limit(1)
             .maybeSingle();
-          if (safarData) setSafarRemindedToday(true);
-        } catch {}
+        if (safarError) console.error("Gagal memuat status pengingat Sahabat Safar:", safarError);
+        if (safarData) setSafarRemindedToday(true);
 
         // 2. Journey
         const { data: journey, error: journeyError } = await supabase
@@ -375,15 +389,9 @@ export default function DashboardPage() {
           setJourneyStatus(journey?.status || "ACTIVE");
           const startDateVal = profile?.start_date || journey?.start_date || journey?.created_at;
           if (startDateVal) {
-            const start = new Date(startDateVal);
-            const today = new Date();
-            start.setHours(0, 0, 0, 0);
-            today.setHours(0, 0, 0, 0);
-            const diffTime = today.getTime() - start.getTime();
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            const currentDay = Math.min(90, Math.max(1, diffDays));
+            const currentDay = Math.min(90, getProgramDay(startDateVal));
             setDayCount(currentDay);
-            setProgressPercent(Math.min(100, Math.round((currentDay / 90) * 100)));
+            setProgressPercent(Math.min(100, Math.round((Math.min(90, currentDay) / 90) * 100)));
           }
         }
 
@@ -594,12 +602,13 @@ export default function DashboardPage() {
         );
 
         // 4. Load All Journals & Last Journal
-        const { data: journalsData } = await supabase
+        const { data: journalsData, error: journalsError } = await supabase
           .from("journals")
           .select("id, date, content")
           .eq("user_id", user.id)
           .not("content", "is", null)
           .order("created_at", { ascending: false });
+        if (journalsError) throw journalsError;
 
         if (journalsData && journalsData.length > 0) {
           setUserJournals(
@@ -883,38 +892,23 @@ export default function DashboardPage() {
   };
 
   const handleRemindSafar = async () => {
-    setSafarRemindedToday(true);
-    if (!userId) return;
-    const todayStr = new Date().toISOString().split("T")[0];
+    if (!userId || !safarPartnerName || safarRemindedToday || safarRemindLoading) return;
+    setSafarRemindLoading(true);
+    setSafarRemindError(null);
     try {
-      // Find Sahabat Safar user_id from support_team
-      const { data: team } = await supabase
-        .from("support_team")
-        .select("sahabat_safar_user_id, sahabat_safar_name")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      const targetId = team?.sahabat_safar_user_id;
-
-      await supabase.from("safar_reminders").insert({
-        user_id: userId,
-        sahabat_safar_user_id: targetId || null,
-        date: todayStr,
-        reminded_at: new Date().toISOString(),
-      });
-
-      // If target Sahabat Safar account exists, send notification to them
-      if (targetId) {
-        await supabase.from("notifications").insert({
-          user_id: targetId,
-          title: "💛 Pengingat dari Sahabat Safar",
-          message: `${userName} mengingatkan Anda untuk tetap konsisten dan semangat menjalankan PTP hari ini!`,
-          category: "reminder",
-          is_read: false,
-        });
-      }
+      const { data, error } = await supabase.rpc("remind_sahabat_safar");
+      if (error) throw error;
+      if (data?.sent || data?.already_sent) setSafarRemindedToday(true);
     } catch (err) {
-      console.log("Remind safar log:", err);
+      console.error("Gagal mengingatkan Sahabat Safar:", err);
+      const message = err instanceof Error ? err.message : "Pengingat belum dapat dikirim.";
+      setSafarRemindError(
+        message.includes("belum ditetapkan") || message.includes("belum sinkron")
+          ? message
+          : "Pengingat belum dapat dikirim. Periksa koneksi lalu coba lagi."
+      );
+    } finally {
+      setSafarRemindLoading(false);
     }
   };
 
@@ -922,17 +916,18 @@ export default function DashboardPage() {
   const handleSaveJournal = async () => {
     if (!journalContent.trim() || !userId) return;
     const todayStr = new Date().toISOString().split("T")[0];
+    setJournalSaveError(null);
 
     try {
-      const { error } = await supabase.from("journals").insert({
-        user_id: userId,
-        date: todayStr,
-        content: journalContent,
-        is_private: true,
-      });
+      const existingJournal = userJournals.find(journal => journal.date === todayStr);
+      const journalPayload = { content: journalContent.trim(), is_private: true };
+      const saveQuery = existingJournal
+        ? supabase.from("journals").update(journalPayload).eq("id", existingJournal.id)
+        : supabase.from("journals").insert({ user_id: userId, date: todayStr, ...journalPayload });
+      const { data: savedJournal, error } = await saveQuery.select("id").single();
       if (error) throw error;
 
-      setJournalLast(journalContent);
+      setJournalLast(journalContent.trim());
       setJournalLastDate(
         new Date().toLocaleDateString("id-ID", {
           day: "numeric",
@@ -943,9 +938,9 @@ export default function DashboardPage() {
 
       // Add to list
       const newItem = {
-        id: todayStr,
+          id: savedJournal?.id || todayStr,
         date: todayStr,
-        reflection: journalContent,
+          reflection: journalContent.trim(),
       };
       setUserJournals((prev) => [
         newItem,
@@ -956,6 +951,7 @@ export default function DashboardPage() {
       setWriteJournalOpen(false);
     } catch (e) {
       console.error("Gagal simpan jurnal:", e);
+      setJournalSaveError("Refleksi belum tersimpan. Periksa koneksi lalu coba lagi.");
     }
   };
 
@@ -979,6 +975,7 @@ export default function DashboardPage() {
   const filteredJournals = sortedJournals.filter((j) =>
     j.reflection.toLowerCase().includes(journalSearch.toLowerCase())
   );
+  const journalPreview = parseJournalContent(journalLast).reflection;
 
   return (
     <ParticipantLayout activePath="/dashboard">
@@ -1002,14 +999,26 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={handleRemindSafar}
+                  disabled={!safarPartnerName || safarRemindedToday || safarRemindLoading}
+                  title={safarPartnerName ? `Kirim pengingat kepada ${safarPartnerName}` : "Sahabat Safar belum ditetapkan"}
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-sm ${
                     safarRemindedToday
                       ? "bg-emerald-500/90 text-white border border-emerald-300"
+                      : !safarPartnerName
+                        ? "bg-white/10 text-white/50 border border-white/15 cursor-not-allowed"
                       : "bg-white/20 hover:bg-white/30 text-amber-200 border border-white/30 backdrop-blur-md"
-                  }`}
+                  } disabled:cursor-not-allowed`}
                 >
                   <Heart className={`h-3 w-3 ${safarRemindedToday ? "fill-white text-white" : "text-amber-300"}`} />
-                  <span>{safarRemindedToday ? "Ingatkan Sahabat Safar (Terkirim)" : "Ingatkan Sahabat Safar"}</span>
+                  <span>
+                    {safarRemindLoading
+                      ? "Mengirim..."
+                      : safarRemindedToday
+                        ? "Pengingat Terkirim"
+                        : safarPartnerName
+                          ? `Ingatkan ${safarPartnerName.split(" ")[0]}`
+                          : "Sahabat Safar Belum Ditentukan"}
+                  </span>
                   {safarRemindedToday && <Check className="h-3 w-3 text-white ml-0.5" />}
                 </button>
 
@@ -1022,6 +1031,15 @@ export default function DashboardPage() {
                   <Maximize2 className="h-4 w-4" />
                 </button>
               </div>
+
+              {safarRemindError && (
+                <p
+                  role="alert"
+                  className="max-w-md rounded-md border border-rose-300/30 bg-rose-950/70 px-2.5 py-1.5 text-[11px] font-semibold text-rose-100"
+                >
+                  {safarRemindError}
+                </p>
+              )}
 
               <h1 className="text-lg sm:text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-md leading-tight pt-0.5">
                 Assalamu&apos;alaikum, {userName.split(" ")[0]}!
@@ -1345,37 +1363,38 @@ export default function DashboardPage() {
         {/* ─── BARIS 3: 2 CARDS BENTO (PROGRESS JOURNEY & JOURNAL REFLEKSI) ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           {/* Card 1: Progress Journey (Total Progress 90 Hari - Countdown) */}
-          <Card className="bg-white border-warm-border p-6 rounded-2xl shadow-2xs flex flex-col justify-between space-y-5">
+           <Card className="bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
                 <div>
-                  <h3 className="font-extrabold text-navy-900 text-xs tracking-wider uppercase">
-                    Progress Journey
+                     <h3 className="font-extrabold text-navy-900 text-sm">
+                     Progress journey
                   </h3>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Countdown Sisa Hari Menuju 90 Hari
+                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                     Perjalanan 90 hari yang sedang Anda jalani
                   </p>
                 </div>
-                <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-bold text-[10px]">
-                  {Math.max(0, 90 - dayCount)} Hari Lagi
+                 <Badge className="bg-amber-50 text-amber-800 border-amber-200 font-bold text-[10px]">
+                   {Math.max(0, 90 - dayCount)} hari lagi
                 </Badge>
               </div>
 
               {/* Countdown Big Display */}
-              <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline space-x-2">
-                  <span className="text-4xl sm:text-5xl font-black text-navy-900 tracking-tight">
+               <div className="flex items-end justify-between gap-3">
+                 <div className="flex items-baseline gap-2">
+                   <span className="text-4xl font-black tracking-tight text-navy-900 tabular-nums sm:text-5xl">
                     {Math.max(0, 90 - dayCount)}
                   </span>
                   <span className="text-xs text-slate-500 font-bold">
-                    hari tersisa (Hari ke-{dayCount} dari 90)
-                  </span>
-                </div>
+                     hari tersisa
+                   </span>
+                 </div>
+                 <span className="shrink-0 text-right text-[11px] font-semibold text-slate-500">Hari ke-{dayCount}<br />dari 90</span>
               </div>
 
               {/* Progress Bar */}
               <div className="space-y-1">
-                <Progress value={Math.min(100, Math.round((dayCount / 90) * 100))} className="h-3 bg-warm-bg" />
+                 <Progress value={Math.min(100, Math.round((Math.min(90, dayCount) / 90) * 100))} className="h-2.5 bg-slate-100" indicatorClassName="bg-amber-500" />
                 <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium pt-1">
                   <span>Hari 1 (Start)</span>
                   <span className="font-bold text-amber-700">Hari 90 (Finish)</span>
@@ -1383,14 +1402,14 @@ export default function DashboardPage() {
               </div>
 
               {/* 3 Micro Stats */}
-              <div className="grid grid-cols-3 gap-2 pt-2 text-center">
-                <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">
-                  <span className="text-lg font-black text-navy-900 block">{dayCount} Hari</span>
+               <div className="grid grid-cols-1 gap-2 pt-2 text-left sm:grid-cols-3 sm:text-center">
+                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                   <span className="text-lg font-black text-navy-900 block tabular-nums">{dayCount} hari</span>
                   <span className="text-[10px] text-slate-500 font-bold block leading-tight">
                     berturut-turut berjalan
                   </span>
                 </div>
-                <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">
+                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-lg font-black text-navy-900 block">
                     {completedTodayCount}/{habits.length}
                   </span>
@@ -1398,12 +1417,12 @@ export default function DashboardPage() {
                     Checklist Selesai Hari Ini
                   </span>
                 </div>
-                <div className="bg-warm-bg p-3 rounded-xl border border-warm-border/60">
-                  <span className="text-lg font-black text-emerald-700 block">
-                    {dayCount >= 30 ? "Check 1" : "Aktif"}
+                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <span className="text-lg font-black text-emerald-700 block">
+                     Bulan {getActiveProgramMonth(dayCount)}
                   </span>
                   <span className="text-[10px] text-slate-500 font-bold block leading-tight">
-                    Checkpoint Status
+                     checkpoint aktif
                   </span>
                 </div>
               </div>
@@ -1426,47 +1445,57 @@ export default function DashboardPage() {
           </Card>
 
           {/* Card 2: Journal Refleksi (Displays user reflections + Pin Journal) */}
-          <Card className="bg-white border-warm-border p-6 rounded-2xl shadow-2xs flex flex-col justify-between space-y-5">
+          <Card className="group bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5 transition-shadow hover:shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
-                <div>
-                  <h3 className="font-extrabold text-navy-900 text-xs tracking-wider uppercase">
-                    Journal Refleksi
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Tulis refleksi harian Anda
-                  </p>
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">Ruang hening</p>
+                    <h3 className="mt-0.5 truncate text-sm font-extrabold text-navy-900">Journal refleksi</h3>
+                    <p className="mt-0.5 text-[11px] font-medium text-slate-500">Catat satu hal yang bermakna hari ini</p>
+                  </div>
                 </div>
                 <Button
                   size="sm"
                   onClick={() => setWriteJournalOpen(true)}
-                  className="bg-navy-900 hover:bg-black text-amber-300 font-bold text-xs rounded-xl gap-1.5 px-3 py-1.5"
+                  className="shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-amber-300 shadow-sm transition-transform hover:bg-slate-800 active:scale-[.98]"
                 >
-                  + Tulis Refleksi
+                  Tulis
                 </Button>
               </div>
 
               {/* Reflection Card Preview */}
               {journalLast ? (
-                <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200/60 space-y-2 relative">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-md">
-                      Refleksi Terakhir ({journalLastDate})
+                <div className="relative overflow-hidden rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50 to-white p-4 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                      Catatan terakhir
                     </span>
-                    {pinnedIds.includes(journalLastDate) && (
-                      <Pin className="h-3.5 w-3.5 text-amber-600 fill-amber-600" />
+                    <span className="text-[10px] font-medium text-slate-400">
+                      {journalLastDate}
+                    </span>
+                    {pinnedIds.includes(userJournals[0]?.id) && (
+                      <Pin className="h-3.5 w-3.5 shrink-0 fill-amber-600 text-amber-600" />
                     )}
                   </div>
-                  <p className="text-xs text-navy-900 font-serif leading-relaxed italic line-clamp-3">
-                    &ldquo;{journalLast}&rdquo;
+                  <p className="text-sm leading-6 text-navy-900 font-serif italic line-clamp-3">
+                    &ldquo;{journalPreview}&rdquo;
                   </p>
+                  <span className="block text-[10px] font-semibold text-amber-700">Buka Journal untuk membaca seluruh catatan</span>
                 </div>
               ) : (
-                <div className="py-8 text-center space-y-2 border border-dashed border-slate-200 rounded-xl bg-warm-bg/40">
-                  <BookOpen className="h-8 w-8 text-slate-300 mx-auto" />
-                  <p className="text-xs text-slate-400 font-medium">
-                    Belum ada jurnal hari ini.
-                  </p>
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center space-y-2">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-300 shadow-sm ring-1 ring-slate-100">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600">Belum ada catatan refleksi</p>
+                  <p className="mx-auto max-w-[220px] text-[11px] leading-relaxed text-slate-400">Mulai dari satu kalimat. Tidak perlu menunggu hari yang sempurna.</p>
+                  <button type="button" onClick={() => setWriteJournalOpen(true)} className="pt-1 text-[11px] font-bold text-amber-700 hover:text-amber-800">
+                    Tulis refleksi pertama
+                  </button>
                 </div>
               )}
             </div>
@@ -1476,7 +1505,7 @@ export default function DashboardPage() {
               <Link href="/journal" className="w-full block">
                 <Button
                   variant="outline"
-                  className="w-full justify-between text-xs font-bold text-navy-900 border-warm-border hover:bg-warm-bg rounded-xl py-2.5"
+                  className="w-full justify-between rounded-xl border-slate-200 text-xs font-bold text-navy-900 hover:bg-slate-50 py-2.5"
                 >
                   <span className="flex items-center gap-2">
                     <BookMarked className="h-4 w-4 text-amber-600" />
@@ -1827,27 +1856,41 @@ export default function DashboardPage() {
 
       {/* 5. MODAL WRITE REFLECTION JOURNAL */}
       <Dialog open={writeJournalOpen} onOpenChange={setWriteJournalOpen}>
-        <DialogContent className="max-w-lg p-6">
-          <DialogHeader className="border-b border-warm-border pb-3">
-            <DialogTitle className="text-base font-extrabold text-navy-900">
-              Tulis Refleksi Journal Hari Ini
-            </DialogTitle>
+        <DialogContent className="max-w-lg overflow-hidden rounded-2xl border-slate-200 p-0">
+          <DialogHeader className="border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                <Edit3 className="h-4 w-4" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-extrabold text-navy-900">Refleksi hari ini</DialogTitle>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">Tuliskan apa yang terasa penting, tanpa perlu merapikan kata-kata.</p>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="py-3 space-y-2">
-            <label className="text-xs font-semibold text-slate-600 block">
-              Refleksi, rasa syukur, atau pembelajaran hari ini:
+          <div className="space-y-2 px-6 py-5">
+            <label htmlFor="dashboard-journal" className="block text-xs font-bold text-slate-700">
+              Catatan refleksi
             </label>
             <Textarea
+              id="dashboard-journal"
               value={journalContent}
               onChange={(e) => setJournalContent(e.target.value)}
-              placeholder="Apa hal terbaik atau evaluasi penting dari perjalananmu hari ini?..."
-              className="text-xs min-h-[140px] rounded-xl border-warm-border"
+              maxLength={1000}
+              placeholder="Apa yang kamu syukuri, pelajari, atau ingin perbaiki hari ini?"
+              className="min-h-[180px] resize-none rounded-xl border-slate-200 p-4 font-serif text-sm leading-6 focus:border-amber-500"
             />
+            <div className="flex items-center justify-between text-[10px] text-slate-400">
+              <span className="flex items-center gap-1.5"><Lock className="h-3 w-3" /> Hanya Anda yang dapat membaca</span>
+              <span className="font-mono tabular-nums">{journalContent.length}/1000</span>
+            </div>
+            {journalSaveError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{journalSaveError}</p>}
           </div>
-          <DialogFooter className="pt-3 border-t border-warm-border">
+          <DialogFooter className="border-t border-slate-100 bg-slate-50/70 px-6 py-4">
             <Button
               onClick={handleSaveJournal}
-              className="bg-navy-900 text-amber-300 font-bold text-xs rounded-xl w-full"
+              disabled={!journalContent.trim()}
+              className="h-10 w-full rounded-xl bg-navy-900 text-xs font-bold text-amber-300 hover:bg-slate-800 disabled:opacity-50"
             >
               Simpan Refleksi
             </Button>

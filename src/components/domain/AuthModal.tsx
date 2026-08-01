@@ -27,7 +27,6 @@ export function AuthModal({ isOpen, onClose = () => {}, initialMode = 'signin' }
   const [showEmailForm, setShowEmailForm] = useState(false);
 
   // Sign up state
-  const [fullName, setFullName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeSkk, setAgreeSkk] = useState(false);
   const [agreeAi, setAgreeAi] = useState(false);
@@ -40,8 +39,10 @@ export function AuthModal({ isOpen, onClose = () => {}, initialMode = 'signin' }
     setLoading(true);
     setError('');
 
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) { setError('Isi email dan password.'); setLoading(false); return; }
     const supabase = createClient();
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
 
     if (signInError) {
       setError(signInError.message);
@@ -50,11 +51,12 @@ export function AuthModal({ isOpen, onClose = () => {}, initialMode = 'signin' }
     }
 
     if (signInData.user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('user_id', signInData.user.id)
-        .single();
+        .maybeSingle();
+      if (profileError) { setError('Profil akun belum dapat dimuat. Coba masuk kembali.'); setLoading(false); return; }
 
       const role = getUserRole(signInData.user, profile?.role);
       if (role === 'admin') router.push('/admin');
@@ -71,6 +73,9 @@ export function AuthModal({ isOpen, onClose = () => {}, initialMode = 'signin' }
     setLoading(true);
     setError('');
 
+    if (!allChecked) { setError('Setujui Syarat, Kebijakan Privasi, dan penggunaan AI sebelum mendaftar.'); setLoading(false); return; }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) { setError('Masukkan email yang valid.'); setLoading(false); return; }
     if (password !== confirmPassword) {
       setError('Password tidak cocok');
       setLoading(false);
@@ -83,12 +88,12 @@ export function AuthModal({ isOpen, onClose = () => {}, initialMode = 'signin' }
     }
 
     try {
-      const defaultName = email.split('@')[0] || 'Peserta SLJ';
+      const defaultName = normalizedEmail.split('@')[0] || 'Peserta SLJ';
       const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
       const supabase = createClient();
 
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           emailRedirectTo: redirectTo,
@@ -116,17 +121,18 @@ export function AuthModal({ isOpen, onClose = () => {}, initialMode = 'signin' }
 
         if (!authData.session) {
           onClose();
-          router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+          router.push(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`);
           return;
         }
 
         const role = getUserRole(authData.user, 'participant');
-        await supabase.from('profiles').upsert({
+        const { error: profileError } = await supabase.from('profiles').upsert({
           user_id: authData.user.id,
           full_name: defaultName,
           role: role,
           location: 'Jakarta',
         });
+        if (profileError) throw profileError;
 
         if (role === 'participant') {
           router.push('/onboarding');
@@ -379,11 +385,11 @@ export function AuthModal({ isOpen, onClose = () => {}, initialMode = 'signin' }
                   />
                   <span className="leading-relaxed text-slate-600">
                     Saya telah membaca dan menyetujui{' '}
-                    <Link href="/settings" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
+                    <Link href="/terms" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
                       Syarat & Ketentuan
                     </Link>{' '}
                     serta{' '}
-                    <Link href="/settings" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
+                    <Link href="/terms#kebijakan-privasi" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
                       Kebijakan Privasi
                     </Link>{' '}
                     SLJ Life OS.

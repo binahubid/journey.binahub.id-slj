@@ -35,11 +35,13 @@ export function NotificationCard({
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onMarkRead?.(); }}
       className={cn(
-        "p-4 flex items-start space-x-3 transition-colors cursor-pointer border-warm-border",
+        "p-4 flex items-start space-x-3 transition-all cursor-pointer border-slate-200/80 hover:border-amber-300 hover:shadow-sm",
         !isRead ? "bg-amber-50/50 border-amber-200" : "bg-white"
       )}
-      onClick={onMarkRead}
     >
       <div className="p-2 rounded-full bg-warm-bg border border-warm-border flex-shrink-0 mt-0.5">
         {getIcon()}

@@ -193,6 +193,9 @@ export default function BaselinePage() {
   const [isIntro, setIsIntro] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // ── LOAD ASSESSMENT DATA ──────────────────────────────────────────────────
 
@@ -203,17 +206,20 @@ export default function BaselinePage() {
         router.replace("/login");
         return;
       }
+      setUserId(user.id);
+      setErrorMessage(null);
 
       // Restore from localStorage first as instant fallback
       let localAnswers: Record<number, number> = {};
       try {
-        const stored = localStorage.getItem("baseline_answers_draft");
+        const stored = localStorage.getItem(`baseline_answers_draft:${user.id}`);
         if (stored) localAnswers = JSON.parse(stored);
       } catch {}
 
       // Check existing assessment
-      let { data: assessment } = await supabase.from("baseline_assessments")
+      let { data: assessment, error: assessmentError } = await supabase.from("baseline_assessments")
         .select("*").eq("user_id", user.id).maybeSingle();
+      if (assessmentError) throw assessmentError;
 
       if (!assessment) {
         // Create new assessment entry
@@ -224,9 +230,11 @@ export default function BaselinePage() {
           assessment = newAss;
         } else {
           // Retry query in case of RLS / concurrent insert
-          const { data: retryAss } = await supabase.from("baseline_assessments")
+          const { data: retryAss, error: retryError } = await supabase.from("baseline_assessments")
             .select("*").eq("user_id", user.id).maybeSingle();
+          if (retryError) throw retryError;
           if (retryAss) assessment = retryAss;
+          else throw error || new Error("Assessment baseline tidak dapat dibuat.");
         }
       }
 
@@ -235,9 +243,10 @@ export default function BaselinePage() {
         setIsCompleted(assessment.completed || false);
 
         // Fetch existing answers
-        const { data: ansList } = await supabase.from("baseline_answers")
+        const { data: ansList, error: answersError } = await supabase.from("baseline_answers")
           .select("question_number, score")
           .eq("assessment_id", assessment.id);
+        if (answersError) throw answersError;
 
         const aMap: Record<number, number> = { ...localAnswers };
         (ansList || []).forEach((a: any) => {
@@ -252,6 +261,7 @@ export default function BaselinePage() {
       }
     } catch (err) {
       console.error("Gagal memuat baseline assessment:", err);
+      setErrorMessage("Baseline belum dapat dimuat. Periksa koneksi lalu muat ulang halaman.");
     } finally {
       setLoading(false);
     }
@@ -262,6 +272,9 @@ export default function BaselinePage() {
   const saveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const answersMapRef = useRef<Record<number, number>>({});
   useEffect(() => { answersMapRef.current = answersMap; }, [answersMap]);
+  useEffect(() => () => {
+    if (saveDebounceTimerRef.current) clearTimeout(saveDebounceTimerRef.current);
+  }, []);
 
   // Jeda Refleksi expand/collapse state
   const [isRefleksiExpanded, setIsRefleksiExpanded] = useState(true);
@@ -277,6 +290,7 @@ export default function BaselinePage() {
   // Batch save current answers map to Supabase
   const batchSaveAnswersToSupabase = async (mapToSave?: Record<number, number>) => {
     try {
+      setSaveStatus("saving");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -304,12 +318,16 @@ export default function BaselinePage() {
       });
 
       if (answerPayload.length > 0) {
-        await supabase.from("baseline_answers").upsert(answerPayload, {
+        const { error } = await supabase.from("baseline_answers").upsert(answerPayload, {
           onConflict: "assessment_id,question_number",
         });
+        if (error) throw error;
       }
+      setSaveStatus("saved");
     } catch (err) {
       console.error("Batch autosave error:", err);
+      setSaveStatus("error");
+      setErrorMessage("Jawaban tersimpan di perangkat, tetapi belum tersinkron ke server.");
     }
   };
 
@@ -322,7 +340,7 @@ export default function BaselinePage() {
 
     // 2. Instant localStorage cache for offline/reload safety
     try {
-      localStorage.setItem("baseline_answers_draft", JSON.stringify(updatedMap));
+      if (userId) localStorage.setItem(`baseline_answers_draft:${userId}`, JSON.stringify(updatedMap));
     } catch {}
 
     // 3. Debounced batch save to Supabase (1.5s debounce to minimize DB calls during rapid clicking)
@@ -335,7 +353,15 @@ export default function BaselinePage() {
   // ── COMPLETE ASSESSMENT ───────────────────────────────────────────────────
 
   const handleCompleteAssessment = async () => {
+    const missingQuestions = BASELINE_STEPS.flatMap(step => step.questions).filter(question => answersMap[question.id] === undefined);
+    if (missingQuestions.length > 0) {
+      const firstMissingStep = BASELINE_STEPS.findIndex(step => step.questions.some(question => answersMap[question.id] === undefined));
+      setErrorMessage(`Masih ada ${missingQuestions.length} pernyataan yang belum dijawab.`);
+      setCurrentStepIndex(Math.max(0, firstMissingStep));
+      return;
+    }
     setSubmitting(true);
+    setErrorMessage(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -346,9 +372,10 @@ export default function BaselinePage() {
           if (assData?.id) {
             currentAssId = assData.id;
           } else {
-            const { data: newAss } = await supabase.from("baseline_assessments")
+            const { data: newAss, error: newAssessmentError } = await supabase.from("baseline_assessments")
               .insert({ user_id: user.id })
               .select("id").single();
+            if (newAssessmentError) throw newAssessmentError;
             if (newAss?.id) currentAssId = newAss.id;
           }
         }
@@ -373,7 +400,7 @@ export default function BaselinePage() {
             const { error: ansErr } = await supabase.from("baseline_answers").upsert(answerPayload, {
               onConflict: "assessment_id,question_number",
             });
-            if (ansErr) console.error("Batch save baseline_answers error:", ansErr);
+            if (ansErr) throw ansErr;
           }
 
           // 2. Update baseline_assessments completed status
@@ -382,14 +409,21 @@ export default function BaselinePage() {
             submitted_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }).eq("id", currentAssId);
-          if (assErr) console.error("Update baseline_assessments error:", assErr);
+          if (assErr) throw assErr;
+          setAssessmentId(currentAssId);
+          setIsCompleted(true);
+          setCurrentStepIndex(6);
+          if (userId) localStorage.removeItem(`baseline_answers_draft:${userId}`);
+        } else {
+          throw new Error("Assessment baseline tidak ditemukan.");
         }
+      } else {
+        throw new Error("Sesi login telah berakhir.");
       }
     } catch (err) {
       console.error("Gagal menyelesaikan baseline:", err);
+      setErrorMessage("Baseline belum berhasil dikirim. Jawaban Anda tetap tersimpan dan dapat dicoba kembali.");
     } finally {
-      setIsCompleted(true);
-      setCurrentStepIndex(6); // ALWAYS proceed to Summary screen!
       setSubmitting(false);
     }
   };
@@ -416,6 +450,8 @@ export default function BaselinePage() {
 
   const answeredCount = Object.keys(answersMap).length;
   const currentStep = BASELINE_STEPS[Math.min(currentStepIndex, 5)];
+  const currentStepAnswered = currentStep.questions.filter(question => answersMap[question.id] !== undefined).length;
+  const currentStepComplete = currentStepAnswered === currentStep.questions.length;
 
   if (loading) {
     return (
@@ -428,6 +464,12 @@ export default function BaselinePage() {
   return (
     <ParticipantLayout activePath="/baseline" pageTitle="Baseline Self-Discovery">
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-8 pt-6 pb-20 font-sans text-slate-800 space-y-6">
+        {errorMessage && (
+          <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+            <span className="flex-1">{errorMessage}</span>
+            <button type="button" onClick={() => setErrorMessage(null)} aria-label="Tutup pesan" className="text-rose-400 hover:text-rose-700">×</button>
+          </div>
+        )}
 
         {/* ─── INTRO SCREEN (MATCHING USER SCREENSHOT DESIGN) ─────────────── */}
         {isIntro ? (
@@ -799,7 +841,10 @@ export default function BaselinePage() {
                 <span className="text-amber-700 uppercase tracking-wider">
                   Langkah {currentStep.stepNum} dari 6: {currentStep.title}
                 </span>
-                <span className="text-slate-400">Progres Jawaban: {answeredCount} / 50</span>
+                <span className="flex items-center gap-2 text-slate-400">
+                  {saveStatus === "saving" ? "Menyimpan..." : saveStatus === "saved" ? "Tersimpan" : saveStatus === "error" ? "Belum tersinkron" : "Siap"}
+                  <span>Progres: {answeredCount} / 50</span>
+                </span>
               </div>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div
@@ -965,7 +1010,14 @@ export default function BaselinePage() {
 
               {currentStepIndex < 5 && (
                 <Button
-                  onClick={() => setCurrentStepIndex(prev => prev + 1)}
+                  onClick={() => {
+                    if (!currentStepComplete) {
+                      setErrorMessage(`Jawab semua pernyataan di bagian ${currentStep.title} sebelum melanjutkan.`);
+                      return;
+                    }
+                    setErrorMessage(null);
+                    setCurrentStepIndex(prev => prev + 1);
+                  }}
                   className="bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-10 px-6 shadow-xs"
                 >
                   Langkah Berikutnya

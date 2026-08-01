@@ -14,11 +14,12 @@ export async function GET(request: Request) {
       const user = data.user;
 
       // 1. Fetch user profile from database
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("id, role")
         .eq("user_id", user.id)
         .maybeSingle();
+      if (profileError) return NextResponse.redirect(`${origin}/login?error=profile_failed`);
 
       // 2. Resolve role (app_metadata.role -> user_metadata.role -> profile.role)
       const role = getUserRole(user, profile?.role);
@@ -27,19 +28,21 @@ export async function GET(request: Request) {
         // First-time user registration
         const fullName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Pengguna SLJ";
 
-        await supabase.from("profiles").insert({
+        const { error: insertProfileError } = await supabase.from("profiles").insert({
           user_id: user.id,
           full_name: fullName,
           avatar_url: user.user_metadata?.avatar_url || null,
           role: role,
           location: "Jakarta",
         });
+        if (insertProfileError) return NextResponse.redirect(`${origin}/login?error=profile_failed`);
 
         if (role === "participant") {
-          await supabase.from("journeys").insert({
+          const { error: journeyError } = await supabase.from("journeys").upsert({
             user_id: user.id,
             status: "ONBOARDING",
-          });
+          }, { onConflict: "user_id" });
+          if (journeyError) return NextResponse.redirect(`${origin}/login?error=profile_failed`);
           return NextResponse.redirect(`${origin}/onboarding`);
         }
       }
@@ -58,7 +61,9 @@ export async function GET(request: Request) {
         .from("journeys")
         .select("status")
         .eq("user_id", user.id)
-        .single();
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (journey?.status === "ONBOARDING") {
         return NextResponse.redirect(`${origin}/onboarding`);

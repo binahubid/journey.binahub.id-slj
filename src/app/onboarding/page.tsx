@@ -66,9 +66,11 @@ export default function OnboardingPage() {
       }
 
       // Update user profile in Supabase with Identity, Company & Access Code
-      const startDate = new Date();
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + 90);
+      const { data: existingProfile, error: existingProfileError } = await supabase.from("profiles").select("start_date, end_date").eq("user_id", user.id).maybeSingle();
+      if (existingProfileError) throw existingProfileError;
+      const startDate = existingProfile?.start_date ? new Date(existingProfile.start_date) : new Date();
+      const endDate = existingProfile?.end_date ? new Date(existingProfile.end_date) : new Date(startDate);
+      if (!existingProfile?.end_date) endDate.setDate(startDate.getDate() + 89);
 
       const { error: profileErr } = await supabase
         .from("profiles")
@@ -98,7 +100,7 @@ export default function OnboardingPage() {
 
       if (journeyFetchErr) {
         console.error("Error fetching journey:", journeyFetchErr);
-        // Non-blocking — continue with insert if needed
+        throw journeyFetchErr;
       }
 
       if (journey) {

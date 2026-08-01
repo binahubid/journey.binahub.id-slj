@@ -25,6 +25,7 @@ interface UserProfileData {
 export default function ProfilePage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfileData>({
     fullName: "Peserta SLJ",
     role: "Peserta Program (Jamaah / Leader)",
@@ -44,20 +45,22 @@ export default function ProfilePage() {
         if (!user) return;
 
         // 1. Fetch Profile
-        const { data: userProfile } = await supabase
+        const { data: userProfile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("user_id", user.id)
           .maybeSingle();
+        if (profileError) throw profileError;
 
         // 2. Fetch Journey
-        const { data: journey } = await supabase
+        const { data: journey, error: journeyError } = await supabase
           .from("journeys")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+        if (journeyError) throw journeyError;
 
         // 3. Fetch Batch & Company info
         let companyName = userProfile?.company_name || "Corporate Mitra";
@@ -117,6 +120,7 @@ export default function ProfilePage() {
         });
       } catch (err) {
         console.error("Gagal memuat profil:", err);
+        setErrorMsg("Profil belum dapat dimuat. Periksa koneksi lalu coba lagi.");
       } finally {
         setLoading(false);
       }
@@ -137,6 +141,7 @@ export default function ProfilePage() {
     <ParticipantLayout activePath="/profile" pageTitle="Profil Saya • Detail Peserta SLJ">
 
       <main className="max-w-wizard mx-auto px-4 md:px-6 pt-6 space-y-6">
+        {errorMsg && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{errorMsg}</div>}
         <Card className="bg-white border-warm-border p-6 space-y-6">
           <div className="flex items-center space-x-4 border-b border-warm-border pb-6">
             <div className="h-16 w-16 rounded-full bg-navy-900 text-accent font-bold flex items-center justify-center text-2xl shadow-md">

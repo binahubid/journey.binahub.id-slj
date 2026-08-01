@@ -129,6 +129,8 @@ export default function JourneyPage() {
   const [ptpStatus, setPtpStatus] = useState<"EDITABLE" | "LOCKED">("EDITABLE");
   const ptpStatusRef = useRef<"EDITABLE" | "LOCKED">("EDITABLE");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // UI
   const [activeSection, setActiveSection] = useState(1);
@@ -204,11 +206,14 @@ interface BatchMate {
   useEffect(() => {
     async function loadData() {
       try {
+        setLoadError(null);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
-        const { data: journey } = await supabase.from("journeys").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+        if (profileError) throw profileError;
+        const { data: journey, error: journeyError } = await supabase.from("journeys").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (journeyError) throw journeyError;
 
         if (profile?.program_code) {
           // Fetch batch mates for Sahabat Safar selection
@@ -254,10 +259,13 @@ interface BatchMate {
             setNiatAlasan(typeof nd === "object" ? (nd.alasan || "") : "");
           } catch { setNiat(journey.niat || ""); }
 
-          if (Array.isArray(journey.area_transformasi) && journey.area_transformasi.length > 0) {
-            setSelectedAreas(journey.area_transformasi);
-            setActiveAreaTab(journey.area_transformasi[0]);
-            setNewActionArea(journey.area_transformasi[0]);
+          const journeyAreas = Array.isArray(journey.area_transformasi)
+            ? journey.area_transformasi.map((area: string) => String(area))
+            : [];
+          if (journeyAreas.length > 0) {
+            setSelectedAreas(journeyAreas);
+            setActiveAreaTab(journeyAreas[0]);
+            setNewActionArea(journeyAreas[0]);
           }
 
           // Target & Indicators per area parsing
@@ -268,7 +276,7 @@ interface BatchMate {
             } else if (parsedTargets.target) {
               // Legacy format fallback
               setAreaTargetsMap({
-                [selectedAreas[0] || "Spiritual Growth"]: {
+                  [journeyAreas[0] || "Spiritual Growth"]: {
                   mainTarget: parsedTargets.target || "",
                   targetAlasan: parsedTargets.alasan || "",
                   kualitas: journey.success_indicators?.[0] || "",
@@ -280,7 +288,7 @@ interface BatchMate {
             }
           } catch {
             setAreaTargetsMap({
-              [selectedAreas[0] || "Spiritual Growth"]: {
+                [journeyAreas[0] || "Spiritual Growth"]: {
                 mainTarget: journey.main_target || "",
                 targetAlasan: "",
                 kualitas: journey.success_indicators?.[0] || "",
@@ -292,7 +300,8 @@ interface BatchMate {
           }
 
           // Action Plans
-          const { data: plans } = await supabase.from("action_plans").select("id, title, frequency, quantity, target, category, area_category").eq("journey_id", journey.id);
+          const { data: plans, error: plansError } = await supabase.from("action_plans").select("id, title, frequency, quantity, target, category, area_category").eq("journey_id", journey.id);
+          if (plansError) throw plansError;
           if (plans && plans.length > 0) {
             setActionPlans(plans.map(p => ({
               id: p.id,
@@ -302,10 +311,12 @@ interface BatchMate {
               area_category: p.area_category || p.category || journey.area_transformasi?.[0] || "Spiritual Growth",
             })));
           } else {
-            const { data: uh } = await supabase.from("habits").select("*").eq("user_id", user.id);
+            const { data: uh, error: habitsError } = await supabase.from("habits").select("*").eq("user_id", user.id).eq("is_archived", false);
+            if (habitsError) throw habitsError;
             if (uh && uh.length > 0) {
               setActionPlans(uh.map(h => ({
-                id: h.id,
+                // Legacy habits have no Action Plan identity; let autosave create the canonical relation.
+                id: undefined,
                 title: h.title,
                 frequency: h.frequency || "Harian",
                 quantity: h.quantity || h.target || 1,
@@ -316,13 +327,20 @@ interface BatchMate {
 
           // Support Team
           try {
-            const { data: team } = await supabase.from("support_team").select("coach_name, sahabat_safar_name, sahabat_safar_user_id").eq("journey_id", journey.id).maybeSingle();
+            const { data: team, error: teamError } = await supabase.from("support_team").select("coach_name, sahabat_safar_name, sahabat_safar_user_id").eq("journey_id", journey.id).maybeSingle();
+            if (teamError) throw teamError;
             if (team?.coach_name) setCoachName(team.coach_name);
             if (team?.sahabat_safar_name) setSahabatSafar(team.sahabat_safar_name);
             if (team?.sahabat_safar_user_id) setSahabatSafarUserId(team.sahabat_safar_user_id);
-          } catch {}
+          } catch (teamError) {
+            console.error("Support team load error:", teamError);
+            setSaveError("Data tim pendukung belum dapat dimuat.");
+          }
         }
-      } catch (err) { console.log("Journey load error:", err); }
+      } catch (err) {
+        console.error("Journey load error:", err);
+        setLoadError("Data PTP gagal dimuat. Periksa koneksi lalu coba muat ulang halaman.");
+      }
       finally { setLoading(false); }
     }
     loadData();
@@ -340,6 +358,10 @@ interface BatchMate {
   useEffect(() => { coachNameRef.current = coachName; }, [coachName]);
   useEffect(() => { journeyIdRef.current = journeyId; }, [journeyId]);
   useEffect(() => { ptpStatusRef.current = ptpStatus; }, [ptpStatus]);
+
+  useEffect(() => () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+  }, []);
 
   // ─── Autosave ──────────────────────────────────────────────────
   const scheduleAutosave = (sectionNum: number) => {
@@ -359,23 +381,28 @@ interface BatchMate {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       switch (sectionNum) {
-        case 1:
-          await supabase.from("journeys").update({ muhasabah: muhasabahRef.current, updated_at: new Date().toISOString() }).eq("id", _journeyId);
+        case 1: {
+          const { error } = await supabase.from("journeys").update({ muhasabah: muhasabahRef.current, updated_at: new Date().toISOString() }).eq("id", _journeyId);
+          if (error) throw error;
           break;
-        case 2:
-          await supabase.from("journeys").update({ niat: JSON.stringify({ niat: niatRef.current, alasan: niatAlasanRef.current }), updated_at: new Date().toISOString() }).eq("id", _journeyId);
+        }
+        case 2: {
+          const { error } = await supabase.from("journeys").update({ niat: JSON.stringify({ niat: niatRef.current, alasan: niatAlasanRef.current }), updated_at: new Date().toISOString() }).eq("id", _journeyId);
+          if (error) throw error;
           break;
+        }
         case 3: {
           // Save area selection + target indicators together (merged step)
           const targetsObj = areaTargetsMapRef.current;
           const jsonStr = JSON.stringify(targetsObj);
           const allIndicators = Object.values(targetsObj).flatMap(t => [t.kualitas, t.kuantitas, t.waktu, t.biaya].filter(b => b && b.trim() !== ""));
-          await supabase.from("journeys").update({
+          const { error } = await supabase.from("journeys").update({
             area_transformasi: selectedAreasRef.current,
             main_target: jsonStr,
             success_indicators: allIndicators,
             updated_at: new Date().toISOString()
           }).eq("id", _journeyId);
+          if (error) throw error;
           break;
         }
         case 4: {
@@ -383,11 +410,11 @@ interface BatchMate {
           // Fetch existing action_plans for this journey
           const { data: existingPlans, error: existingPlansError } = await supabase.from("action_plans").select("id, title").eq("journey_id", _journeyId);
           if (existingPlansError) throw existingPlansError;
-          const existingTitles = new Set((existingPlans || []).map((p) => p.title));
-          const currentTitles = new Set(_plans.map((p) => p.title));
+          const currentPlanIds = new Set(_plans.map((p) => p.id).filter(Boolean));
+          const currentTitles = new Set(_plans.map((p) => p.title.trim().toLowerCase()));
 
-          // Delete only plans that were removed by user
-          const toDelete = (existingPlans || []).filter((p) => !currentTitles.has(p.title));
+          // Delete only plans that were removed by user. IDs are preferred so duplicate titles cannot collide.
+          const toDelete = (existingPlans || []).filter((p) => !currentPlanIds.has(p.id) && !currentTitles.has(p.title.trim().toLowerCase()));
           if (toDelete.length > 0) {
             const { error } = await supabase.from("action_plans").delete().in("id", toDelete.map((p) => p.id));
             if (error) throw error;
@@ -441,7 +468,11 @@ interface BatchMate {
       }
       setSaveStatus("saved");
       setLastSaved(new Date());
-    } catch (err) { console.error("Save error:", err); setSaveStatus("idle"); }
+    } catch (err) {
+      console.error("Save error:", err);
+      setSaveStatus("idle");
+      setSaveError("Perubahan PTP belum tersimpan. Periksa koneksi lalu coba lagi.");
+    }
   };
 
   // ─── Helpers ───────────────────────────────────────────────────
@@ -449,8 +480,8 @@ interface BatchMate {
     switch (num) {
       case 1: return muhasabah.trim().length > 0;
       case 2: return niat.trim().length > 0;
-      case 3: return selectedAreas.length > 0 && Object.values(areaTargetsMap).some(t => t.mainTarget && t.mainTarget.trim().length > 0);
-      case 4: return actionPlans.length > 0;
+      case 3: return selectedAreas.length === 3 && selectedAreas.every(area => areaTargetsMap[area]?.mainTarget?.trim().length > 0);
+      case 4: return actionPlans.length > 0 && actionPlans.every(plan => selectedAreas.includes(plan.area_category));
       default: return false;
     }
   };
@@ -476,15 +507,28 @@ interface BatchMate {
   const toggleArea = (id: string) => {
     if (ptpStatus === "LOCKED") return;
     let next: string[];
-    if (selectedAreas.includes(id)) { next = selectedAreas.filter(a => a !== id); }
+    if (selectedAreas.includes(id)) {
+      if (actionPlans.some(plan => plan.area_category === id)) {
+        setSaveError(`Pindahkan atau hapus Action Plan pada area ${id} sebelum membatalkan area ini.`);
+        return;
+      }
+      next = selectedAreas.filter(a => a !== id);
+    }
     else { if (selectedAreas.length >= 3) return; next = [...selectedAreas, id]; }
+    setSaveError(null);
     setSelectedAreas(next);
+    selectedAreasRef.current = next;
     scheduleAutosave(3);
   };
 
   const addActionPlan = () => {
     if (ptpStatus === "LOCKED" || !newActionTitle.trim()) return;
-    const next = [...actionPlans, { id: String(Date.now()), title: newActionTitle.trim(), frequency: newActionFreq, quantity: Number(newActionQty) || 1, area_category: newActionArea }];
+    const title = newActionTitle.trim();
+    if (actionPlans.some(plan => plan.title.trim().toLowerCase() === title.toLowerCase())) {
+      setSaveError("Action Plan dengan nama yang sama sudah ada.");
+      return;
+    }
+    const next = [...actionPlans, { id: undefined, title, frequency: newActionFreq, quantity: Math.max(1, Number(newActionQty) || 1), area_category: newActionArea }];
     setActionPlans(next);
     setNewActionTitle("");
     setShowAddHabit(false);
@@ -530,12 +574,19 @@ interface BatchMate {
       setLastSaved(new Date());
     } catch (error) {
       console.error("Gagal memperbarui area Action Plan:", error);
+      setActionPlans(actionPlans);
+      actionPlansRef.current = actionPlans;
+      setSaveError("Area Action Plan belum diperbarui. Coba lagi.");
       setSaveStatus("idle");
     }
   };
 
   const goToNext = () => {
-    if (activeSection < SECTIONS.length) { setActiveSection(activeSection + 1); setMobileView("editor"); }
+    if (!isSectionComplete(activeSection)) {
+      setSaveError(`Lengkapi bagian "${SECTIONS[activeSection - 1].title}" sebelum melanjutkan.`);
+      return;
+    }
+    if (activeSection < SECTIONS.length) { setSaveError(null); setActiveSection(activeSection + 1); setMobileView("editor"); }
     else { setShowCelebration(true); }
   };
 
@@ -1314,6 +1365,16 @@ interface BatchMate {
     </div>
   );
 
+  const renderPageAlert = () => (loadError || saveError) ? (
+    <div role="alert" className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 lg:mx-0">
+      <Info className="mt-0.5 h-4 w-4 shrink-0" />
+      <span className="flex-1 whitespace-pre-line">{loadError || saveError}</span>
+      <button type="button" onClick={() => { setLoadError(null); setSaveError(null); }} className="text-rose-400 hover:text-rose-700" aria-label="Tutup pesan">
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  ) : null;
+
   // ─── Desktop Stats Bar ─────────────────────────────────────────
   const renderStatsBar = () => (
     <div className="border-b border-warm-border bg-white px-6 py-2.5 flex items-center justify-between gap-5 text-xs overflow-x-auto shrink-0">
@@ -1442,7 +1503,9 @@ interface BatchMate {
   // MAIN RENDER
   // ══════════════════════════════════════════════════════════════
   return (
-    <ParticipantLayout activePath="/journey" pageTitle="Journey (PTP)" hideBackToHome noPadding hideFooter>
+      <ParticipantLayout activePath="/journey" pageTitle="Journey (PTP)" hideBackToHome noPadding hideFooter>
+
+      {renderPageAlert()}
 
       {/* ── MOBILE (< lg) ─────────────────────────────────────── */}
       <div className="lg:hidden flex flex-col h-[calc(100dvh-64px-56px)] overflow-hidden">

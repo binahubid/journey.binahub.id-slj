@@ -31,8 +31,10 @@ function LoginForm() {
     setLoading(true);
     setError('');
 
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) { setError('Isi email dan password.'); setLoading(false); return; }
     const supabase = createClient();
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
 
     if (signInError) {
       setError(
@@ -45,11 +47,12 @@ function LoginForm() {
     }
 
     if (signInData.user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('user_id', signInData.user.id)
-        .single();
+        .maybeSingle();
+      if (profileError) { setError('Profil akun belum dapat dimuat. Coba lagi.'); setLoading(false); return; }
 
       const role = getUserRole(signInData.user, profile?.role);
       if (role === 'admin') {
@@ -273,6 +276,17 @@ function LoginForm() {
           Belum punya akun?{' '}
           <Link href="/register" className="font-semibold text-[#C79A3C] transition-colors hover:text-[#A87E2A]">
             Daftar gratis
+          </Link>
+        </p>
+
+        {/* Legal links */}
+        <p className="mt-4 flex items-center justify-center gap-3 text-[11px] text-slate-400">
+          <Link href="/terms" className="transition-colors hover:text-[#C79A3C]">
+            Syarat &amp; Ketentuan
+          </Link>
+          <span className="text-slate-300">•</span>
+          <Link href="/terms#kebijakan-privasi" className="transition-colors hover:text-[#C79A3C]">
+            Kebijakan Privasi
           </Link>
         </p>
       </div>

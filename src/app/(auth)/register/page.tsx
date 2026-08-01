@@ -29,6 +29,9 @@ export default function RegisterPage() {
     setError('');
     setSuccessMessage('');
 
+    if (!allChecked) { setError('Setujui Syarat, Kebijakan Privasi, dan penggunaan AI sebelum mendaftar.'); setLoading(false); return; }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) { setError('Masukkan email yang valid.'); setLoading(false); return; }
     if (password !== confirmPassword) {
       setError('Password tidak cocok');
       setLoading(false);
@@ -41,12 +44,12 @@ export default function RegisterPage() {
     }
 
     try {
-      const defaultName = email.split('@')[0] || 'Peserta SLJ';
+      const defaultName = normalizedEmail.split('@')[0] || 'Peserta SLJ';
       const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
       const supabase = createClient();
 
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           emailRedirectTo: redirectTo,
@@ -78,20 +81,22 @@ export default function RegisterPage() {
 
         // If Supabase "Confirm Email" is enabled, user won't have an active session until email is confirmed
         if (!authData.session) {
-          router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+          router.push(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`);
           return;
         }
 
-        await supabase.from('profiles').upsert({
+        const { error: profileError } = await supabase.from('profiles').upsert({
           user_id: authData.user.id,
           full_name: defaultName,
           role: 'participant',
         });
+        if (profileError) throw profileError;
 
-        await supabase.from('journeys').insert({
+        const { error: journeyError } = await supabase.from('journeys').upsert({
           user_id: authData.user.id,
           status: 'ONBOARDING',
-        });
+        }, { onConflict: 'user_id' });
+        if (journeyError) throw journeyError;
 
         router.push('/onboarding');
         router.refresh();
@@ -335,11 +340,11 @@ export default function RegisterPage() {
               />
               <span className="text-xs leading-relaxed text-slate-600">
                 Saya telah membaca dan menyetujui{' '}
-                <Link href="/settings" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
+                <Link href="/terms" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
                   Syarat & Ketentuan
                 </Link>{' '}
                 serta{' '}
-                <Link href="/settings" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
+                <Link href="/terms#kebijakan-privasi" target="_blank" className="font-medium text-[#C79A3C] underline hover:text-[#A87E2A]">
                   Kebijakan Privasi
                 </Link>{' '}
                 SLJ Life OS.

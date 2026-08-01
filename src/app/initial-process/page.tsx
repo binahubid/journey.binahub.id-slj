@@ -106,6 +106,8 @@ export default function InitialProcessPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
 
   const handleStepChange = (nextStep: number) => {
     setActiveStep(nextStep);
@@ -162,24 +164,26 @@ export default function InitialProcessPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        setUserId(user.id);
 
         // Try restoring from localStorage first
-        const savedDraft = localStorage.getItem("sahabat_safar_profile_draft");
+        const savedDraft = localStorage.getItem(`sahabat_safar_profile_draft:${user.id}`);
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
           if (parsed.layer1) setLayer1(parsed.layer1);
           if (parsed.layer2) setLayer2(parsed.layer2);
           if (parsed.layer3) setLayer3(parsed.layer3);
           if (parsed.prefs) setPrefs(parsed.prefs);
-          if (parsed.submitted) setSubmitted(true);
+          if (parsed.submitted) { setSubmitted(true); setActiveStep(5); }
         }
 
         // Try loading from Supabase sahabat_safar_profiles if table exists
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from("sahabat_safar_profiles")
           .select("*")
           .eq("user_id", user.id)
           .maybeSingle();
+        if (profileError) throw profileError;
 
         if (profile) {
           if (profile.layer1) setLayer1(profile.layer1);
@@ -187,9 +191,11 @@ export default function InitialProcessPage() {
           if (profile.layer3) setLayer3(profile.layer3);
           if (profile.preferences) setPrefs(profile.preferences);
           setSubmitted(profile.is_completed || false);
+          if (profile.is_completed) setActiveStep(5);
         }
       } catch (err) {
         console.error("Load Sahabat Safar profile error:", err);
+        setLoadError("Data Initial Process belum dapat dimuat. Periksa koneksi lalu coba lagi.");
       } finally {
         setLoading(false);
       }
@@ -200,7 +206,8 @@ export default function InitialProcessPage() {
   // Save draft locally
   const saveDraft = (newL1 = layer1, newL2 = layer2, newL3 = layer3, newPrefs = prefs) => {
     try {
-      localStorage.setItem("sahabat_safar_profile_draft", JSON.stringify({
+      if (!userId) return;
+      localStorage.setItem(`sahabat_safar_profile_draft:${userId}`, JSON.stringify({
         layer1: newL1,
         layer2: newL2,
         layer3: newL3,
@@ -209,6 +216,10 @@ export default function InitialProcessPage() {
       }));
     } catch {}
   };
+
+  useEffect(() => {
+    if (!loading && userId) saveDraft(layer1, layer2, layer3, prefs);
+  }, [layer1, layer2, layer3, prefs, loading, userId]);
 
   // Helper toggle commMedia (max 2)
   const toggleCommMedia = (item: string) => {
@@ -248,8 +259,9 @@ export default function InitialProcessPage() {
 
   // Submit profile to Supabase
   const handleSubmit = async () => {
-    if (totalPoints !== 100) {
-      setErrorMessage("Total alokasi poin untuk Layer 2 harus tepat 100 poin.");
+    const validationError = getValidationError();
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
     setSubmitting(true);
@@ -280,7 +292,7 @@ export default function InitialProcessPage() {
       }
 
       // Save locally as optimistic backup
-      localStorage.setItem("sahabat_safar_profile_draft", JSON.stringify({
+      localStorage.setItem(`sahabat_safar_profile_draft:${user.id}`, JSON.stringify({
         ...payload,
         submitted: true,
       }));
@@ -293,6 +305,39 @@ export default function InitialProcessPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const getValidationError = () => {
+    const currentYear = new Date().getFullYear();
+    if (!layer1.gender || !layer1.birthYear || !layer1.city || !layer1.company || !layer1.division || !layer1.role || !layer1.commTime || layer1.commMedia.length === 0 || !layer1.umrahExperience) {
+      return "Lengkapi seluruh informasi dasar di Layer 1 sebelum melanjutkan.";
+    }
+    const birthYear = Number(layer1.birthYear);
+    if (!Number.isInteger(birthYear) || birthYear < 1920 || birthYear > currentYear - 15) return "Masukkan tahun lahir yang valid.";
+    if (totalPoints !== 100) return "Total alokasi poin untuk Layer 2 harus tepat 100 poin.";
+    if (layer3.spontaneousSupport.length === 0 || layer3.expectedSupport.length === 0) return "Pilih minimal satu bentuk dukungan pada kedua bagian Layer 3.";
+    if (Object.values(prefs).some(value => !value.trim())) return "Lengkapi seluruh preferensi perjalanan di Layer 4.";
+    return "";
+  };
+
+  const canOpenStep = (step: number) => {
+    if (submitted) return true;
+    if (step <= activeStep) return true;
+    if (step === 2) return !getLayer1ValidationError();
+    if (step === 3) return !getLayer1ValidationError() && totalPoints === 100;
+    if (step === 4) return !getLayer1ValidationError() && totalPoints === 100 && layer3.spontaneousSupport.length > 0 && layer3.expectedSupport.length > 0;
+    return false;
+  };
+
+  const getLayer1ValidationError = () => !layer1.gender || !layer1.birthYear || !layer1.city || !layer1.company || !layer1.division || !layer1.role || !layer1.commTime || layer1.commMedia.length === 0 || !layer1.umrahExperience;
+
+  const continueToStep = (step: number) => {
+    const validationError = getValidationError();
+    if (step === 2 && getLayer1ValidationError()) { setErrorMessage("Lengkapi seluruh informasi dasar di Layer 1 sebelum melanjutkan."); return; }
+    if (step === 3 && (getLayer1ValidationError() || totalPoints !== 100)) { setErrorMessage(getLayer1ValidationError() ? "Lengkapi Layer 1 terlebih dahulu." : "Total alokasi poin harus tepat 100 Poin."); return; }
+    if (step === 4 && (getLayer1ValidationError() || totalPoints !== 100 || layer3.spontaneousSupport.length === 0 || layer3.expectedSupport.length === 0)) { setErrorMessage(validationError || "Lengkapi Layer 3 sebelum melanjutkan."); return; }
+    setErrorMessage("");
+    handleStepChange(step);
   };
 
   if (loading) {
@@ -331,13 +376,20 @@ export default function InitialProcessPage() {
             ].map((s) => (
               <button
                 key={s.num}
-                onClick={() => setActiveStep(s.num)}
+                onClick={() => {
+                  if (!canOpenStep(s.num)) {
+                    setErrorMessage("Selesaikan langkah sebelumnya sebelum membuka bagian ini.");
+                    return;
+                  }
+                  setErrorMessage("");
+                  handleStepChange(s.num);
+                }}
                 className={`py-2 px-1 rounded-xl transition-all border ${
                   activeStep === s.num
                     ? "bg-amber-400 text-navy-900 border-amber-300 font-extrabold shadow-sm"
                     : activeStep > s.num
                     ? "bg-white/10 text-emerald-300 border-white/20"
-                    : "bg-white/5 text-slate-400 border-white/10"
+                    : `bg-white/5 text-slate-400 border-white/10 ${!canOpenStep(s.num) ? "cursor-not-allowed opacity-60" : ""}`
                 }`}
               >
                 <div className="text-[11px] sm:text-[10px] uppercase tracking-wider font-extrabold">Step {s.num}</div>
@@ -348,10 +400,10 @@ export default function InitialProcessPage() {
         </div>
 
         {/* ── ERROR ALERT ─────────────────────────────────────────────────── */}
-        {errorMessage && (
+        {(errorMessage || loadError) && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-medium flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{errorMessage}</span>
+            <span>{errorMessage || loadError}</span>
           </div>
         )}
 
@@ -519,7 +571,7 @@ export default function InitialProcessPage() {
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
               <Button
-                onClick={() => handleStepChange(2)}
+                 onClick={() => continueToStep(2)}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
                 Lanjut<span className="hidden sm:inline"> ke Layer 2: Prioritas</span> <ChevronRight className="h-4 w-4" />
@@ -609,7 +661,7 @@ export default function InitialProcessPage() {
                     return;
                   }
                   setErrorMessage("");
-                  handleStepChange(3);
+                   continueToStep(3);
                 }}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
@@ -689,7 +741,7 @@ export default function InitialProcessPage() {
                 <ChevronLeft className="h-4 w-4" /> Kembali
               </Button>
               <Button
-                onClick={() => handleStepChange(4)}
+                 onClick={() => continueToStep(4)}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
                 Lanjut<span className="hidden sm:inline"> ke Journey Preference</span> <ChevronRight className="h-4 w-4" />
@@ -886,7 +938,7 @@ export default function InitialProcessPage() {
         )}
 
         {/* ── STEP 5: COMPLETED CONFIRMATION ──────────────────────────────── */}
-        {(activeStep === 5 || submitted) && (
+        {activeStep === 5 && submitted && (
           <Card className="p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-5 shadow-sm">
             <div className="h-16 w-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-2xs">
               <CheckCircle2 className="h-8 w-8" />

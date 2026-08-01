@@ -1308,10 +1308,10 @@ export default function LandingPage() {
               . PT Binahub Solusi Transformasi.
             </div>
             <div className="flex items-center gap-6">
-              <Link href="#" className="font-semibold uppercase tracking-widest hover:text-[#C79A3C] transition-colors text-[10px]">
+              <Link href="/terms#kebijakan-privasi" className="font-semibold uppercase tracking-widest hover:text-[#C79A3C] transition-colors text-[10px]">
                 Kebijakan Privasi
               </Link>
-              <Link href="#" className="font-semibold uppercase tracking-widest hover:text-[#C79A3C] transition-colors text-[10px]">
+              <Link href="/terms" className="font-semibold uppercase tracking-widest hover:text-[#C79A3C] transition-colors text-[10px]">
                 Syarat &amp; Ketentuan
               </Link>
             </div>

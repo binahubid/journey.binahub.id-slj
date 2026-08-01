@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { getJournalStreak, getJourneyDayForDate, parseJournalContent, composeJournalContent } from "@/lib/journal";
 
 // ── DAILY PROMPTS MAPPING (DAY 1 TO 90) ─────────────────────────────────────
 
@@ -103,6 +104,7 @@ export default function RefactoredJournalPage() {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("Faisal");
   const [userLocation, setUserLocation] = useState("Jakarta");
+  const [journeyStartDate, setJourneyStartDate] = useState<string | null>(null);
   const [dayCount, setDayCount] = useState(24);
   const [dateFormatted, setDateFormatted] = useState("Rabu, 29 Juli 2026");
   const [dailyPrompt, setDailyPrompt] = useState("");
@@ -179,6 +181,7 @@ export default function RefactoredJournalPage() {
           setUserLocation(profile.location);
         }
         if (profile.start_date) {
+          setJourneyStartDate(profile.start_date);
           const startD = new Date(profile.start_date);
           const diff = Math.floor((Date.now() - startD.getTime()) / 86400000);
           currentDay = Math.max(1, diff + 1);
@@ -201,43 +204,28 @@ export default function RefactoredJournalPage() {
         .order("created_at", { ascending: false });
 
       if (journals && journals.length > 0) {
-        setStreakCount(journals.length);
+        setStreakCount(getJournalStreak(journals.map((journal: any) => journal.date || journal.created_at)));
         setPosts(
-          journals.map((j: any, idx: number) => {
+          journals.map((j: any) => {
             const d = new Date(j.created_at || j.date);
             const dateStr = d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
             const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
-
-            let mainTxt = j.content;
-            let pelTxt = "";
-            let perbTxt = "";
-
-            if (j.content.includes("--- Pelajaran: ---")) {
-              const parts = j.content.split("--- Pelajaran: ---");
-              mainTxt = parts[0].trim();
-              if (parts[1]?.includes("--- Perbaikan Besok: ---")) {
-                const subParts = parts[1].split("--- Perbaikan Besok: ---");
-                pelTxt = subParts[0].trim();
-                perbTxt = subParts[1].trim();
-              } else {
-                pelTxt = parts[1].trim();
-              }
-            }
+            const parsed = parseJournalContent(j.content);
 
             return {
               id: j.id,
-              dayNumber: Math.max(1, currentDay - idx),
+              dayNumber: getJourneyDayForDate(j.date || j.created_at, profile?.start_date),
               dateStr,
               timeStr,
               location: j.location || profile?.location || "Jakarta",
               userFullName: fName,
               userAvatar: fName.charAt(0).toUpperCase(),
-              content: mainTxt,
-              pelajaran: pelTxt,
-              perbaikanBesok: perbTxt,
+              content: parsed.reflection,
+              pelajaran: parsed.lesson,
+              perbaikanBesok: parsed.improvement,
               mood: j.mood || "Bersyukur",
               isLiked: j.is_favorite || false,
-              likeCount: (j.is_favorite ? 1 : 0) + (idx % 3 === 0 ? 1 : 0),
+              likeCount: j.is_favorite ? 1 : 0,
             };
           })
         );
@@ -274,22 +262,19 @@ export default function RefactoredJournalPage() {
       const todayStr = now.toISOString().split("T")[0];
       const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
 
-      let combinedContent = mainReflection.trim();
-      if (pelajaran.trim()) {
-        combinedContent += `\n\n--- Pelajaran: ---\n${pelajaran.trim()}`;
-      }
-      if (perbaikanBesok.trim()) {
-        combinedContent += `\n\n--- Perbaikan Besok: ---\n${perbaikanBesok.trim()}`;
-      }
+      const combinedContent = composeJournalContent(mainReflection, pelajaran, perbaikanBesok);
 
-      const { data, error } = await supabase.from("journals").insert({
-        user_id: user.id,
-        date: todayStr,
+      const existingToday = posts.find(post => post.dateStr === now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }));
+      const journalPayload = {
         content: combinedContent,
         mood: selectedMood,
         is_private: true,
         location: userLocation,
-      }).select().single();
+      };
+      const saveQuery = existingToday
+        ? supabase.from("journals").update(journalPayload).eq("id", existingToday.id)
+        : supabase.from("journals").insert({ user_id: user.id, date: todayStr, ...journalPayload });
+      const { data, error } = await saveQuery.select().single();
 
       if (error) {
         console.error("Gagal menyimpan refleksi:", error);
@@ -300,7 +285,7 @@ export default function RefactoredJournalPage() {
       if (data) {
         const newPost: JournalPost = {
           id: data.id,
-          dayNumber: dayCount,
+          dayNumber: getJourneyDayForDate(todayStr, journeyStartDate) || dayCount,
           dateStr: now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
           timeStr,
           location: userLocation,
@@ -314,7 +299,7 @@ export default function RefactoredJournalPage() {
           likeCount: 1,
         };
 
-        setPosts([newPost, ...posts]);
+        setPosts(prev => [newPost, ...prev.filter(post => post.dateStr !== newPost.dateStr)]);
         setMainReflection("");
         setPelajaran("");
         setPerbaikanBesok("");
@@ -342,9 +327,11 @@ export default function RefactoredJournalPage() {
         return p;
       })
     );
-    try {
-      await supabase.from("journals").update({ is_favorite: !currentLiked }).eq("id", id);
-    } catch {}
+    const { error } = await supabase.from("journals").update({ is_favorite: !currentLiked }).eq("id", id);
+    if (error) {
+      setPosts(prev => prev.map(post => post.id === id ? { ...post, isLiked: currentLiked, likeCount: currentLiked ? post.likeCount + 1 : Math.max(0, post.likeCount - 1) } : post));
+      setSaveError("Status favorit belum tersimpan. Coba lagi.");
+    }
   };
 
   if (loading) {

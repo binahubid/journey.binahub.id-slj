@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Auth provider & Security States
   const [userEmail, setUserEmail] = useState("");
@@ -56,14 +57,27 @@ export default function SettingsPage() {
           setHasPassword(true);
         }
 
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("location")
           .eq("user_id", user.id)
           .maybeSingle();
+        if (profileError) throw profileError;
 
         if (profile?.location) {
           setCity(profile.location);
+        }
+
+        const { data: settings, error: settingsError } = await supabase
+          .from("settings")
+          .select("prayer_notifications_enabled, habit_notifications_enabled, journal_privacy_default")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (settingsError) throw settingsError;
+        if (settings) {
+          setPrayerNotif(settings.prayer_notifications_enabled ?? true);
+          setHabitNotif(settings.habit_notifications_enabled ?? true);
+          setJournalPrivacy(settings.journal_privacy_default ?? true);
         }
 
         // Load local preferences if available
@@ -73,6 +87,7 @@ export default function SettingsPage() {
         if (savedTf) setTimeFormat(savedTf);
       } catch (err) {
         console.error("Gagal memuat pengaturan:", err);
+        setErrorMsg("Pengaturan belum dapat dimuat. Periksa koneksi lalu coba lagi.");
       } finally {
         setLoading(false);
       }
@@ -134,16 +149,26 @@ export default function SettingsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setErrorMsg(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
+        if (user) {
+         const { error } = await supabase
           .from("profiles")
           .update({
             location: city,
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", user.id);
+        if (error) throw error;
+        const { error: settingsError } = await supabase.from("settings").upsert({
+          user_id: user.id,
+          prayer_notifications_enabled: prayerNotif,
+          habit_notifications_enabled: habitNotif,
+          journal_privacy_default: journalPrivacy,
+          preferred_prayer_city: city,
+        }, { onConflict: "user_id" });
+        if (settingsError) throw settingsError;
       }
 
       localStorage.setItem("slj_timezone", timezone);
@@ -153,6 +178,7 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error("Gagal menyimpan pengaturan:", err);
+      setErrorMsg("Pengaturan belum tersimpan. Periksa koneksi lalu coba lagi.");
     } finally {
       setSaving(false);
     }
@@ -170,6 +196,7 @@ export default function SettingsPage() {
     <ParticipantLayout activePath="/settings" pageTitle="Pengaturan • Lokasi & Notifikasi">
 
       <main className="max-w-wizard mx-auto px-4 md:px-6 pt-6 space-y-6">
+        {errorMsg && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{errorMsg}</div>}
         <Card className="bg-white border-warm-border p-6 space-y-6">
           <form onSubmit={handleSave} className="space-y-6">
             <Tabs defaultValue="notifikasi">
@@ -442,6 +469,23 @@ export default function SettingsPage() {
             </CardFooter>
           </form>
         </Card>
+
+        <div className="rounded-xl border border-warm-border bg-white p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold text-navy-900">Syarat &amp; Ketentuan dan Kebijakan Privasi</p>
+            <p className="text-[11px] text-gray-500">Dokumen legal Platform BinaJourney — versi 1.1.</p>
+          </div>
+          <Link
+            href="/terms"
+            target="_blank"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-navy-900 transition-colors"
+          >
+            Baca dokumen
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </Link>
+        </div>
       </main>
     </ParticipantLayout>
   );

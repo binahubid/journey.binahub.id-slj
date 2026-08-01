@@ -35,6 +35,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getTransformationAreaColor, normalizeTransformationArea } from "@/lib/transformation-areas";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { getActiveProgramMonth, getMonthEditState, getProgramDay } from "@/lib/program-timeline";
 import Link from "next/link";
 
 interface MonthlyReviewItem {
@@ -93,16 +94,6 @@ function calcBiayaScore(biayaTarget: string, biayaActual: string): number {
 // ── Month Edit Window Helper ────────────────────────────────────────────────
 // Bulan ke-N aktif diisi mulai hari ke-((N-1)*30+1), tetap bisa diedit sampai
 // 7 hari masuk ke bulan berikutnya (masa tenggang), lalu terkunci permanen.
-type MonthEditState = "LOCKED_FUTURE" | "ACTIVE" | "LOCKED_PAST";
-
-function getMonthEditState(month: 1 | 2 | 3, dayCount: number): MonthEditState {
-  const startDay = (month - 1) * 30 + 1;
-  const graceEndDay = month * 30 + 7;
-  if (dayCount < startDay) return "LOCKED_FUTURE";
-  if (dayCount > graceEndDay) return "LOCKED_PAST";
-  return "ACTIVE";
-}
-
 function calcAreaScore(rep: AreaReport): number {
   if (!rep.isSaved) return rep.baselineScore || 0;
 
@@ -166,12 +157,14 @@ export default function MonitoringPage() {
 
       // Profile & Day Count
       const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+      let initialMonth: 1 | 2 | 3 = 1;
       if (profile) {
         setUserName(profile.full_name || "Peserta SLJ");
         if (profile.start_date) {
-          const startD = new Date(profile.start_date);
-          const diff = Math.floor((Date.now() - startD.getTime()) / 86400000);
-          setDayCount(Math.max(1, diff + 1));
+          const currentDay = Math.min(90, getProgramDay(profile.start_date));
+          initialMonth = getActiveProgramMonth(currentDay);
+          setDayCount(currentDay);
+          setSelectedMonth(initialMonth);
         }
       }
 
@@ -195,8 +188,8 @@ export default function MonitoringPage() {
         }
       });
       setReviews(revMap);
-      setStatus(revMap[selectedMonth]?.status === "NEED_SUPPORT" ? "NEED_SUPPORT" : "ON_TRACK");
-      setNote(revMap[selectedMonth]?.participantNote || "");
+      setStatus(revMap[initialMonth]?.status === "NEED_SUPPORT" ? "NEED_SUPPORT" : "ON_TRACK");
+      setNote(revMap[initialMonth]?.participantNote || "");
 
       // Journey (areas + targets)
       const { data: journey } = await supabase.from("journeys")
@@ -369,9 +362,10 @@ export default function MonitoringPage() {
         });
       });
 
-      // Build Dynamic Chart based on timeframe (1d, 7d, 1m, 3m)
+      // Build cumulative chart based on timeframe (1d, 7d, 1m, 3m).
       const numDays = timeframe === "1d" ? 1 : timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
       const today = new Date();
+      const todayStr = today.toISOString().split("T")[0];
       const datesArr: string[] = [];
       for (let i = numDays - 1; i >= 0; i--) {
         const d = new Date(today);
@@ -379,21 +373,49 @@ export default function MonitoringPage() {
         datesArr.push(d.toISOString().split("T")[0]);
       }
 
-      // Query habit_logs + specialized logs in parallel
+      const profileStartDate = profile?.start_date
+        ? new Date(profile.start_date).toISOString().split("T")[0]
+        : datesArr[0];
+      const accumulationStartDate = profileStartDate <= todayStr ? profileStartDate : todayStr;
+      const accumulationDates: string[] = [];
+      const accumulationCursor = new Date(`${accumulationStartDate}T00:00:00`);
+      while (accumulationCursor.toISOString().split("T")[0] <= todayStr) {
+        accumulationDates.push(accumulationCursor.toISOString().split("T")[0]);
+        accumulationCursor.setDate(accumulationCursor.getDate() + 1);
+      }
+
+      // Include the full program period so every timeframe starts from the true running balance.
       const [habitLogsRes] = await Promise.all([
-        supabase.from("habit_logs").select("habit_id, date, completed, completed_count").eq("user_id", user.id).in("date", datesArr),
+        supabase
+          .from("habit_logs")
+          .select("habit_id, date, completed, completed_count")
+          .eq("user_id", user.id)
+          .gte("date", accumulationStartDate)
+          .lte("date", todayStr),
       ]);
+      if (habitLogsRes.error) throw habitLogsRes.error;
 
       const habitLogs = habitLogsRes.data || [];
 
       if (areas.length > 0) {
-        const sampledDates = numDays > 30
-          ? datesArr.filter((_, idx) => idx % 3 === 0 || idx === datesArr.length - 1)
-          : numDays > 7
-          ? datesArr.filter((_, idx) => idx % 2 === 0 || idx === datesArr.length - 1)
-          : datesArr;
+        const calculateAreaScore = (area: string, dateStr: string, logsForDay: any[]) => {
+          const areaHabits = habitsWithArea.filter(h =>
+            h.area === area &&
+            (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
+            (!h.effectiveUntil || h.effectiveUntil >= dateStr)
+          );
+          if (areaHabits.length === 0) return 0;
+          const completedWeight = areaHabits.reduce((total, h) => {
+            const log = h.id.startsWith("missing:") ? null : logsForDay.find((l: any) => l.habit_id === h.id);
+            const cnt = log ? (log.completed_count || (log.completed ? h.qty : 0)) : 0;
+            return total + Math.min(1, cnt / h.qty);
+          }, 0);
+          return Number((completedWeight / areaHabits.length).toFixed(2));
+        };
 
-        const chart = sampledDates.map((dateStr) => {
+        const runningScores: Record<string, number> = Object.fromEntries(areas.map(area => [area, 0]));
+        const areaHasStarted: Record<string, boolean> = Object.fromEntries(areas.map(area => [area, false]));
+        const cumulativeChart = accumulationDates.map((dateStr) => {
           const dObj = new Date(dateStr);
           const label = numDays === 1
             ? "Hari Ini"
@@ -404,21 +426,40 @@ export default function MonitoringPage() {
           const logsForDay = habitLogs.filter((l: any) => l.date === dateStr);
           const scores: Record<string, number> = {};
           areas.forEach(area => {
-            const areaHabits = habitsWithArea.filter(h =>
+            const activeAreaHabits = habitsWithArea.filter(h =>
               h.area === area &&
               (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
               (!h.effectiveUntil || h.effectiveUntil >= dateStr)
             );
-            if (areaHabits.length === 0) { scores[area] = 0; return; }
-            const completedWeight = areaHabits.reduce((total, h) => {
-              const log = h.id.startsWith("missing:") ? null : logsForDay.find((l: any) => l.habit_id === h.id);
-              const cnt = log ? (log.completed_count || (log.completed ? h.qty : 0)) : 0;
-              return total + Math.min(1, cnt / h.qty);
-            }, 0);
-            scores[area] = Number((completedWeight / areaHabits.length).toFixed(2));
+            // No obligation exists before an Action Plan becomes effective.
+            // Do not penalize those dates, otherwise a late-created habit starts in debt.
+            if (activeAreaHabits.length === 0) {
+              scores[area] = runningScores[area];
+              return;
+            }
+
+            const areaHabitIds = new Set(activeAreaHabits.map(h => h.id));
+            const hasCompletedActivity = logsForDay.some((l: any) =>
+              areaHabitIds.has(l.habit_id) && (l.completed || (l.completed_count || 0) > 0)
+            );
+            if (hasCompletedActivity) areaHasStarted[area] = true;
+            const dailyChange = hasCompletedActivity
+              ? calculateAreaScore(area, dateStr, logsForDay)
+              : areaHasStarted[area] ? -1 : 0;
+            runningScores[area] = Number((runningScores[area] + dailyChange).toFixed(2));
+            scores[area] = runningScores[area];
           });
           return { day: label, scores };
         });
+
+        const visibleChart = cumulativeChart.filter((_, idx) => accumulationDates[idx] >= datesArr[0]);
+        const chart = visibleChart.filter((_, idx) =>
+          numDays > 30
+            ? idx % 3 === 0 || idx === visibleChart.length - 1
+            : numDays > 7
+            ? idx % 2 === 0 || idx === visibleChart.length - 1
+            : true
+        );
         setChartData(chart);
       }
 
@@ -470,7 +511,7 @@ export default function MonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, timeframe]);
+  }, [timeframe]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -483,6 +524,7 @@ export default function MonitoringPage() {
   });
 
   const handleSelectMonth = (month: 1 | 2 | 3) => {
+    setEditingAreaModal(null);
     setSelectedMonth(month);
     const rev = reviews[month];
     setStatus(rev?.status === "NEED_SUPPORT" ? "NEED_SUPPORT" : "ON_TRACK");
@@ -490,6 +532,14 @@ export default function MonitoringPage() {
   };
 
   const handleSave = async () => {
+    if (getMonthEditState(selectedMonth, dayCount) !== "ACTIVE") {
+      setSaveError(
+        getMonthEditState(selectedMonth, dayCount) === "LOCKED_FUTURE"
+          ? `Checkpoint Bulan Ke-${selectedMonth} belum aktif.`
+          : `Checkpoint Bulan Ke-${selectedMonth} sudah terkunci dan tidak dapat diedit.`
+      );
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -563,7 +613,10 @@ export default function MonitoringPage() {
   };
 
   const handleSaveReflection = async () => {
-    if (!journeyId) return;
+    if (!journeyId || dayCount < 89) {
+      setSaveError("Refleksi akhir program baru dapat diisi mulai Hari ke-89.");
+      return;
+    }
     setSavingReflection(true);
     try {
       setSaveError(null);
@@ -611,6 +664,16 @@ export default function MonitoringPage() {
   const monthEditState = getMonthEditState(selectedMonth, dayCount);
   const monthStartDay = (selectedMonth - 1) * 30 + 1;
   const monthGraceEndDay = selectedMonth * 30 + 7;
+  const finalReflectionUnlocked = dayCount >= 89;
+
+  const chartScores = chartData.flatMap(row => selectedAreas.map(area => row.scores[area] || 0));
+  const chartMinScore = Math.min(0, ...chartScores);
+  const chartMaxScore = Math.max(0, ...chartScores);
+  const chartScoreRange = chartMaxScore - chartMinScore;
+  const chartScalePadding = Math.max(1, chartScoreRange * 0.12);
+  const chartScaleMin = chartMinScore - chartScalePadding;
+  const chartScaleMax = chartMaxScore + chartScalePadding;
+  const chartScaleRange = chartScaleMax - chartScaleMin;
 
   if (loading) {
     return (
@@ -803,7 +866,7 @@ export default function MonitoringPage() {
                       </span>
                       Grafik Progress Action Plan
                     </h3>
-                    <p className="ml-9 mt-0.5 text-[11px] text-slate-400">Skor penyelesaian harian per area, skala 0 sampai 1</p>
+                    <p className="ml-9 mt-0.5 text-[11px] text-slate-400">Pergerakan saldo poin kumulatif per area</p>
                   </div>
 
                   {/* Timeframe Filter Toggle */}
@@ -836,13 +899,10 @@ export default function MonitoringPage() {
                   <div className="px-3 pb-2 pt-5 sm:px-5">
                     <div className="relative h-[220px] w-full rounded-xl bg-slate-50/60 px-2 pb-7 pt-2 sm:h-[250px]">
                     <svg className="h-full w-full overflow-visible" viewBox="0 0 720 180" preserveAspectRatio="none" role="img" aria-label="Grafik progres Action Plan per area transformasi">
-                      {[0, 0.25, 0.5, 0.75, 1].map(value => {
-                        const y = 160 - value * 144;
+                      {[0, 1, 2, 3, 4].map(step => {
+                        const y = 16 + step * 36;
                         return (
-                          <g key={value}>
-                            <line x1="42" y1={y} x2="708" y2={y} stroke="#E2E8F0" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                            <text x="32" y={y + 3} textAnchor="end" fill="#94A3B8" fontSize="9" fontWeight="600">{value.toFixed(value === 0 || value === 1 ? 0 : 2)}</text>
-                          </g>
+                          <line key={step} x1="42" y1={y} x2="708" y2={y} stroke="#E2E8F0" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                         );
                       })}
                       <line x1="42" y1="16" x2="42" y2="160" stroke="#CBD5E1" strokeWidth="1" vectorEffect="non-scaling-stroke" />
@@ -856,7 +916,7 @@ export default function MonitoringPage() {
                             : 0;
                           return [
                             chartData.length === 1 ? 375 : 42 + i * (666 / (chartData.length - 1)),
-                            160 - score * 144 + overlapOffset,
+                            Math.max(18, Math.min(158, 160 - ((score - chartScaleMin) / chartScaleRange) * 144 + overlapOffset)),
                           ];
                         });
                         const d = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
@@ -897,7 +957,6 @@ export default function MonitoringPage() {
                     <div key={area} className="flex items-center gap-2 text-[11px] text-slate-600">
                       <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: getTransformationAreaColor(area), boxShadow: `0 0 0 1px ${getTransformationAreaColor(area)}33` }} />
                       <span className="font-bold">{area}</span>
-                      <span className="text-slate-400">{areaActionPlanCounts[area] || 0} AP</span>
                       <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600">
                         {(chartData[chartData.length - 1]?.scores[area] || 0).toFixed(2)}
                       </span>
@@ -955,14 +1014,30 @@ export default function MonitoringPage() {
 
             {/* ─── 4. 3 AREA TRANSFORMATION CARDS (Border-free) ──────────────── */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Area Transformasi & Pelaporan Bulanan
                   </h2>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                    {monthEditState === "ACTIVE"
+                      ? `Pelaporan Bulan Ke-${selectedMonth} dapat diisi atau diedit sampai Hari ke-${monthGraceEndDay}.`
+                      : monthEditState === "LOCKED_FUTURE"
+                      ? `Pelaporan Bulan Ke-${selectedMonth} baru aktif mulai Hari ke-${monthStartDay}.`
+                      : `Pelaporan Bulan Ke-${selectedMonth} telah terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
+                  </p>
                 </div>
-                <span className="text-xs text-slate-400 font-medium">
-                  Bulan Ke-{selectedMonth}
+                <span className={`inline-flex w-fit items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-bold ${
+                  monthEditState === "ACTIVE"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-200 text-slate-600"
+                }`}>
+                  {monthEditState === "ACTIVE" ? <Edit3 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                  {monthEditState === "ACTIVE"
+                    ? `Bulan ${selectedMonth} · Dapat diedit`
+                    : monthEditState === "LOCKED_FUTURE"
+                    ? `Bulan ${selectedMonth} · Belum aktif`
+                    : `Bulan ${selectedMonth} · Terkunci`}
                 </span>
               </div>
 
@@ -985,11 +1060,15 @@ export default function MonitoringPage() {
                     return (
                       <div
                         key={area}
-                        className="bg-white p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between"
+                        className={`relative flex flex-col justify-between space-y-4 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5 ${
+                          monthEditState === "ACTIVE"
+                            ? "border-slate-200/80 bg-white"
+                            : "border-slate-200 bg-slate-50/70"
+                        }`}
                       >
                         <div className="space-y-3">
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                            <span className="text-xs font-extrabold text-navy-900">{area}</span>
+                            <span className={`text-xs font-extrabold ${monthEditState === "ACTIVE" ? "text-navy-900" : "text-slate-600"}`}>{area}</span>
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
                               !hasFilledData && isEarlyStage
                                 ? "bg-slate-100 text-slate-600"
@@ -1063,7 +1142,7 @@ export default function MonitoringPage() {
                                 ? `Aktif mulai Hari ke-${monthStartDay}`
                                 : `Terkunci sejak Hari ke-${monthGraceEndDay + 1} (lewat masa tenggang 7 hari)`
                             }
-                            className="w-full bg-slate-100 text-slate-400 text-xs font-bold rounded-xl h-9 flex items-center justify-center gap-2 mt-2 cursor-not-allowed hover:bg-slate-100"
+                            className="mt-2 flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-100"
                           >
                             {monthEditState === "LOCKED_FUTURE" ? (
                               <><Hourglass className="h-3.5 w-3.5" /> Aktif di Hari ke-{monthStartDay}</>
@@ -1159,25 +1238,36 @@ export default function MonitoringPage() {
                 </div>
 
                 {/* Checkpoint Form Editor (PRESERVED UNTOUCHED AS REQUESTED) */}
-                <div className="border-t border-slate-100 pt-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-700 block">Update Catatan Refleksi Bulan Ke-{selectedMonth}:</label>
-                    <div className="flex gap-2">
+                <div className="border-t border-slate-100 pt-4 space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700">Catatan checkpoint Bulan Ke-{selectedMonth}</label>
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
+                        {monthEditState === "ACTIVE"
+                          ? `Dapat diedit sampai Hari ke-${monthGraceEndDay}.`
+                          : monthEditState === "LOCKED_FUTURE"
+                          ? `Aktif mulai Hari ke-${monthStartDay}.`
+                          : `Terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 sm:flex">
                       <button
                         type="button"
                         onClick={() => setStatus("ON_TRACK")}
+                        disabled={monthEditState !== "ACTIVE"}
                         className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                           status === "ON_TRACK" ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600"
-                        }`}
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
                         On Track
                       </button>
                       <button
                         type="button"
                         onClick={() => setStatus("NEED_SUPPORT")}
+                        disabled={monthEditState !== "ACTIVE"}
                         className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                           status === "NEED_SUPPORT" ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-600"
-                        }`}
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
                         Need Support
                       </button>
@@ -1187,12 +1277,13 @@ export default function MonitoringPage() {
                     rows={3}
                     value={note}
                     onChange={e => setNote(e.target.value)}
+                    disabled={monthEditState !== "ACTIVE"}
                     placeholder="Tuliskan kendala atau keberhasilan Anda bulan ini..."
-                    className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none"
+                    className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none disabled:bg-slate-50 disabled:text-slate-500 disabled:opacity-100"
                   />
                   <div className="flex justify-end">
-                    <Button onClick={handleSave} disabled={saving} className="bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl px-5 h-9">
-                      {saving ? "Menyimpan..." : saved ? "✓ Tersimpan!" : "Simpan Catatan Checkpoint"}
+                    <Button onClick={handleSave} disabled={saving || monthEditState !== "ACTIVE"} className="h-10 w-full rounded-xl bg-[#071A33] px-5 text-xs font-bold text-amber-300 hover:bg-slate-900 disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto">
+                      {monthEditState !== "ACTIVE" ? <><Lock className="mr-1.5 h-3.5 w-3.5" /> Tidak dapat diedit</> : saving ? "Menyimpan..." : saved ? "Tersimpan" : "Simpan catatan checkpoint"}
                     </Button>
                   </div>
                 </div>
@@ -1200,30 +1291,42 @@ export default function MonitoringPage() {
             </div>
 
             {/* ─── 6. REFLEKSI AKHIR 90 HARI (Border-free) ────────────────── */}
-            <div className="bg-white p-6 rounded-2xl space-y-4 shadow-2xs">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-bold text-navy-900 flex items-center gap-2">
-                  Refleksi Akhir Program (90 Hari)
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Tuliskan pembelajaran utama, perubahan nyata, dan komitmen keberlanjutan setelah 90 hari.
-                </p>
+            <div className={`relative overflow-hidden rounded-2xl border p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-6 ${finalReflectionUnlocked ? "border-slate-200/80 bg-white" : "border-slate-200 bg-slate-50/80"}`}>
+              <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${finalReflectionUnlocked ? "bg-amber-50 text-amber-700" : "bg-slate-200 text-slate-500"}`}>
+                    {finalReflectionUnlocked ? <BookOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-navy-900 sm:text-base">Refleksi akhir program</h3>
+                    <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+                      {finalReflectionUnlocked
+                        ? "Rangkum pembelajaran utama, perubahan nyata, dan komitmen setelah perjalanan 90 hari."
+                        : "Bagian ini dibuka menjelang akhir perjalanan agar refleksi merangkum proses secara utuh."}
+                    </p>
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold ${finalReflectionUnlocked ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                  {finalReflectionUnlocked ? "Terbuka" : `Terbuka Hari ke-89 · ${Math.max(0, 89 - dayCount)} hari lagi`}
+                </span>
               </div>
               <Textarea
                 rows={4}
                 value={finalReflection}
                 onChange={e => setFinalReflection(e.target.value)}
+                disabled={!finalReflectionUnlocked}
+                maxLength={3000}
                 placeholder="Tuliskan refleksi & komitmen keberlanjutan Anda..."
-                className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none"
+                className="mt-4 min-h-[140px] resize-none rounded-xl border-slate-200 text-xs leading-relaxed focus:border-amber-400 disabled:bg-white/60 disabled:text-slate-400 disabled:opacity-100"
               />
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <span className="text-[10px] text-slate-400 font-medium">{finalReflection.length} karakter</span>
+              <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-[10px] font-medium text-slate-400">{finalReflection.length}/3000 karakter</span>
                 <Button
                   onClick={handleSaveReflection}
-                  disabled={savingReflection || !journeyId}
-                  className="font-bold text-xs bg-[#071A33] text-amber-300 hover:bg-black rounded-xl px-5 h-9"
+                  disabled={savingReflection || !journeyId || !finalReflectionUnlocked || !finalReflection.trim()}
+                  className="h-10 w-full rounded-xl bg-[#071A33] px-5 text-xs font-bold text-amber-300 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400 sm:w-auto"
                 >
-                  {savingReflection ? "Menyimpan..." : savedReflection ? "✓ Tersimpan!" : "Simpan Refleksi Akhir"}
+                  {!finalReflectionUnlocked ? <><Lock className="mr-1.5 h-3.5 w-3.5" /> Belum tersedia</> : savingReflection ? "Menyimpan..." : savedReflection ? "Tersimpan" : "Simpan refleksi akhir"}
                 </Button>
               </div>
             </div>

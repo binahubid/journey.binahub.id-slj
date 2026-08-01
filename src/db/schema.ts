@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, pgEnum, uniqueIndex, date } from "drizzle-orm/pg-core";
 
 export const journeyStatusEnum = pgEnum("journey_status", [
   "DRAFT",
@@ -107,6 +107,9 @@ export const journals = pgTable("journals", {
   date: text("date").notNull(), // YYYY-MM-DD
   content: text("content").notNull(),
   isPrivate: boolean("is_private").default(true).notNull(),
+  mood: text("mood"),
+  location: text("location"),
+  isFavorite: boolean("is_favorite").default(false).notNull(),
   aiPolishedContent: text("ai_polished_content"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -128,6 +131,16 @@ export const supportTeam = pgTable("support_team", {
   userId: uuid("user_id").notNull(),
   coachName: text("coach_name"),
   sahabatSafarName: text("sahabat_safar_name"),
+  sahabatSafarUserId: uuid("sahabat_safar_user_id").references(() => profiles.userId, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const safarReminders = pgTable("safar_reminders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => profiles.userId, { onDelete: "cascade" }),
+  sahabatSafarUserId: uuid("sahabat_safar_user_id").references(() => profiles.userId, { onDelete: "set null" }),
+  date: date("date").notNull(),
+  remindedAt: timestamp("reminded_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
