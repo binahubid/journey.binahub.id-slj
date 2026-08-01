@@ -68,7 +68,6 @@ export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
         .select("id")
         .eq("user_id", userId)
         .ilike("title", habitTitle)
-        .eq("is_archived", false)
         .maybeSingle();
 
       if (!habit) return;

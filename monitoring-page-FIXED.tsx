@@ -33,7 +33,6 @@ import {
   Hourglass,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getTransformationAreaColor, normalizeTransformationArea } from "@/lib/transformation-areas";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import Link from "next/link";
 
@@ -104,8 +103,9 @@ function getMonthEditState(month: 1 | 2 | 3, dayCount: number): MonthEditState {
 }
 
 function calcAreaScore(rep: AreaReport): number {
-  if (!rep.isSaved) return rep.baselineScore || 0;
-
+  if (!rep.isSaved) {
+    return rep.baselineScore !== undefined ? rep.baselineScore : 0;
+  }
   const scores: number[] = [];
   if (rep.targets.kualitas) scores.push(rep.kualitasRating * 20);
   if (rep.targets.kuantitas && rep.kuantitasBaseline && rep.kuantitasActual)
@@ -115,6 +115,18 @@ function calcAreaScore(rep: AreaReport): number {
   if (scores.length === 0) return rep.kualitasRating * 20;
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }
+
+// Unified SLJ Brand Color Mapping
+const AREA_COLORS: Record<string, string> = {
+  "Spiritual Growth": "#D97706", // Gold / Amber
+  "Personal Development": "#0B2C6B", // Navy
+  "Leadership Excellence": "#071A33", // Dark Navy
+  "Leadership/Profesional Excellence": "#071A33",
+  "Leadership / Professional Excellence": "#071A33",
+  "Family Bonding": "#D97706",
+  "Community Impact": "#059669", // Emerald
+  "Health & Wellbeing": "#10B981",
+};
 
 export default function MonitoringPage() {
   const supabase = createClient();
@@ -145,13 +157,11 @@ export default function MonitoringPage() {
   const [savingReflection, setSavingReflection] = useState(false);
   const [savedReflection, setSavedReflection] = useState(false);
   const [savingArea, setSavingArea] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Timeframe filter state: '1d' | '7d' | '1m' | '3m'
   const [timeframe, setTimeframe] = useState<"1d" | "7d" | "1m" | "3m">("7d");
   const [chartData, setChartData] = useState<{ day: string; scores: Record<string, number> }[]>([]);
-  const [areaActionPlanCounts, setAreaActionPlanCounts] = useState<Record<string, number>>({});
-  const [heatmapData, setHeatmapData] = useState<{ date: string; count: number; level: number }[]>([]);
+  const [heatmapData, setHeatmapData] = useState<{ date: string; level: number; pct: number }[]>([]);
   const [habitConsistencyPct, setHabitConsistencyPct] = useState<number>(0);
 
   // Modal Drawer for 4-Dimension Indicator Update
@@ -210,9 +220,7 @@ export default function MonitoringPage() {
       setJourneyId(journey.id);
       setFinalReflection(journey.final_reflection || "");
 
-      const areas: string[] = Array.isArray(journey.area_transformasi)
-        ? journey.area_transformasi.map(normalizeTransformationArea)
-        : [];
+      const areas: string[] = Array.isArray(journey.area_transformasi) ? journey.area_transformasi : [];
       setSelectedAreas(areas);
 
       // Support Team / Coach
@@ -239,13 +247,8 @@ export default function MonitoringPage() {
       } catch {}
 
       // Fetch Baseline Assessment Answers if available
-      const { data: baselineAssessment } = await supabase.from("baseline_assessments")
-        .select("id").eq("user_id", user.id).eq("completed", true).maybeSingle();
-      const { data: bAnswers } = baselineAssessment
-        ? await supabase.from("baseline_answers")
-            .select("area, score")
-            .eq("assessment_id", baselineAssessment.id)
-        : { data: [] };
+      const { data: bAnswers } = await supabase.from("baseline_answers")
+        .select("area, score").eq("user_id", user.id);
       
       const baselineScoresMap: Record<string, number> = {};
       if (bAnswers && bAnswers.length > 0) {
@@ -307,67 +310,19 @@ export default function MonitoringPage() {
       // PENTING: habit_logs.habit_id mengacu ke habits.id, BUKAN action_plans.id — keduanya tabel
       // berbeda. Sebelumnya kode ini salah mencocokkan habit_id langsung ke action_plans.id
       // sehingga log check-in harian tidak pernah ketemu (chart selalu flat/kosong).
-      let { data: actionPlans, error: actionPlansError } = await supabase.from("action_plans")
-        .select("*").eq("journey_id", journey.id);
-      if (actionPlansError) throw actionPlansError;
+      const { data: actionPlans } = await supabase.from("action_plans")
+        .select("id, area_category, quantity").eq("user_id", user.id);
 
-      if (!actionPlans || actionPlans.length === 0) {
-        const fallback = await supabase.from("action_plans").select("*").eq("user_id", user.id);
-        if (fallback.error) throw fallback.error;
-        actionPlans = fallback.data;
-      }
-
-      const { data: habitsList, error: habitsError } = await supabase.from("habits")
-        .select("*").eq("user_id", user.id);
-      if (habitsError) throw habitsError;
+      const { data: habitsList } = await supabase.from("habits")
+        .select("id, action_plan_id, target").eq("user_id", user.id).eq("is_archived", false);
 
       const apAreaMap: Record<string, string> = {};
-      (actionPlans || []).forEach((ap: any) => {
-        const area = normalizeTransformationArea(ap.area_category || ap.category || "Spiritual Growth");
-        apAreaMap[ap.id] = area;
-      });
+      (actionPlans || []).forEach((ap: any) => { apAreaMap[ap.id] = ap.area_category || "Spiritual Growth"; });
 
-      const planCounts: Record<string, number> = {};
-      areas.forEach(area => { planCounts[area] = 0; });
-      (actionPlans || []).forEach((ap: any) => {
-        const area = apAreaMap[ap.id];
-        if (areas.includes(area)) planCounts[area] += 1;
-      });
-      setAreaActionPlanCounts(planCounts);
-
-      const activeHabits = (habitsList || []).filter((h: any) => h.is_archived !== true);
-      const habitsWithArea: { id: string; actionPlanId: string; area: string; qty: number; effectiveFrom?: string; effectiveUntil?: string }[] = [];
-      const usedHabitIds = new Set<string>();
-
-      // Action Plan is the source of truth for area. Matching by title supports legacy habits.
-      (actionPlans || []).forEach((ap: any) => {
-        const area = apAreaMap[ap.id];
-        if (!areas.includes(area)) return;
-        const habit = activeHabits.find((h: any) =>
-          !usedHabitIds.has(h.id) &&
-          h.action_plan_id === ap.id ||
-          (!usedHabitIds.has(h.id) && String(h.title || "").trim().toLowerCase() === String(ap.title || "").trim().toLowerCase())
-        );
-        if (!habit) {
-          // Keep the Action Plan in the area denominator even while its Habit row is being repaired.
-          habitsWithArea.push({
-            id: `missing:${ap.id}`,
-            actionPlanId: ap.id,
-            area,
-            qty: ap.quantity || ap.target || 1,
-          });
-          return;
-        }
-        usedHabitIds.add(habit.id);
-        habitsWithArea.push({
-          id: habit.id,
-          actionPlanId: ap.id,
-          area,
-          qty: habit.quantity || habit.target || ap.quantity || ap.target || 1,
-          effectiveFrom: habit.effective_from || undefined,
-          effectiveUntil: habit.effective_until || undefined,
-        });
-      });
+      // habit yang terhubung ke action_plan area tertentu (habit tanpa action_plan_id, mis. sholat/quran bawaan, dilewati)
+      const habitsWithArea = (habitsList || [])
+        .filter((h: any) => h.action_plan_id && apAreaMap[h.action_plan_id])
+        .map((h: any) => ({ id: h.id, area: apAreaMap[h.action_plan_id], qty: h.target || 1 }));
 
       // Build Dynamic Chart based on timeframe (1d, 7d, 1m, 3m)
       const numDays = timeframe === "1d" ? 1 : timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
@@ -379,43 +334,37 @@ export default function MonitoringPage() {
         datesArr.push(d.toISOString().split("T")[0]);
       }
 
-      // Query habit_logs + specialized logs in parallel
-      const [habitLogsRes] = await Promise.all([
-        supabase.from("habit_logs").select("habit_id, date, completed, completed_count").eq("user_id", user.id).in("date", datesArr),
-      ]);
+      const { data: habitLogs } = await supabase.from("habit_logs")
+        .select("habit_id, date, completed, completed_count")
+        .eq("user_id", user.id).in("date", datesArr);
 
-      const habitLogs = habitLogsRes.data || [];
-
-      if (areas.length > 0) {
-        const sampledDates = numDays > 30
+      if (habitsWithArea.length > 0) {
+        const sampledDates = numDays > 30 
           ? datesArr.filter((_, idx) => idx % 3 === 0 || idx === datesArr.length - 1)
-          : numDays > 7
+          : numDays > 7 
           ? datesArr.filter((_, idx) => idx % 2 === 0 || idx === datesArr.length - 1)
           : datesArr;
 
         const chart = sampledDates.map((dateStr) => {
           const dObj = new Date(dateStr);
-          const label = numDays === 1
-            ? "Hari Ini"
-            : numDays <= 7
-            ? dObj.toLocaleDateString("id-ID", { weekday: "short" })
+          const label = numDays === 1 
+            ? "Hari Ini" 
+            : numDays <= 7 
+            ? dObj.toLocaleDateString("id-ID", { weekday: "short" }) 
             : `${dObj.getDate()}/${dObj.getMonth() + 1}`;
-
-          const logsForDay = habitLogs.filter((l: any) => l.date === dateStr);
+          
+          const logsForDay = (habitLogs || []).filter((l: any) => l.date === dateStr);
           const scores: Record<string, number> = {};
           areas.forEach(area => {
-            const areaHabits = habitsWithArea.filter(h =>
-              h.area === area &&
-              (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
-              (!h.effectiveUntil || h.effectiveUntil >= dateStr)
-            );
+            const areaHabits = habitsWithArea.filter(h => h.area === area);
             if (areaHabits.length === 0) { scores[area] = 0; return; }
-            const completedWeight = areaHabits.reduce((total, h) => {
-              const log = h.id.startsWith("missing:") ? null : logsForDay.find((l: any) => l.habit_id === h.id);
+            let total = 0;
+            areaHabits.forEach(h => {
+              const log = logsForDay.find((l: any) => l.habit_id === h.id);
               const cnt = log ? (log.completed_count || (log.completed ? h.qty : 0)) : 0;
-              return total + Math.min(1, cnt / h.qty);
-            }, 0);
-            scores[area] = Number((completedWeight / areaHabits.length).toFixed(2));
+              total += Math.min(1, cnt / h.qty);
+            });
+            scores[area] = Math.round((total / areaHabits.length) * 100);
           });
           return { day: label, scores };
         });
@@ -429,44 +378,32 @@ export default function MonitoringPage() {
         d.setDate(d.getDate() - i);
         dates90.push(d.toISOString().split("T")[0]);
       }
-
       const { data: logs90 } = await supabase.from("habit_logs")
-        .select("habit_id, date, completed, completed_count").eq("user_id", user.id).in("date", dates90);
+        .select("date, completed")
+        .eq("user_id", user.id).in("date", dates90);
 
-      let consistencyTotal = 0;
-      let consistencyDays = 0;
+      const totalHabitCount = (habitsList || []).length || 1;
+      let totalCompletedDays = 0;
 
       const heatmap = dates90.map(dateStr => {
-        const activeHabits = habitsWithArea.filter(h =>
-          (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
-          (!h.effectiveUntil || h.effectiveUntil >= dateStr)
-        );
-        const dayLogs = (logs90 || []).filter((l: any) => l.date === dateStr);
-        const completedCount = activeHabits.reduce((sum, h) => {
-          const log = h.id.startsWith("missing:") ? null : dayLogs.find((l: any) => l.habit_id === h.id);
-          return sum + (log ? Number(log.completed_count || (log.completed ? 1 : 0)) : 0);
-        }, 0);
-        const totalUnits = activeHabits.reduce((sum, h) => sum + h.qty, 0);
-        const pct = totalUnits ? Math.round((completedCount / totalUnits) * 100) : 0;
-        if (totalUnits > 0) { consistencyTotal += pct; consistencyDays++; }
-        const level = completedCount > 10 ? 4 : completedCount >= 7 ? 3 : completedCount >= 4 ? 2 : completedCount > 0 ? 1 : 0;
-        return { date: dateStr, count: completedCount, level };
+        const dayLogs = (logs90 || []).filter((l: any) => l.date === dateStr && l.completed);
+        const pct = Math.round((dayLogs.length / totalHabitCount) * 100);
+        if (pct >= 50) totalCompletedDays++;
+        let level = 0;
+        if (pct > 0 && pct < 40) level = 1;
+        else if (pct >= 40 && pct < 80) level = 2;
+        else if (pct >= 80) level = 3;
+        return { date: dateStr, level, pct };
       });
       setHeatmapData(heatmap);
 
       // Real calculated habit consistency % over active days
-      const realHabitPct = consistencyDays ? Math.round(consistencyTotal / consistencyDays) : 0;
+      const activeDaysSoFar = Math.min(dayCount, 90);
+      const realHabitPct = Math.min(100, Math.round((totalCompletedDays / Math.max(1, activeDaysSoFar)) * 100));
       setHabitConsistencyPct(realHabitPct);
 
     } catch (err) {
-      const error = err as { code?: string; message?: string; details?: string; hint?: string };
-      console.error("Gagal memuat monitoring:", {
-        code: error?.code,
-        message: error?.message || String(err),
-        details: error?.details,
-        hint: error?.hint,
-      });
-      setSaveError(`Data monitoring gagal dimuat${error?.message ? `: ${error.message}` : "."}`);
+      console.error("Gagal memuat monitoring:", err);
     } finally {
       setLoading(false);
     }
@@ -491,7 +428,6 @@ export default function MonitoringPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    setSaveError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -500,16 +436,15 @@ export default function MonitoringPage() {
         id: currentReview?.id,
         user_id: user.id, month_number: selectedMonth, status, participant_note: note,
         updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id,month_number" }).select().maybeSingle();
-      if (error) throw error;
-      if (data) {
+      }).select().maybeSingle();
+      if (!error && data) {
         setReviews(prev => ({
           ...prev,
           [selectedMonth]: { ...prev[selectedMonth], id: data.id, status, participantNote: note },
         }));
         setSaved(true); setTimeout(() => setSaved(false), 2500);
       }
-    } catch (err: any) { console.error(err); setSaveError(`Gagal menyimpan checkpoint: ${err.message || "silakan coba lagi"}.`); } finally { setSaving(false); }
+    } catch (err) { console.error(err); } finally { setSaving(false); }
   };
 
   const handleSaveIndReport = async (area: string) => {
@@ -519,36 +454,22 @@ export default function MonitoringPage() {
     const rep = areaReports[selectedMonth]?.[area];
     if (!rep) return;
     setSavingArea(area);
-    setSaveError(null);
     const overallPct = calcAreaScore(rep);
     try {
-      const { error } = await supabase.from("monthly_indicator_reports").upsert({
-        user_id: user.id,
-        journey_id: journeyId,
-        month_number: selectedMonth,
-        area,
+      await supabase.from("monthly_indicator_reports").upsert({
+        user_id: user.id, journey_id: journeyId, month_number: selectedMonth, area,
         kualitas_actual_rating: rep.kualitasRating,
         kuantitas_baseline: parseFloat(rep.kuantitasBaseline) || null,
         kuantitas_actual: parseFloat(rep.kuantitasActual) || null,
         waktu_actual_days: parseFloat(rep.waktuActualDays) || null,
         biaya_actual: parseFloat(rep.biayaActual.replace(/[^0-9.]/g, "")) || null,
-        score_percentage: overallPct,
-        updated_at: new Date().toISOString(),
+        score_percentage: overallPct, updated_at: new Date().toISOString(),
       }, { onConflict: "user_id,month_number,area" });
-      if (error) throw error;
-      setAreaReports(prev => ({
-        ...prev,
-        [selectedMonth]: {
-          ...prev[selectedMonth],
-          [area]: { ...prev[selectedMonth][area], isSaved: true },
-        },
-      }));
-      setEditingAreaModal(null);
-    } catch (err: any) {
-      console.error(err);
-      setSaveError(`Gagal menyimpan capaian ${area}: ${err.message || "silakan coba lagi"}.`);
-    } finally {
-      setSavingArea(null);
+    } catch (err) { console.error(err); } finally {
+      setTimeout(() => {
+        setSavingArea(null);
+        setEditingAreaModal(null);
+      }, 1200);
     }
   };
 
@@ -566,13 +487,11 @@ export default function MonitoringPage() {
     if (!journeyId) return;
     setSavingReflection(true);
     try {
-      setSaveError(null);
-      const { error } = await supabase.from("journeys").update({
+      await supabase.from("journeys").update({
         final_reflection: finalReflection, updated_at: new Date().toISOString(),
       }).eq("id", journeyId);
-      if (error) throw error;
       setSavedReflection(true); setTimeout(() => setSavedReflection(false), 2500);
-    } catch (err: any) { console.error(err); setSaveError(`Gagal menyimpan refleksi: ${err.message || "silakan coba lagi"}.`); } finally { setSavingReflection(false); }
+    } catch (err) { console.error(err); } finally { setSavingReflection(false); }
   };
 
   // Overall Health Score Calculation & Guilt-Free Status Helper
@@ -620,29 +539,10 @@ export default function MonitoringPage() {
     );
   }
 
-  if (!journeyId) {
-    return (
-      <ParticipantLayout activePath="/monitoring" pageTitle="Monitoring Perjalanan SLJ">
-        <main className="max-w-3xl mx-auto px-4 py-16 text-center space-y-4">
-          <Target className="h-10 w-10 text-amber-600 mx-auto" />
-          <h1 className="text-xl font-black text-navy-900">PTP belum siap dimonitor</h1>
-          <p className="text-sm text-slate-600">Pilih tiga area transformasi, isi target, dan buat Action Plan terlebih dahulu.</p>
-          <Link href="/journey"><Button className="bg-navy-900 text-amber-300">Lengkapi PTP</Button></Link>
-        </main>
-      </ParticipantLayout>
-    );
-  }
-
   return (
     <ParticipantLayout activePath="/monitoring" pageTitle="Monitoring Perjalanan SLJ">
       {/* Full-width container with clean whitespace */}
       <main className="w-full px-4 sm:px-6 lg:px-8 pt-6 pb-16 font-sans text-slate-800">
-        {saveError && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>{saveError}</span>
-          </div>
-        )}
         
         {/* Two-column layout: Left Main Content (70%), Right Analytics & Guidance Sidebar (30%) */}
         <div className="flex flex-col lg:flex-row gap-7 items-start">
@@ -723,9 +623,9 @@ export default function MonitoringPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {selectedAreas.map(area => {
                   const score = healthData.areas[area] || 0;
-                  const color = getTransformationAreaColor(area);
+                  const color = AREA_COLORS[area] || "#0B2C6B";
                   const rep = areaReports[selectedMonth]?.[area];
-                  const hasFilledData = Boolean(rep?.isSaved);
+                  const hasFilledData = rep && (rep.kuantitasActual || rep.waktuActualDays || rep.biayaActual);
 
                   return (
                     <div
@@ -794,26 +694,24 @@ export default function MonitoringPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
               {/* Dynamic Multi-Timeframe Chart (2 cols) */}
-              <div className="md:col-span-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-                <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="md:col-span-2 bg-white p-5 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                   <div>
-                    <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                      </span>
+                    <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-emerald-600" />
                       Grafik Progress Action Plan
                     </h3>
-                    <p className="ml-9 mt-0.5 text-[11px] text-slate-400">Skor penyelesaian harian per area, skala 0 sampai 1</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Tren kedisiplinan habit harian</p>
                   </div>
 
                   {/* Timeframe Filter Toggle */}
-                  <div className="flex shrink-0 items-center gap-0.5 self-start rounded-lg border border-slate-200 bg-slate-50 p-0.5 sm:self-auto">
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto">
                     {(["1d", "7d", "1m", "3m"] as const).map(tf => (
                       <button
                         key={tf}
                         onClick={() => setTimeframe(tf)}
-                        className={`rounded-md px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
-                          timeframe === tf ? "bg-white text-navy-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]" : "text-slate-400 hover:text-slate-700"
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                          timeframe === tf ? "bg-white text-navy-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
                         {tf === "1d" ? "1 Hari" : tf === "7d" ? "7 Hari" : tf === "1m" ? "1 Bulan" : "3 Bulan"}
@@ -824,83 +722,48 @@ export default function MonitoringPage() {
 
                 {/* Line Chart Render */}
                 {selectedAreas.length === 0 ? (
-                  <div className="space-y-2 px-5 py-16 text-center">
+                  <div className="py-12 text-center space-y-2">
                     <p className="text-xs text-slate-400">Belum ada area dipilih di PTP.</p>
                     <Link href="/journey">
                       <Button variant="outline" className="text-xs font-bold rounded-xl border-amber-400">Lengkapi PTP</Button>
                     </Link>
                   </div>
                 ) : chartData.length === 0 ? (
-                  <div className="px-5 py-16 text-center text-xs text-slate-400">Belum ada log habit pada rentang waktu ini.</div>
+                  <div className="py-12 text-center text-xs text-slate-400">Belum ada log habit pada rentang waktu ini.</div>
                 ) : (
-                  <div className="px-3 pb-2 pt-5 sm:px-5">
-                    <div className="relative h-[220px] w-full rounded-xl bg-slate-50/60 px-2 pb-7 pt-2 sm:h-[250px]">
-                    <svg className="h-full w-full overflow-visible" viewBox="0 0 720 180" preserveAspectRatio="none" role="img" aria-label="Grafik progres Action Plan per area transformasi">
-                      {[0, 0.25, 0.5, 0.75, 1].map(value => {
-                        const y = 160 - value * 144;
-                        return (
-                          <g key={value}>
-                            <line x1="42" y1={y} x2="708" y2={y} stroke="#E2E8F0" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                            <text x="32" y={y + 3} textAnchor="end" fill="#94A3B8" fontSize="9" fontWeight="600">{value.toFixed(value === 0 || value === 1 ? 0 : 2)}</text>
-                          </g>
-                        );
-                      })}
-                      <line x1="42" y1="16" x2="42" y2="160" stroke="#CBD5E1" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                      {selectedAreas.map((area, areaIndex) => {
-                        const pts = chartData.map((row, i) => {
-                          const score = row.scores[area] || 0;
-                          const overlappingAreas = selectedAreas.filter(candidate => (row.scores[candidate] || 0) === score);
-                          const overlapRank = overlappingAreas.indexOf(area);
-                          const overlapOffset = overlappingAreas.length > 1
-                            ? (overlapRank - (overlappingAreas.length - 1) / 2) * 3
-                            : 0;
-                          return [
-                            chartData.length === 1 ? 375 : 42 + i * (666 / (chartData.length - 1)),
-                            160 - score * 144 + overlapOffset,
-                          ];
-                        });
+                  <div className="w-full relative bg-slate-50 rounded-xl p-3" style={{ height: 160 }}>
+                    {/* SVG Multi-Line */}
+                    <svg className="w-full h-full" viewBox={`0 0 ${(chartData.length - 1) * 100} 120`} preserveAspectRatio="none">
+                      {selectedAreas.map(area => {
+                        const pts = chartData.map((row, i) => [
+                          i * 100,
+                          120 - ((row.scores[area] || 0) / 100) * 120,
+                        ]);
                         const d = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
-                        const color = getTransformationAreaColor(area);
+                        const color = AREA_COLORS[area] || "#94a3b8";
                         return (
                           <g key={area}>
-                            <path
-                              d={d}
-                              fill="none"
-                              stroke={color}
-                              strokeWidth={1.25}
-                              strokeDasharray={areaIndex === 0 ? undefined : areaIndex === 1 ? "6 3" : "2 3"}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              vectorEffect="non-scaling-stroke"
-                            />
-                            {pts.map(([x, y], i) => (
-                              <circle key={i} cx={x} cy={y} r={2.75} fill="white" stroke={color} strokeWidth={1.25} vectorEffect="non-scaling-stroke">
-                                <title>{`${area} · ${chartData[i].day}: ${(chartData[i].scores[area] || 0).toFixed(2)}`}</title>
-                              </circle>
-                            ))}
+                            <path d={d} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                            {pts.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={3} fill={color} />)}
                           </g>
                         );
                       })}
                     </svg>
-                    <div className="absolute inset-x-10 bottom-2 flex justify-between text-[9px] font-semibold text-slate-400">
+                    {/* Labels */}
+                    <div className="flex justify-between text-[9px] text-slate-400 font-bold mt-1">
                       {chartData.map((row, i) => (
                         <span key={i}>{row.day}</span>
                       ))}
-                    </div>
                     </div>
                   </div>
                 )}
 
                 {/* Legend */}
-                <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 bg-white px-5 py-3">
+                <div className="flex flex-wrap gap-3 pt-1 border-t border-slate-100">
                   {selectedAreas.map(area => (
-                    <div key={area} className="flex items-center gap-2 text-[11px] text-slate-600">
-                      <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: getTransformationAreaColor(area), boxShadow: `0 0 0 1px ${getTransformationAreaColor(area)}33` }} />
-                      <span className="font-bold">{area}</span>
-                      <span className="text-slate-400">{areaActionPlanCounts[area] || 0} AP</span>
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600">
-                        {(chartData[chartData.length - 1]?.scores[area] || 0).toFixed(2)}
-                      </span>
+                    <div key={area} className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: AREA_COLORS[area] || "#94a3b8" }} />
+                      <span>{area}</span>
                     </div>
                   ))}
                 </div>
@@ -916,7 +779,7 @@ export default function MonitoringPage() {
                     </h3>
                   </div>
                   <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                    Semakin banyak Action Plan dikerjakan, semakin gelap warnanya. Level tertinggi dicapai jika lebih dari 10 eksekusi.
+                    Setiap kotak merepresentasikan pengisian checklist harian Anda.
                   </p>
                 </div>
 
@@ -925,13 +788,12 @@ export default function MonitoringPage() {
                   {heatmapData.map((item, idx) => (
                     <div
                       key={idx}
-                      title={`${item.date}: ${item.count} eksekusi Action Plan`}
-                      className={`h-4.5 w-4.5 rounded-xs border transition-transform hover:scale-125 cursor-pointer ${
-                        item.level === 4 ? "bg-[#216E39] border-[#1A5A2E]"
-                        : item.level === 3 ? "bg-[#30A14E] border-[#27883F]"
-                        : item.level === 2 ? "bg-[#40C463] border-[#35A653]"
-                        : item.level === 1 ? "bg-[#9BE9A8] border-[#7FD68E]"
-                        : "bg-[#EBEDF0] border-slate-200/80"
+                      title={`${item.date}: ${item.pct}% Selesai`}
+                      className={`h-4.5 w-4.5 rounded-xs transition-transform hover:scale-125 cursor-pointer ${
+                        item.level === 3 ? "bg-emerald-600 border border-emerald-700"
+                        : item.level === 2 ? "bg-emerald-400 border border-emerald-500"
+                        : item.level === 1 ? "bg-emerald-200 border border-emerald-300"
+                        : "bg-[#ebedf0] border border-slate-200/80"
                       }`}
                     />
                   ))}
@@ -942,10 +804,9 @@ export default function MonitoringPage() {
                   <span>Kurang</span>
                   <div className="flex items-center gap-1">
                     <span className="h-2.5 w-2.5 bg-[#ebedf0] border border-slate-200/80 rounded-xs" />
-                    <span className="h-2.5 w-2.5 bg-[#9BE9A8] border border-[#7FD68E] rounded-xs" title="1-3 eksekusi" />
-                    <span className="h-2.5 w-2.5 bg-[#40C463] border border-[#35A653] rounded-xs" title="4-6 eksekusi" />
-                    <span className="h-2.5 w-2.5 bg-[#30A14E] border border-[#27883F] rounded-xs" title="7-10 eksekusi" />
-                    <span className="h-2.5 w-2.5 bg-[#216E39] border border-[#1A5A2E] rounded-xs" title=">10 eksekusi" />
+                    <span className="h-2.5 w-2.5 bg-emerald-200 border border-emerald-300 rounded-xs" />
+                    <span className="h-2.5 w-2.5 bg-emerald-400 border border-emerald-500 rounded-xs" />
+                    <span className="h-2.5 w-2.5 bg-emerald-600 border border-emerald-700 rounded-xs" />
                   </div>
                   <span>Istiqamah</span>
                 </div>
@@ -979,8 +840,8 @@ export default function MonitoringPage() {
                   {selectedAreas.map(area => {
                     const rep = areaReports[selectedMonth]?.[area];
                     const score = rep ? calcAreaScore(rep) : 0;
-                    const color = getTransformationAreaColor(area);
-                    const hasFilledData = Boolean(rep?.isSaved);
+                    const color = AREA_COLORS[area] || "#0B2C6B";
+                    const hasFilledData = rep && (rep.kuantitasActual || rep.waktuActualDays || rep.biayaActual);
 
                     return (
                       <div
@@ -997,7 +858,7 @@ export default function MonitoringPage() {
                                 : score >= 50 ? "bg-amber-50 text-amber-700"
                                 : "bg-slate-100 text-slate-600"
                             }`}>
-                              {!hasFilledData ? `${score}% Skor Baseline` : `${score}% Capaian`}
+                              {!hasFilledData && isEarlyStage ? "Belum Diisi" : `${score}% Capaian`}
                             </span>
                           </div>
 
@@ -1036,14 +897,9 @@ export default function MonitoringPage() {
                               )}
                             </div>
                           ) : (
-                            <div className="pt-1 space-y-1">
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="text-slate-500">Rating Evaluasi Mandiri</span>
-                                <span className="font-bold text-amber-600 flex items-center gap-1">
-                                  {rep?.kualitasRating || 4}/5 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                                </span>
-                              </div>
-                            </div>
+                            <p className="text-[11px] text-slate-400 italic pt-1">
+                              Belum ada indikator Kualitas/Kuantitas/Waktu/Biaya yang diisi untuk area ini di PTP.
+                            </p>
                           )}
                         </div>
 
@@ -1401,92 +1257,64 @@ export default function MonitoringPage() {
                       <span className="text-sm font-extrabold text-emerald-600">{overallPct}% Berhasil</span>
                     </div>
 
-                    {/* Rating 1 - 5 Bintang Fallback (jika 4D indikator tidak diisi di PTP) */}
-                    {!rep.targets.kualitas && !rep.targets.kuantitas && !rep.targets.waktu && !rep.targets.biaya ? (
-                      <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="font-extrabold text-amber-900 text-xs block">Rating Capaian Bulanan (1 – 5 Bintang)</label>
-                          <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
-                            {rep.kualitasRating}/5 ★ ({rep.kualitasRating * 20}% Capaian)
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 leading-relaxed">
-                          Berikan penilaian mandiri atas kualitas keberhasilan & pencapaian Anda pada area ini di Bulan Ke-{selectedMonth}.
-                        </p>
-                        <div className="flex justify-center items-center gap-2 py-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {/* 1. Kualitas */}
+                      <div className="bg-purple-50/50 p-3.5 rounded-xl border border-purple-200 space-y-2">
+                        <label className="font-bold text-purple-800 block">1. Kualitas (Mutu / Kekhusyukan)</label>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kualitas || "Khusyu & Tepat waktu"}</p>
+                        <div className="flex gap-1 py-1">
                           {[1, 2, 3, 4, 5].map(star => (
                             <button
                               key={star}
-                              type="button"
                               onClick={() => updateAreaReport(editingAreaModal, "kualitasRating", star)}
-                              className="transition-transform hover:scale-125 cursor-pointer p-1"
+                              className="transition-transform hover:scale-125"
                             >
-                              <Star className={`h-8 w-8 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
+                              <Star className={`h-5 w-5 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
                             </button>
                           ))}
+                          <span className="text-xs font-bold text-slate-600 ml-1 self-center">{rep.kualitasRating}/5 ★</span>
                         </div>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                        {/* 1. Kualitas */}
-                        {rep.targets.kualitas && <div className="bg-purple-50/50 p-3.5 rounded-xl border border-purple-200 space-y-2">
-                          <label className="font-bold text-purple-800 block">1. Kualitas (Mutu / Kekhusyukan)</label>
-                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kualitas || "Khusyu & Tepat waktu"}</p>
-                          <div className="flex gap-1 py-1">
-                            {[1, 2, 3, 4, 5].map(star => (
-                              <button
-                                key={star}
-                                type="button"
-                                onClick={() => updateAreaReport(editingAreaModal, "kualitasRating", star)}
-                                className="transition-transform hover:scale-125"
-                              >
-                                <Star className={`h-5 w-5 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
-                              </button>
-                            ))}
-                            <span className="text-xs font-bold text-slate-600 ml-1 self-center">{rep.kualitasRating}/5 ★</span>
-                          </div>
-                        </div>}
 
-                        {/* 2. Kuantitas */}
-                        {rep.targets.kuantitas && <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-200 space-y-2">
-                          <label className="font-bold text-blue-800 block">2. Kuantitas (Realisasi)</label>
-                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kuantitas || "Target PTP"}</p>
-                          <div className="space-y-1.5">
-                            <Input
-                              value={rep.kuantitasActual}
-                              onChange={e => updateAreaReport(editingAreaModal, "kuantitasActual", e.target.value)}
-                              placeholder="Realisasi bulan ini (misal: 95)"
-                              className="text-xs h-8 border-slate-200 rounded-lg bg-white"
-                            />
-                          </div>
-                        </div>}
-
-                        {/* 3. Waktu */}
-                        {rep.targets.waktu && <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 space-y-2">
-                          <label className="font-bold text-amber-800 block">3. Waktu (Hari Tepat Waktu)</label>
-                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.waktu || "Jadwal Tepat Waktu"}</p>
+                      {/* 2. Kuantitas */}
+                      <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-200 space-y-2">
+                        <label className="font-bold text-blue-800 block">2. Kuantitas (Realisasi)</label>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kuantitas || "Target PTP"}</p>
+                        <div className="space-y-1.5">
                           <Input
-                            type="number" min={0} max={30}
-                            value={rep.waktuActualDays}
-                            onChange={e => updateAreaReport(editingAreaModal, "waktuActualDays", e.target.value)}
-                            placeholder="Hari tepat waktu dari 30 (misal: 25)"
+                            value={rep.kuantitasActual}
+                            onChange={e => updateAreaReport(editingAreaModal, "kuantitasActual", e.target.value)}
+                            placeholder="Realisasi bulan ini (misal: 95)"
                             className="text-xs h-8 border-slate-200 rounded-lg bg-white"
                           />
-                        </div>}
-
-                        {/* 4. Biaya */}
-                        {rep.targets.biaya && <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 space-y-2">
-                          <label className="font-bold text-emerald-800 block">4. Biaya / Anggaran (Nominal)</label>
-                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.biaya || "Nominal Rp"}</p>
-                          <Input
-                            value={rep.biayaActual}
-                            onChange={e => updateAreaReport(editingAreaModal, "biayaActual", e.target.value)}
-                            placeholder="Nominal realisasi (misal: 600000)"
-                            className="text-xs h-8 border-slate-200 rounded-lg bg-white"
-                          />
-                        </div>}
+                        </div>
                       </div>
-                    )}
+
+                      {/* 3. Waktu */}
+                      <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 space-y-2">
+                        <label className="font-bold text-amber-800 block">3. Waktu (Hari Tepat Waktu)</label>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.waktu || "Jadwal Tepat Waktu"}</p>
+                        <Input
+                          type="number" min={0} max={30}
+                          value={rep.waktuActualDays}
+                          onChange={e => updateAreaReport(editingAreaModal, "waktuActualDays", e.target.value)}
+                          placeholder="Hari tepat waktu dari 30 (misal: 25)"
+                          className="text-xs h-8 border-slate-200 rounded-lg bg-white"
+                        />
+                      </div>
+
+                      {/* 4. Biaya */}
+                      <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 space-y-2">
+                        <label className="font-bold text-emerald-800 block">4. Biaya / Anggaran (Nominal)</label>
+                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.biaya || "Nominal Rp"}</p>
+                        <Input
+                          value={rep.biayaActual}
+                          onChange={e => updateAreaReport(editingAreaModal, "biayaActual", e.target.value)}
+                          placeholder="Nominal realisasi (misal: 600000)"
+                          className="text-xs h-8 border-slate-200 rounded-lg bg-white"
+                        />
+                      </div>
+                    </div>
 
                     <DialogFooter className="border-t border-slate-100 pt-3 sticky bottom-0 bg-white">
                       <Button variant="outline" onClick={() => setEditingAreaModal(null)} className="w-full sm:w-auto text-xs font-semibold rounded-xl h-11 sm:h-9">

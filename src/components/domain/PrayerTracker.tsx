@@ -130,7 +130,6 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
             .select("id")
             .eq("user_id", userId)
             .eq("title", targetHabitTitle)
-            .eq("is_archived", false)
             .maybeSingle();
 
           if (habit) {

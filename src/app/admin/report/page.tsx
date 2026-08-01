@@ -31,6 +31,7 @@ import {
   Check,
 } from "lucide-react";
 import { TransformationRadarChart } from "@/components/domain/TransformationRadarChart";
+import { getTransformationAreaColor } from "@/lib/transformation-areas";
 import { DonutChart } from "@/components/domain/DonutChart";
 
 interface ParticipantReport {
@@ -433,7 +434,7 @@ export default function AdminImpactReportPage() {
                     <div key={item.area} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs font-bold">
                         <span className="text-[#0F1E3D] flex items-center gap-2">
-                          <span className="h-5 w-5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black flex items-center justify-center">
+                          <span className="h-5 w-5 rounded-full text-white text-[10px] font-black flex items-center justify-center" style={{ backgroundColor: getTransformationAreaColor(item.area) }}>
                             #{index + 1}
                           </span>
                           {item.area}
@@ -453,8 +454,8 @@ export default function AdminImpactReportPage() {
                           style={{ width: `${item.before}%` }}
                         />
                         <div
-                          className="h-full bg-[#C79A3C] transition-all"
-                          style={{ width: `${item.delta}%` }}
+                          className="h-full transition-all"
+                          style={{ width: `${item.delta}%`, backgroundColor: getTransformationAreaColor(item.area) }}
                         />
                       </div>
                     </div>
@@ -833,7 +834,7 @@ export default function AdminImpactReportPage() {
                       </div>
                       <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
                         <div className="h-full bg-slate-400" style={{ width: `${item.before}%` }} />
-                        <div className="h-full bg-[#C79A3C]" style={{ width: `${item.delta}%` }} />
+                        <div className="h-full" style={{ width: `${item.delta}%`, backgroundColor: getTransformationAreaColor(item.area) }} />
                       </div>
                     </div>
                   ))}

@@ -76,6 +76,7 @@ export default function DashboardPage() {
   const [completedTodayCount, setCompletedTodayCount] = useState(0);
   const [habitPercentage, setHabitPercentage] = useState(0);
   const [prayerLogsMap, setPrayerLogsMap] = useState<Record<string, boolean>>({});
+  const [habitSaveError, setHabitSaveError] = useState<string | null>(null);
 
   // Modals
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
@@ -361,13 +362,14 @@ export default function DashboardPage() {
         } catch {}
 
         // 2. Journey
-        const { data: journey } = await supabase
+        const { data: journey, error: journeyError } = await supabase
           .from("journeys")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+        if (journeyError) throw journeyError;
 
         if (journey || profile?.start_date) {
           setJourneyStatus(journey?.status || "ACTIVE");
@@ -385,65 +387,108 @@ export default function DashboardPage() {
           }
         }
 
-        // 3. Habits: Primary = action_plans (direct from PTP), Fallback = habits table
+        // 3. Habits: Query habits table + action_plans, ensuring valid habits.id FK
         const todayStr = new Date().toISOString().split("T")[0];
         let userHabits: any[] = [];
 
-        // Primary: Query action_plans table (what user directly enters in PTP Section 5)
-        const { data: actionPlansData } = await supabase
+        // Query action_plans from PTP
+        let { data: actionPlansData, error: actionPlansError } = await supabase
           .from("action_plans")
-          .select("id, title, category, area_category, frequency, quantity")
+          .select("*")
+          .eq("journey_id", journey?.id || "");
+        if (actionPlansError) throw actionPlansError;
+
+        // Older PTP data may still point to a previous journey row.
+        if ((!actionPlansData || actionPlansData.length === 0) && journey?.id) {
+          const fallback = await supabase.from("action_plans").select("*").eq("user_id", user.id);
+          if (fallback.error) throw fallback.error;
+          actionPlansData = fallback.data;
+        }
+
+        // Query habits table (the FK target for habit_logs) - ONLY valid columns!
+        const { data: habitsTableData, error: habitsTableError } = await supabase
+          .from("habits")
+          .select("*")
           .eq("user_id", user.id);
+        if (habitsTableError) throw habitsTableError;
+
+        const existingHabits = habitsTableData || [];
+        const habitMap: Record<string, any> = {};
 
         if (actionPlansData && actionPlansData.length > 0) {
-          userHabits = actionPlansData.map((ap) => ({
-            id: ap.id,
-            title: ap.title,
-            quantity: ap.quantity || 1,
-            area_category: ap.area_category || ap.category || 'Spiritual Growth',
-            is_archived: false,
-            effective_from: null,
-            effective_until: null,
-          }));
-        }
+          for (const ap of actionPlansData) {
+            let match = existingHabits.find(
+              (h: any) => h.action_plan_id === ap.id || (h.title && h.title.trim().toLowerCase() === ap.title.trim().toLowerCase())
+            );
 
-        // Fallback: action_plans by journey_id if user_id didn't match
-        if (userHabits.length === 0 && journey?.id) {
-          const { data: apByJourney } = await supabase
-            .from("action_plans")
-            .select("id, title, category, area_category, frequency, quantity")
-            .eq("journey_id", journey.id);
+            if (match && (!match.action_plan_id || !match.area_category)) {
+              const { data: linked, error: linkError } = await supabase.from("habits").update({
+                action_plan_id: ap.id,
+                area_category: ap.area_category || ap.category || "Spiritual Growth",
+                quantity: ap.quantity || ap.target || match.quantity || match.target || 1,
+              }).eq("id", match.id).select("*").maybeSingle();
+              if (!linkError && linked) match = linked;
+            }
 
-          if (apByJourney && apByJourney.length > 0) {
-            userHabits = apByJourney.map((ap) => ({
-              id: ap.id,
+            if (!match) {
+              // Try to create missing habits row (only valid schema columns!)
+              try {
+                const { data: created, error: createHabitError } = await supabase
+                  .from("habits")
+                  .insert({
+                    user_id: user.id,
+                    action_plan_id: ap.id,
+                    title: ap.title,
+                    category: ap.area_category || ap.category || "Spiritual Growth",
+                    frequency: ap.frequency || "Harian",
+                    target: ap.quantity || ap.target || 1,
+                    quantity: ap.quantity || ap.target || 1,
+                    area_category: ap.area_category || ap.category || "Spiritual Growth",
+                  })
+                  .select("*")
+                  .maybeSingle();
+
+                if (createHabitError) throw createHabitError;
+                if (created) match = created;
+              } catch (e) {
+                console.warn("Could not insert habit row:", e);
+              }
+            }
+
+            if (!match) continue;
+            habitMap[ap.id] = {
+              id: match.id,
+              action_plan_id: ap.id,
               title: ap.title,
-              quantity: ap.quantity || 1,
-              area_category: ap.area_category || ap.category || 'Spiritual Growth',
-              is_archived: false,
-              effective_from: null,
-              effective_until: null,
-            }));
+              quantity: ap.quantity || ap.target || (match ? (match.quantity || match.target) : 1) || 1,
+              area_category: ap.area_category || ap.category || (match ? (match.area_category || match.category) : null) || "Spiritual Growth",
+              effective_from: match?.effective_from || null,
+              effective_until: match?.effective_until || null,
+            };
           }
         }
 
-        // Secondary Fallback: habits table (versioned engine)
-        if (userHabits.length === 0) {
-          const { data: newHabits } = await supabase
-            .from("habits")
-            .select("id, title, effective_from, effective_until, is_archived")
-            .eq("user_id", user.id)
-            .or(`is_archived.eq.false,is_archived.is.null`);
-
-          if (newHabits && newHabits.length > 0) {
-            userHabits = newHabits;
+        // Include any standalone habits from habits table
+        existingHabits.forEach((h: any) => {
+          if (!Object.values(habitMap).some((m: any) => m.id === h.id) && h.is_archived !== true) {
+            habitMap[h.id] = {
+              id: h.id,
+              action_plan_id: h.action_plan_id || null,
+              title: h.title,
+              quantity: h.quantity || h.target || 1,
+              area_category: h.area_category || h.category || "Spiritual Growth",
+              effective_from: h.effective_from || null,
+              effective_until: h.effective_until || null,
+            };
           }
-        }
+        });
+
+        userHabits = Object.values(habitMap);
 
 
         // Filter habits active today
         const activeTodayHabits = (userHabits || []).filter((h: any) => {
-          if (h.is_archived) return false;
+          if (h.is_archived === true) return false;
           if (h.effective_from && h.effective_from > todayStr) return false;
           if (h.effective_until && h.effective_until < todayStr) return false;
           return true;
@@ -507,7 +552,7 @@ export default function DashboardPage() {
 
         if (activeTodayHabits.length > 0) {
           habitList = activeTodayHabits.map((h: any) => {
-            const cat = detectCategory(h.title);
+            const cat = h.area_category === "Spiritual Growth" ? detectCategory(h.title) : "general";
             const qty = h.quantity || 1;
             let completedCount = habitLogCountMap[h.id] || 0;
             let completedToday = false;
@@ -550,21 +595,21 @@ export default function DashboardPage() {
 
         // 4. Load All Journals & Last Journal
         const { data: journalsData } = await supabase
-          .from("daily_logs")
-          .select("id, date, reflection, niat_today")
+          .from("journals")
+          .select("id, date, content")
           .eq("user_id", user.id)
-          .not("reflection", "is", null)
-          .order("date", { ascending: false });
+          .not("content", "is", null)
+          .order("created_at", { ascending: false });
 
         if (journalsData && journalsData.length > 0) {
           setUserJournals(
             journalsData.map((j) => ({
               id: j.id || j.date,
               date: j.date,
-              reflection: j.reflection || "",
+              reflection: j.content || "",
             }))
           );
-          setJournalLast(journalsData[0].reflection || "");
+          setJournalLast(journalsData[0].content || "");
           setJournalLastDate(
             new Date(journalsData[0].date).toLocaleDateString("id-ID", {
               day: "numeric",
@@ -574,7 +619,14 @@ export default function DashboardPage() {
           );
         }
       } catch (err) {
-        console.error("Error loading dashboard:", err);
+        const error = err as { code?: string; message?: string; details?: string; hint?: string };
+        console.error("Error loading dashboard:", {
+          code: error?.code,
+          message: error?.message || String(err),
+          details: error?.details,
+          hint: error?.hint,
+        });
+        setHabitSaveError(`Data habit gagal dimuat${error?.message ? `: ${error.message}` : "."}`);
       } finally {
         setLoading(false);
       }
@@ -658,6 +710,7 @@ export default function DashboardPage() {
     const todayStr = new Date().toISOString().split("T")[0];
     const target = habits.find((h) => h.id === habitId);
     if (!target) return;
+    setHabitSaveError(null);
 
     const newCompleted = !target.completedToday;
     const updated = habits.map((h) =>
@@ -672,25 +725,26 @@ export default function DashboardPage() {
     );
 
     try {
-      const cat = detectHabitCategory(target.title);
+      const cat = target.category;
 
+      // Record to specific tracker tables for specialized widgets
       if (cat === "prayer") {
         const prayerKey = getPrayerKeyFromTitle(target.title);
         if (prayerKey) {
-          // Realtime sync to PrayerTracker card state
           setPrayerLogsMap((prev) => ({ ...prev, [`${todayStr}_${prayerKey}`]: newCompleted }));
-
           if (newCompleted) {
-            await supabase.from("prayer_logs").upsert(
+            const { error } = await supabase.from("prayer_logs").upsert(
               { user_id: userId, date: todayStr, prayer_name: prayerKey, is_completed: true },
               { onConflict: "user_id,date,prayer_name" }
             );
+            if (error) throw error;
           } else {
-            await supabase.from("prayer_logs")
+            const { error } = await supabase.from("prayer_logs")
               .update({ is_completed: false })
               .eq("user_id", userId)
               .eq("date", todayStr)
               .eq("prayer_name", prayerKey);
+            if (error) throw error;
           }
         }
       } else if (cat === "quran") {
@@ -698,7 +752,7 @@ export default function DashboardPage() {
           const { data: existing } = await supabase.from("quran_logs")
             .select("id").eq("user_id", userId).eq("date", todayStr).limit(1);
           if (!existing || existing.length === 0) {
-            await supabase.from("quran_logs").insert({
+            const { error } = await supabase.from("quran_logs").insert({
               user_id: userId,
               date: todayStr,
               surah_name: "(Dari Habit PTP)",
@@ -706,34 +760,59 @@ export default function DashboardPage() {
               from_ayat: 0,
               to_ayat: 0,
             });
+            if (error) throw error;
           }
         } else {
-          await supabase.from("quran_logs")
+          const { error } = await supabase.from("quran_logs")
             .delete()
             .eq("user_id", userId)
             .eq("date", todayStr)
             .eq("surah_name", "(Dari Habit PTP)");
+          if (error) throw error;
         }
       } else if (cat === "hadith") {
-        await supabase.from("hadith_logs").upsert(
+        const { error } = await supabase.from("hadith_logs").upsert(
           { user_id: userId, date: todayStr, is_read: newCompleted },
           { onConflict: "user_id,date" }
         );
-      } else {
-        // General habit — upsert habit_log with count = full quantity if completed, 0 if not
-        const newCount = newCompleted ? target.quantity : 0;
-        await supabase.from("habit_logs").upsert(
-          { habit_id: habitId, user_id: userId, date: todayStr, completed: newCompleted, completed_count: newCount },
-          { onConflict: "habit_id,date" }
-        );
+        if (error) throw error;
+      }
+
+      // Record to habit_logs using select + insert/update/delete pattern (compatible with or without UNIQUE constraint)
+      const newCount = newCompleted ? target.quantity : 0;
+      const { data: existingHL } = await supabase
+        .from("habit_logs")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("habit_id", habitId)
+        .eq("date", todayStr)
+        .maybeSingle();
+
+      if (existingHL) {
+        if (newCompleted || newCount > 0) {
+          const { error } = await supabase.from("habit_logs").update({ completed: newCompleted, completed_count: newCount }).eq("id", existingHL.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("habit_logs").delete().eq("id", existingHL.id);
+          if (error) throw error;
+        }
+      } else if (newCompleted || newCount > 0) {
+        const { error } = await supabase.from("habit_logs").insert({
+          user_id: userId,
+          habit_id: habitId,
+          date: todayStr,
+          completed: newCompleted,
+          completed_count: newCount,
+        });
+        if (error) throw error;
       }
     } catch (err) {
-      console.error("Gagal update habit:", err);
+      console.error("Gagal menyimpan checklist habit:", err);
+      setHabitSaveError("Checklist gagal disimpan. Periksa koneksi lalu coba lagi.");
       setHabits(habits);
-      const prevDone = habits.filter((h) => h.completedToday).length;
-      setCompletedTodayCount(prevDone);
-      const prevScore = habits.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
-      setHabitPercentage(habits.length > 0 ? Math.round((prevScore / habits.length) * 100) : 0);
+      const totalScore = habits.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
+      setCompletedTodayCount(habits.filter((h) => h.completedToday).length);
+      setHabitPercentage(habits.length > 0 ? Math.round((totalScore / habits.length) * 100) : 0);
     }
   };
 
@@ -742,6 +821,7 @@ export default function DashboardPage() {
     const todayStr = new Date().toISOString().split("T")[0];
     const target = habits.find((h) => h.id === habitId);
     if (!target || target.category !== 'general') return;
+    setHabitSaveError(null);
 
     const newCount = Math.min(target.quantity, (target.completedCount || 0) + 1);
     const newCompleted = newCount >= target.quantity;
@@ -757,12 +837,34 @@ export default function DashboardPage() {
     setHabitPercentage(updated.length > 0 ? Math.round((totalScore / updated.length) * 100) : 0);
 
     try {
-      await supabase.from("habit_logs").upsert(
-        { habit_id: habitId, user_id: userId, date: todayStr, completed: newCompleted, completed_count: newCount },
-        { onConflict: "habit_id,date" }
-      );
+      const { data: existingHL } = await supabase
+        .from("habit_logs")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("habit_id", habitId)
+        .eq("date", todayStr)
+        .maybeSingle();
+
+      if (existingHL) {
+        const { error } = await supabase.from("habit_logs").update({ completed: newCompleted, completed_count: newCount }).eq("id", existingHL.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("habit_logs").insert({
+          user_id: userId,
+          habit_id: habitId,
+          date: todayStr,
+          completed: newCompleted,
+          completed_count: newCount,
+        });
+        if (error) throw error;
+      }
     } catch (err) {
       console.error("Gagal simpan sub-step:", err);
+      setHabitSaveError("Progress habit gagal disimpan. Periksa koneksi lalu coba lagi.");
+      setHabits(habits);
+      const totalScore = habits.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
+      setCompletedTodayCount(habits.filter((h) => h.completedToday).length);
+      setHabitPercentage(habits.length > 0 ? Math.round((totalScore / habits.length) * 100) : 0);
     }
   };
 
@@ -822,11 +924,13 @@ export default function DashboardPage() {
     const todayStr = new Date().toISOString().split("T")[0];
 
     try {
-      await supabase.from("daily_logs").upsert({
+      const { error } = await supabase.from("journals").insert({
         user_id: userId,
         date: todayStr,
-        reflection: journalContent,
+        content: journalContent,
+        is_private: true,
       });
+      if (error) throw error;
 
       setJournalLast(journalContent);
       setJournalLastDate(
@@ -1128,6 +1232,12 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
+
+                  {habitSaveError && (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
+                      {habitSaveError}
+                    </div>
+                  )}
 
                   {/* Habit Checklist Preview — supports quantity sub-step counter */}
                   <div className="space-y-1.5 pt-1">
@@ -1634,28 +1744,29 @@ export default function DashboardPage() {
             <Progress value={habitPercentage} className="h-2.5 bg-warm-bg" />
 
             <div className="space-y-2 pt-2 max-h-[300px] overflow-y-auto pr-1">
-              {habits.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => toggleHabitToday(h.id)}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl text-xs font-bold transition-all text-left ${
-                    h.completedToday
-                      ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
-                      : "bg-warm-bg text-slate-700 border border-warm-border hover:bg-slate-100"
-                  }`}
-                >
-                  <span>{h.title}</span>
-                  <div
-                    className={`h-5 w-5 rounded-full flex items-center justify-center ${
+              {habits.map((h) => {
+                const isMultiStep = h.category === "general" && h.quantity > 1;
+                return (
+                  <button
+                    key={h.id}
+                    onClick={() => isMultiStep && !h.completedToday ? incrementHabitCount(h.id) : toggleHabitToday(h.id)}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl text-xs font-bold transition-all text-left ${
                       h.completedToday
-                        ? "bg-emerald-600 text-white"
-                        : "border border-slate-300 bg-white"
+                        ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
+                        : "bg-warm-bg text-slate-700 border border-warm-border hover:bg-slate-100"
                     }`}
                   >
-                    {h.completedToday && <Check className="h-3 w-3 stroke-[3]" />}
-                  </div>
-                </button>
-              ))}
+                    <span>{h.title}</span>
+                    {isMultiStep && !h.completedToday ? (
+                      <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] text-slate-700">{h.completedCount}/{h.quantity} +</span>
+                    ) : (
+                      <div className={`h-5 w-5 rounded-full flex items-center justify-center ${h.completedToday ? "bg-emerald-600 text-white" : "border border-slate-300 bg-white"}`}>
+                        {h.completedToday && <Check className="h-3 w-3 stroke-[3]" />}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

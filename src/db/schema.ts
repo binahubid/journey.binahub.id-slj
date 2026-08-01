@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const journeyStatusEnum = pgEnum("journey_status", [
   "DRAFT",
@@ -55,6 +55,8 @@ export const actionPlans = pgTable("action_plans", {
   frequency: text("frequency").default("daily").notNull(),
   reminderTime: text("reminder_time"),
   target: integer("target").default(1),
+  quantity: integer("quantity").default(1),
+  areaCategory: text("area_category"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -67,12 +69,16 @@ export const habits = pgTable("habits", {
   frequency: text("frequency").default("daily").notNull(),
   reminderTime: text("reminder_time"),
   target: integer("target").default(1),
+  quantity: integer("quantity").default(1),
+  areaCategory: text("area_category"),
   source: text("source").default("manual").notNull(), // 'action_plan' | 'manual'
   effectiveFrom: text("effective_from"),
   effectiveUntil: text("effective_until"),
   isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  actionPlanIdUnique: uniqueIndex("habits_action_plan_id_unique").on(table.actionPlanId),
+}));
 
 export const ptpSnapshots = pgTable("ptp_snapshots", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -90,6 +96,7 @@ export const habitLogs = pgTable("habit_logs", {
   userId: uuid("user_id").notNull(),
   date: text("date").notNull(), // YYYY-MM-DD
   completed: boolean("completed").default(false).notNull(),
+  completedCount: integer("completed_count").default(0).notNull(),
   note: text("note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { createClient } from "@/lib/supabase/client";
+import { TRANSFORMATION_AREAS } from "@/lib/transformation-areas";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -48,9 +49,10 @@ export default function JourneySetupPage() {
   const [mainTarget, setMainTarget] = useState("");
   const [indicators, setIndicators] = useState<string[]>(["", "", ""]);
   
-  const [actionPlans, setActionPlans] = useState<{ id: string; title: string; frequency: string }[]>([]);
+  const [actionPlans, setActionPlans] = useState<{ id: string; title: string; frequency: string; areaCategory: string }[]>([]);
   const [newActionTitle, setNewActionTitle] = useState("");
   const [newActionFreq, setNewActionFreq] = useState("Setiap hari");
+  const [newActionArea, setNewActionArea] = useState("Spiritual Growth");
 
   const [sahabatSafar, setSahabatSafar] = useState("");
   const [sahabatRole, setSahabatRole] = useState("");
@@ -118,7 +120,7 @@ export default function JourneySetupPage() {
     if (newActionTitle.trim()) {
       setActionPlans([
         ...actionPlans,
-        { id: String(Date.now()), title: newActionTitle.trim(), frequency: newActionFreq },
+        { id: String(Date.now()), title: newActionTitle.trim(), frequency: newActionFreq, areaCategory: newActionArea || selectedAreas[0] || "Spiritual Growth" },
       ]);
       setNewActionTitle("");
     }
@@ -160,8 +162,12 @@ export default function JourneySetupPage() {
         return;
       }
 
+      if (selectedAreas.length !== 3) {
+        setCommitError("Pilih tepat 3 area transformasi sebelum memulai Journey.");
+        return;
+      }
+
       // 1b. Ensure profile start_date is set to TODAY if not already
-      const todayStr = new Date().toISOString().split("T")[0];
       await supabase
         .from("profiles")
         .update({ start_date: new Date().toISOString() })
@@ -176,7 +182,13 @@ export default function JourneySetupPage() {
         muhasabah,
         niat,
         area_transformasi: selectedAreas,
-        main_target: mainTarget,
+        main_target: JSON.stringify(Object.fromEntries(selectedAreas.map((area) => [area, {
+          mainTarget,
+          kualitas: indicators[0] || "",
+          kuantitas: indicators[1] || "",
+          waktu: indicators[2] || "",
+          biaya: "",
+        }]))),
         success_indicators: indicators.filter((i) => i.trim() !== ""),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" }).select().maybeSingle();
@@ -197,8 +209,11 @@ export default function JourneySetupPage() {
             journey_id: journey.id,
             user_id: currentUserId,
             title: ap.title,
-            category: "general",
+            category: ap.areaCategory,
+            area_category: ap.areaCategory,
             frequency: ap.frequency,
+            quantity: 1,
+            target: 1,
           }).select().maybeSingle();
 
           if (apErr) {
@@ -211,11 +226,11 @@ export default function JourneySetupPage() {
             user_id: currentUserId,
             action_plan_id: apData?.id || null,
             title: ap.title,
-            category: "general",
+            category: ap.areaCategory,
+            area_category: ap.areaCategory,
             frequency: ap.frequency,
-            source: "action_plan",
-            effective_from: todayStr,
-            is_archived: false,
+            quantity: 1,
+            target: 1,
           });
 
           if (habitErr) {
@@ -234,7 +249,13 @@ export default function JourneySetupPage() {
             muhasabah,
             niat,
             area_transformasi: selectedAreas,
-            main_target: mainTarget,
+            main_target: JSON.stringify(Object.fromEntries(selectedAreas.map((area) => [area, {
+              mainTarget,
+              kualitas: indicators[0] || "",
+              kuantitas: indicators[1] || "",
+              waktu: indicators[2] || "",
+              biaya: "",
+            }]))),
             success_indicators: indicators.filter((i) => i.trim() !== ""),
             action_plans: actionPlans,
           },
@@ -275,11 +296,11 @@ export default function JourneySetupPage() {
   };
 
   const areaOptions = [
-    { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT" },
-    { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri" },
-    { id: "Leadership Excellence", icon: Award, label: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan" },
-    { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain" },
-    { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "dampak terhadap lingkungan sekitar" },
+    { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT", color: TRANSFORMATION_AREAS["Spiritual Growth"].color },
+    { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", color: TRANSFORMATION_AREAS["Personal Development"].color },
+    { id: "Leadership Excellence", icon: Award, label: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", color: TRANSFORMATION_AREAS["Leadership Excellence"].color },
+    { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", color: TRANSFORMATION_AREAS.Relationship.color },
+    { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "dampak terhadap lingkungan sekitar", color: TRANSFORMATION_AREAS["Community Impact"].color },
   ];
 
   return (
@@ -468,13 +489,14 @@ export default function JourneySetupPage() {
                           isMaxedOut
                             ? "opacity-50 cursor-not-allowed border-gray-200 bg-gray-50"
                             : isSelected
-                            ? "border-navy-900 bg-navy-50/60 text-navy-900 font-semibold shadow-2xs cursor-pointer"
+                            ? "bg-white text-navy-900 font-semibold shadow-2xs cursor-pointer"
                             : "border-warm-border bg-white text-gray-600 hover:border-gray-300 cursor-pointer"
                         }`}
+                        style={isSelected ? { borderColor: area.color, boxShadow: `inset 4px 0 0 ${area.color}` } : undefined}
                       >
                         <div className="flex items-start justify-between w-full">
                           <div className="flex items-center space-x-3">
-                            <area.icon className="h-5 w-5 text-accent shrink-0" />
+                            <area.icon className="h-5 w-5 shrink-0" style={{ color: area.color }} />
                             <div>
                               <h4 className="font-bold text-xs">{area.label}</h4>
                               <p className="text-[11px] text-gray-500">{area.desc}</p>
@@ -636,13 +658,21 @@ export default function JourneySetupPage() {
                   </div>
                 ))}
 
-                <div className="flex space-x-2 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_auto] gap-2 pt-2">
                   <Input
                     value={newActionTitle}
                     onChange={(e) => setNewActionTitle(e.target.value)}
                     placeholder="Tambah kebiasaan baru..."
                     className="text-xs"
                   />
+                  <select
+                    value={selectedAreas.includes(newActionArea) ? newActionArea : selectedAreas[0] || "Spiritual Growth"}
+                    onChange={(event) => setNewActionArea(event.target.value)}
+                    className="h-10 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-navy-900"
+                    aria-label="Area transformasi Action Plan"
+                  >
+                    {selectedAreas.map(area => <option key={area} value={area}>{area}</option>)}
+                  </select>
                   <Button onClick={addActionPlan} variant="outline" size="sm" className="text-xs font-bold shrink-0 gap-1">
                     <Plus className="h-3.5 w-3.5" /> Tambah
                   </Button>

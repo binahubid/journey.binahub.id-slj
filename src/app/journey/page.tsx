@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { TRANSFORMATION_AREAS } from "@/lib/transformation-areas";
 import {
   CheckCircle2,
   Lock,
@@ -51,11 +52,11 @@ const SECTIONS = [
 
 // ─── Area List ───────────────────────────────────────────────────
 const AREA_LIST = [
-  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah ﷻ", sel: "border-amber-600 bg-amber-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-amber-300" },
-  { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", sel: "border-blue-600 bg-blue-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-blue-300" },
-  { id: "Leadership Excellence", icon: Award, label: "Leadership/Profesional Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", sel: "border-[#071A33] bg-[#071A33] text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-slate-400" },
-  { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", sel: "border-rose-600 bg-rose-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-rose-300" },
-  { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "dampak terhadap lingkungan sekitar", sel: "border-emerald-600 bg-emerald-600 text-white shadow-sm", base: "border-slate-200 bg-white text-slate-700 hover:border-emerald-300" },
+  { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah ﷻ", color: TRANSFORMATION_AREAS["Spiritual Growth"].color },
+  { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", color: TRANSFORMATION_AREAS["Personal Development"].color },
+  { id: "Leadership Excellence", icon: Award, label: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", color: TRANSFORMATION_AREAS["Leadership Excellence"].color },
+  { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", color: TRANSFORMATION_AREAS.Relationship.color },
+  { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "dampak terhadap lingkungan sekitar", color: TRANSFORMATION_AREAS["Community Impact"].color },
 ];
 
 // ─── Habit Icon Detector ─────────────────────────────────────────
@@ -291,24 +292,24 @@ interface BatchMate {
           }
 
           // Action Plans
-          const { data: plans } = await supabase.from("action_plans").select("id, title, frequency, quantity, category").eq("journey_id", journey.id);
+          const { data: plans } = await supabase.from("action_plans").select("id, title, frequency, quantity, target, category, area_category").eq("journey_id", journey.id);
           if (plans && plans.length > 0) {
             setActionPlans(plans.map(p => ({
               id: p.id,
               title: p.title,
               frequency: p.frequency || "Harian",
-              quantity: p.quantity || 1,
-              area_category: p.category || selectedAreas[0] || "Spiritual Growth",
+              quantity: p.quantity || p.target || 1,
+              area_category: p.area_category || p.category || journey.area_transformasi?.[0] || "Spiritual Growth",
             })));
           } else {
-            const { data: uh } = await supabase.from("habits").select("id, title, frequency, quantity, category").eq("user_id", user.id).eq("is_archived", false);
+            const { data: uh } = await supabase.from("habits").select("*").eq("user_id", user.id);
             if (uh && uh.length > 0) {
               setActionPlans(uh.map(h => ({
                 id: h.id,
                 title: h.title,
                 frequency: h.frequency || "Harian",
-                quantity: h.quantity || 1,
-                area_category: h.category || selectedAreas[0] || "Spiritual Growth",
+                quantity: h.quantity || h.target || 1,
+                area_category: h.area_category || h.category || journey.area_transformasi?.[0] || "Spiritual Growth",
               })));
             }
           }
@@ -357,8 +358,6 @@ interface BatchMate {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const todayStr = new Date().toISOString().split("T")[0];
-
       switch (sectionNum) {
         case 1:
           await supabase.from("journeys").update({ muhasabah: muhasabahRef.current, updated_at: new Date().toISOString() }).eq("id", _journeyId);
@@ -382,54 +381,60 @@ interface BatchMate {
         case 4: {
           const _plans = actionPlansRef.current;
           // Fetch existing action_plans for this journey
-          const { data: existingPlans } = await supabase.from("action_plans").select("id, title").eq("journey_id", _journeyId);
+          const { data: existingPlans, error: existingPlansError } = await supabase.from("action_plans").select("id, title").eq("journey_id", _journeyId);
+          if (existingPlansError) throw existingPlansError;
           const existingTitles = new Set((existingPlans || []).map((p) => p.title));
           const currentTitles = new Set(_plans.map((p) => p.title));
 
           // Delete only plans that were removed by user
           const toDelete = (existingPlans || []).filter((p) => !currentTitles.has(p.title));
           if (toDelete.length > 0) {
-            await supabase.from("action_plans").delete().in("id", toDelete.map((p) => p.id));
+            const { error } = await supabase.from("action_plans").delete().in("id", toDelete.map((p) => p.id));
+            if (error) throw error;
           }
 
           // Insert or update remaining plans
           for (const ap of _plans) {
-            const match = (existingPlans || []).find((p) => p.title === ap.title);
+            const match = (existingPlans || []).find((p) => p.id === ap.id) ||
+              (existingPlans || []).find((p) => p.title === ap.title);
             let apId = match?.id;
 
             if (match) {
-              await supabase.from("action_plans").update({
+              const { error } = await supabase.from("action_plans").update({
                 category: ap.area_category || "Spiritual Growth",
+                area_category: ap.area_category || "Spiritual Growth",
                 frequency: ap.frequency,
                 quantity: ap.quantity || 1,
+                target: ap.quantity || 1,
               }).eq("id", match.id);
+              if (error) throw error;
             } else {
-              const { data: inserted } = await supabase.from("action_plans").insert({
+              const { data: inserted, error } = await supabase.from("action_plans").insert({
                 journey_id: _journeyId,
                 user_id: user.id,
                 title: ap.title,
                 category: ap.area_category || "Spiritual Growth",
+                area_category: ap.area_category || "Spiritual Growth",
                 frequency: ap.frequency,
                 quantity: ap.quantity || 1,
+                target: ap.quantity || 1,
               }).select().maybeSingle();
+              if (error) throw error;
               apId = inserted?.id;
             }
 
-            // Sync with habits table
-            const { data: existingHabit } = await supabase.from("habits").select("id").eq("user_id", user.id).eq("title", ap.title).eq("is_archived", false).maybeSingle();
-            if (!existingHabit) {
-              await supabase.from("habits").insert({
-                user_id: user.id,
-                action_plan_id: apId || null,
-                title: ap.title,
-                category: ap.area_category || "Spiritual Growth",
-                frequency: ap.frequency,
-                quantity: ap.quantity || 1,
-                source: "action_plan",
-                effective_from: todayStr,
-                is_archived: false,
-              });
-            }
+            if (!apId) throw new Error(`Action plan ${ap.title} tidak memiliki ID.`);
+            const { error: habitError } = await supabase.from("habits").upsert({
+              user_id: user.id,
+              action_plan_id: apId,
+              title: ap.title,
+              category: ap.area_category || "Spiritual Growth",
+              area_category: ap.area_category || "Spiritual Growth",
+              frequency: ap.frequency,
+              quantity: ap.quantity || 1,
+              target: ap.quantity || 1,
+            }, { onConflict: "action_plan_id" });
+            if (habitError) throw habitError;
           }
           break;
         }
@@ -491,6 +496,42 @@ interface BatchMate {
     const next = actionPlans.filter((_, i) => i !== idx);
     setActionPlans(next);
     scheduleAutosave(4);
+  };
+
+  const updateActionPlanArea = async (idx: number, area: string) => {
+    if (ptpStatus === "LOCKED" || !selectedAreas.includes(area)) return;
+    const plan = actionPlans[idx];
+    const next = actionPlans.map((plan, planIndex) =>
+      planIndex === idx ? { ...plan, area_category: area } : plan
+    );
+    setActionPlans(next);
+    actionPlansRef.current = next;
+
+    if (!plan?.id) {
+      scheduleAutosave(4);
+      return;
+    }
+
+    setSaveStatus("saving");
+    try {
+      const { error: planError } = await supabase.from("action_plans").update({
+        category: area,
+        area_category: area,
+      }).eq("id", plan.id);
+      if (planError) throw planError;
+
+      const { error: habitError } = await supabase.from("habits").update({
+        category: area,
+        area_category: area,
+      }).eq("action_plan_id", plan.id);
+      if (habitError) throw habitError;
+
+      setSaveStatus("saved");
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error("Gagal memperbarui area Action Plan:", error);
+      setSaveStatus("idle");
+    }
   };
 
   const goToNext = () => {
@@ -564,27 +605,29 @@ interface BatchMate {
       case 2:
         return (
           <div className="space-y-4">
-            {/* Collapsible Reflection Guide Niat */}
-            <button
-              type="button"
-              onClick={() => setHadithOpen(v => !v)}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-left hover:bg-amber-100/60 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-amber-500 text-sm">✦</span>
-                <span className="text-sm font-bold text-amber-800">Reflection Guide Niat</span>
-              </div>
-              <ChevronRight className={`h-4 w-4 text-amber-500 transition-transform duration-200 ${hadithOpen ? "rotate-90" : ""}`} />
-            </button>
-            {hadithOpen && (
-              <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-3 -mt-2">
-                <ul className="text-sm text-amber-900 space-y-2">
-                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">1.</span> Apakah niat utama Anda menunaikan Umrah murni karena Allah SWT dan kerinduan untuk bertransformasi?</li>
-                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">2.</span> Perubahan bermakna apa yang ingin Anda bawa pulang agar memberi dampak positif bagi diri dan lingkungan?</li>
-                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">3.</span> Komitmen konkret apa yang siap Anda jalankan secara istiqamah selama 90 hari ke depan?</li>
-                </ul>
-              </div>
-            )}
+            {/* Collapsible Reflection Guide */}
+            <div className="bg-[#071A33] border border-amber-400/40 rounded-2xl overflow-hidden shadow-xs">
+              <button
+                type="button"
+                onClick={() => setHadithOpen(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 text-sm font-black">✦</span>
+                  <span className="text-sm font-extrabold text-white">Reflection Guide</span>
+                </div>
+                <ChevronRight className={`h-4 w-4 text-amber-400 transition-transform duration-200 ${hadithOpen ? "rotate-90" : ""}`} />
+              </button>
+              {hadithOpen && (
+                <div className="px-4 pb-4 pt-1 border-t border-slate-700/60 bg-[#071A33]">
+                  <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Apakah niat utama Anda menunaikan Umrah murni karena Allah SWT dan kerinduan untuk bertransformasi?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Perubahan bermakna apa yang ingin Anda bawa pulang agar memberi dampak positif bagi diri dan lingkungan?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Komitmen konkret apa yang siap Anda jalankan secara istiqamah selama 90 hari ke depan?</li>
+                  </ul>
+                </div>
+              )}
+            </div>
             <div>
               <p className="text-xs text-slate-500 mb-2 font-medium">Tulis niat perubahan Anda dengan jelas.</p>
               <Textarea disabled={locked} value={niat} onChange={e => { setNiat(e.target.value); scheduleAutosave(2); }} placeholder="Tulis niat Anda di sini..." className="min-h-[140px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={1000} />
@@ -684,9 +727,9 @@ interface BatchMate {
                       } ${!isSelected && selectedAreas.length >= 3 ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                        isSelected ? `${area.sel.includes("amber") ? "bg-amber-600" : area.sel.includes("blue") ? "bg-blue-600" : area.sel.includes("navy") || area.sel.includes("071A33") ? "bg-[#071A33]" : area.sel.includes("rose") ? "bg-rose-600" : "bg-emerald-600"} text-white` :
-                        "bg-slate-100 text-slate-500"
-                      }`}>
+                         isSelected ? "text-white" :
+                         "bg-slate-100 text-slate-500"
+                       }`} style={isSelected ? { backgroundColor: area.color } : undefined}>
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -937,12 +980,12 @@ interface BatchMate {
 
         return (
           <div className="space-y-5">
-            <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-4">
-              <h3 className="text-sm font-black text-navy-900 flex items-center gap-2">
-                <Zap className="h-4 w-4 text-amber-500 fill-amber-400" />
+            <div className="bg-[#071A33] border border-amber-400/40 rounded-2xl p-4 sm:p-5 shadow-xs space-y-1.5">
+              <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-400 fill-amber-400" />
                 Action Plan & Habit Engine
               </h3>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
                 Tetapkan kebiasaan rutin yang akan Anda jalankan. Kebiasaan ini akan dipantau secara berkala dalam sistem Monitoring 90 Hari.
               </p>
             </div>
@@ -1144,15 +1187,20 @@ interface BatchMate {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-bold text-navy-900 leading-tight">{ap.title}</p>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                          areaCategory.includes("Spiritual") ? "bg-amber-50 text-amber-800 border-amber-200/80" :
-                          areaCategory.includes("Personal") ? "bg-blue-50 text-blue-800 border-blue-200/80" :
-                          areaCategory.includes("Leadership") ? "bg-navy-50 text-navy-900 border-navy-200/80" :
-                          areaCategory.includes("Relationship") ? "bg-rose-50 text-rose-800 border-rose-200/80" :
-                          "bg-emerald-50 text-emerald-800 border-emerald-200/80"
-                        }`}>
-                          {areaCategory}
-                        </span>
+                        {locked ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border bg-slate-50 text-slate-700 border-slate-200">
+                            {areaCategory}
+                          </span>
+                        ) : (
+                          <select
+                            value={areaCategory}
+                            onChange={(event) => updateActionPlanArea(idx, event.target.value)}
+                            className="max-w-[190px] rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-700 focus:border-amber-400 focus:outline-none"
+                            aria-label={`Area transformasi untuk ${ap.title}`}
+                          >
+                            {selectedAreas.map(area => <option key={area} value={area}>{area}</option>)}
+                          </select>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 mt-1 font-medium">
                         Target: <span className="font-extrabold text-navy-900">{ap.quantity || 1}x</span> {ap.frequency?.toLowerCase() === "pekanan" ? "per minggu (Pekanan)" : "per hari (Harian)"}

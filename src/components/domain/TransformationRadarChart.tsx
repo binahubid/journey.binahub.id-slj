@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { getTransformationAreaColor } from "@/lib/transformation-areas";
 
 interface AreaScore {
   area: string;
@@ -19,8 +20,8 @@ const DEFAULT_AREAS: AreaScore[] = [
   { area: "Spiritual Growth", before: 62, after: 94 },
   { area: "Personal Development", before: 58, after: 88 },
   { area: "Leadership Excellence", before: 55, after: 91 },
-  { area: "Relationship & Community", before: 60, after: 86 },
-  { area: "Professional Impact", before: 64, after: 92 },
+  { area: "Relationship", before: 60, after: 86 },
+  { area: "Community Impact", before: 64, after: 92 },
 ];
 
 export function TransformationRadarChart({
@@ -141,8 +142,8 @@ export function TransformationRadarChart({
                   cx={x}
                   cy={y}
                   r="5"
-                  fill="#0F1E3D"
-                  stroke="#D97706"
+                  fill={getTransformationAreaColor(d.area)}
+                  stroke="#FFFFFF"
                   strokeWidth="2"
                 />
                 <text
@@ -175,7 +176,7 @@ export function TransformationRadarChart({
                 textAnchor={textAnchor}
                 fontSize="11"
                 fontWeight="700"
-                fill="#0F1E3D"
+                fill={getTransformationAreaColor(d.area)}
                 className="select-none font-sans"
               >
                 {d.area}

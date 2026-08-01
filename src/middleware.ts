@@ -100,7 +100,7 @@ export async function middleware(request: NextRequest) {
     if (role === "participant") {
       const { data: journey } = await supabase
         .from("journeys")
-        .select("status")
+        .select("status, area_transformasi")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -113,6 +113,25 @@ export async function middleware(request: NextRequest) {
           journey.status !== "ONBOARDING"
       );
 
+      let baselineCompleted = false;
+      let initialProcessCompleted = false;
+      let ptpCompleted = false;
+
+      if (isCompletedOnboarding) {
+        const [{ data: baseline }, { data: initialProcess }, { data: actionPlans }] = await Promise.all([
+          supabase.from("baseline_assessments").select("completed").eq("user_id", user.id).maybeSingle(),
+          supabase.from("sahabat_safar_profiles").select("is_completed").eq("user_id", user.id).maybeSingle(),
+          supabase.from("action_plans").select("id").eq("user_id", user.id).limit(1),
+        ]);
+        baselineCompleted = baseline?.completed === true;
+        initialProcessCompleted = initialProcess?.is_completed === true;
+        ptpCompleted = Boolean(
+          Array.isArray(journey?.area_transformasi) &&
+          journey.area_transformasi.length === 3 &&
+          actionPlans && actionPlans.length > 0
+        );
+      }
+
       // A) Incomplete onboarding -> Block dashboard, journey, journal, monitoring, etc. -> Redirect to /onboarding
       if (!isCompletedOnboarding && path !== "/onboarding") {
         const url = request.nextUrl.clone();
@@ -124,6 +143,31 @@ export async function middleware(request: NextRequest) {
       if (isCompletedOnboarding && path === "/onboarding") {
         const url = request.nextUrl.clone();
         url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
+
+      if (isCompletedOnboarding && !baselineCompleted && path !== "/baseline") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/baseline";
+        return NextResponse.redirect(url);
+      }
+
+      if (isCompletedOnboarding && baselineCompleted && !initialProcessCompleted && path !== "/initial-process") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/initial-process";
+        return NextResponse.redirect(url);
+      }
+
+      const ptpRequiredRoutes = ["/dashboard", "/monitoring"];
+      if (
+        isCompletedOnboarding &&
+        baselineCompleted &&
+        initialProcessCompleted &&
+        !ptpCompleted &&
+        ptpRequiredRoutes.some((route) => path.startsWith(route))
+      ) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/journey";
         return NextResponse.redirect(url);
       }
     }

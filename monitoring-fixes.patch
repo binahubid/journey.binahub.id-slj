@@ -1,0 +1,329 @@
+diff --git a/src/app/monitoring/page.tsx b/src/app/monitoring/page.tsx
+index 79e4f23..491f855 100644
+--- a/src/app/monitoring/page.tsx
++++ b/src/app/monitoring/page.tsx
+@@ -29,6 +29,8 @@ import {
+   BookOpen,
+   BarChart2,
+   Users,
++  Lock,
++  Hourglass,
+ } from "lucide-react";
+ import { createClient } from "@/lib/supabase/client";
+ import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+@@ -87,6 +89,19 @@ function calcBiayaScore(biayaTarget: string, biayaActual: string): number {
+   return Math.min(100, Math.round((a / t) * 100));
+ }
+ 
++// ── Month Edit Window Helper ────────────────────────────────────────────────
++// Bulan ke-N aktif diisi mulai hari ke-((N-1)*30+1), tetap bisa diedit sampai
++// 7 hari masuk ke bulan berikutnya (masa tenggang), lalu terkunci permanen.
++type MonthEditState = "LOCKED_FUTURE" | "ACTIVE" | "LOCKED_PAST";
++
++function getMonthEditState(month: 1 | 2 | 3, dayCount: number): MonthEditState {
++  const startDay = (month - 1) * 30 + 1;
++  const graceEndDay = month * 30 + 7;
++  if (dayCount < startDay) return "LOCKED_FUTURE";
++  if (dayCount > graceEndDay) return "LOCKED_PAST";
++  return "ACTIVE";
++}
++
+ function calcAreaScore(rep: AreaReport): number {
+   if (!rep.isSaved) {
+     return rep.baselineScore !== undefined ? rep.baselineScore : 0;
+@@ -291,10 +306,24 @@ export default function MonitoringPage() {
+       });
+       setAreaReports(newReports);
+ 
+-      // Fetch Action Plans
++      // Fetch Action Plans (untuk area_category) + Habits (untuk cocok dengan habit_logs.habit_id)
++      // PENTING: habit_logs.habit_id mengacu ke habits.id, BUKAN action_plans.id — keduanya tabel
++      // berbeda. Sebelumnya kode ini salah mencocokkan habit_id langsung ke action_plans.id
++      // sehingga log check-in harian tidak pernah ketemu (chart selalu flat/kosong).
+       const { data: actionPlans } = await supabase.from("action_plans")
+         .select("id, area_category, quantity").eq("user_id", user.id);
+ 
++      const { data: habitsList } = await supabase.from("habits")
++        .select("id, action_plan_id, target").eq("user_id", user.id).eq("is_archived", false);
++
++      const apAreaMap: Record<string, string> = {};
++      (actionPlans || []).forEach((ap: any) => { apAreaMap[ap.id] = ap.area_category || "Spiritual Growth"; });
++
++      // habit yang terhubung ke action_plan area tertentu (habit tanpa action_plan_id, mis. sholat/quran bawaan, dilewati)
++      const habitsWithArea = (habitsList || [])
++        .filter((h: any) => h.action_plan_id && apAreaMap[h.action_plan_id])
++        .map((h: any) => ({ id: h.id, area: apAreaMap[h.action_plan_id], qty: h.target || 1 }));
++
+       // Build Dynamic Chart based on timeframe (1d, 7d, 1m, 3m)
+       const numDays = timeframe === "1d" ? 1 : timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
+       const today = new Date();
+@@ -309,7 +338,7 @@ export default function MonitoringPage() {
+         .select("habit_id, date, completed, completed_count")
+         .eq("user_id", user.id).in("date", datesArr);
+ 
+-      if (actionPlans && actionPlans.length > 0) {
++      if (habitsWithArea.length > 0) {
+         const sampledDates = numDays > 30 
+           ? datesArr.filter((_, idx) => idx % 3 === 0 || idx === datesArr.length - 1)
+           : numDays > 7 
+@@ -327,16 +356,15 @@ export default function MonitoringPage() {
+           const logsForDay = (habitLogs || []).filter((l: any) => l.date === dateStr);
+           const scores: Record<string, number> = {};
+           areas.forEach(area => {
+-            const areaAPs = (actionPlans as any[]).filter(ap => (ap.area_category || "Spiritual Growth") === area);
+-            if (areaAPs.length === 0) { scores[area] = 0; return; }
++            const areaHabits = habitsWithArea.filter(h => h.area === area);
++            if (areaHabits.length === 0) { scores[area] = 0; return; }
+             let total = 0;
+-            areaAPs.forEach(ap => {
+-              const log = logsForDay.find((l: any) => l.habit_id === ap.id);
+-              const qty = ap.quantity || 1;
+-              const cnt = log ? (log.completed_count || (log.completed ? qty : 0)) : 0;
+-              total += Math.min(1, cnt / qty);
++            areaHabits.forEach(h => {
++              const log = logsForDay.find((l: any) => l.habit_id === h.id);
++              const cnt = log ? (log.completed_count || (log.completed ? h.qty : 0)) : 0;
++              total += Math.min(1, cnt / h.qty);
+             });
+-            scores[area] = Math.round((total / areaAPs.length) * 100);
++            scores[area] = Math.round((total / areaHabits.length) * 100);
+           });
+           return { day: label, scores };
+         });
+@@ -354,12 +382,12 @@ export default function MonitoringPage() {
+         .select("date, completed")
+         .eq("user_id", user.id).in("date", dates90);
+ 
+-      const totalAPCount = (actionPlans || []).length || 1;
++      const totalHabitCount = (habitsList || []).length || 1;
+       let totalCompletedDays = 0;
+ 
+       const heatmap = dates90.map(dateStr => {
+         const dayLogs = (logs90 || []).filter((l: any) => l.date === dateStr && l.completed);
+-        const pct = Math.round((dayLogs.length / totalAPCount) * 100);
++        const pct = Math.round((dayLogs.length / totalHabitCount) * 100);
+         if (pct >= 50) totalCompletedDays++;
+         let level = 0;
+         if (pct > 0 && pct < 40) level = 1;
+@@ -420,6 +448,7 @@ export default function MonitoringPage() {
+   };
+ 
+   const handleSaveIndReport = async (area: string) => {
++    if (getMonthEditState(selectedMonth, dayCount) !== "ACTIVE") return;
+     const { data: { user } } = await supabase.auth.getUser();
+     if (!user || !journeyId) return;
+     const rep = areaReports[selectedMonth]?.[area];
+@@ -497,6 +526,11 @@ export default function MonitoringPage() {
+   // Guilt-Free UX Helper for New Participants (< 7 days or no entries)
+   const isEarlyStage = dayCount <= 7;
+ 
++  // Status kunci/aktif untuk input capaian bulan yang sedang dipilih
++  const monthEditState = getMonthEditState(selectedMonth, dayCount);
++  const monthStartDay = (selectedMonth - 1) * 30 + 1;
++  const monthGraceEndDay = selectedMonth * 30 + 7;
++
+   if (loading) {
+     return (
+       <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
+@@ -542,9 +576,11 @@ export default function MonitoringPage() {
+                   {/* Progress Bar */}
+                   <div className="pt-2 space-y-1.5">
+                     <div className="flex items-center justify-between text-xs">
+-                      <span className="text-slate-300 font-medium">Journey Health Score</span>
++                      <span className="text-slate-300 font-medium">
++                        Journey Health Score {isEarlyStage && "(Skor Awal dari Baseline)"}
++                      </span>
+                       <span className="font-extrabold text-amber-300">
+-                        {isEarlyStage && healthData.overall === 0 ? "Awal Perjalanan" : `${healthData.overall}%`}
++                        {healthData.overall}%
+                       </span>
+                     </div>
+                     <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
+@@ -601,13 +637,13 @@ export default function MonitoringPage() {
+                       </div>
+                       <div className="flex items-baseline justify-between">
+                         <span className="text-2xl font-black" style={{ color }}>
+-                          {!hasFilledData && isEarlyStage ? "--" : `${score}%`}
++                          {score}%
+                         </span>
+ 
+-                        {/* Guilt-Free UX Badge: Neutral status if early stage or unsubmitted */}
+-                        {!hasFilledData && isEarlyStage ? (
++                        {/* Badge: bedakan skor awal (dari baseline, belum ada laporan bulan ini) vs capaian nyata */}
++                        {!hasFilledData ? (
+                           <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+-                            Belum ada data
++                            Skor Awal (Baseline)
+                           </span>
+                         ) : score >= 80 ? (
+                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+@@ -832,34 +868,66 @@ export default function MonitoringPage() {
+                             </p>
+                           )}
+ 
+-                          {/* 4 Dimensi Non-Contradictory Real Metrics */}
+-                          <div className="space-y-1.5 pt-1 text-xs">
+-                            <div className="flex items-center justify-between text-[11px]">
+-                              <span className="text-slate-500">Rating Target PTP</span>
+-                              <span className="font-bold text-amber-700">{rep?.targets?.kualitas || "4★ Khusyu"}</span>
+-                            </div>
+-                            <div className="flex items-center justify-between text-[11px]">
+-                              <span className="text-slate-500">Realisasi Kuantitas</span>
+-                              <span className="font-bold text-navy-900">{rep?.kuantitasActual || "Belum Diisi"}</span>
+-                            </div>
+-                            <div className="flex items-center justify-between text-[11px]">
+-                              <span className="text-slate-500">Waktu Tepat Hari</span>
+-                              <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/30 hari` : "Belum Diisi"}</span>
++                          {/* 4 Dimensi — hanya tampil jika targetnya memang diisi user di PTP */}
++                          {(rep?.targets?.kualitas || rep?.targets?.kuantitas || rep?.targets?.waktu || rep?.targets?.biaya) ? (
++                            <div className="space-y-1.5 pt-1 text-xs">
++                              {rep?.targets?.kualitas && (
++                                <div className="flex items-center justify-between text-[11px]">
++                                  <span className="text-slate-500">Rating Target PTP</span>
++                                  <span className="font-bold text-amber-700">{rep.targets.kualitas}</span>
++                                </div>
++                              )}
++                              {rep?.targets?.kuantitas && (
++                                <div className="flex items-center justify-between text-[11px]">
++                                  <span className="text-slate-500">Realisasi Kuantitas</span>
++                                  <span className="font-bold text-navy-900">{rep?.kuantitasActual || "Belum Diisi"}</span>
++                                </div>
++                              )}
++                              {rep?.targets?.waktu && (
++                                <div className="flex items-center justify-between text-[11px]">
++                                  <span className="text-slate-500">Waktu Tepat Hari</span>
++                                  <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/30 hari` : "Belum Diisi"}</span>
++                                </div>
++                              )}
++                              {rep?.targets?.biaya && (
++                                <div className="flex items-center justify-between text-[11px]">
++                                  <span className="text-slate-500">Biaya / Anggaran</span>
++                                  <span className="font-bold text-emerald-700">{rep?.biayaActual ? `Rp ${rep.biayaActual}` : "Belum Diisi"}</span>
++                                </div>
++                              )}
+                             </div>
+-                            <div className="flex items-center justify-between text-[11px]">
+-                              <span className="text-slate-500">Biaya / Anggaran</span>
+-                              <span className="font-bold text-emerald-700">{rep?.biayaActual ? `Rp ${rep.biayaActual}` : "Belum Diisi"}</span>
+-                            </div>
+-                          </div>
++                          ) : (
++                            <p className="text-[11px] text-slate-400 italic pt-1">
++                              Belum ada indikator Kualitas/Kuantitas/Waktu/Biaya yang diisi untuk area ini di PTP.
++                            </p>
++                          )}
+                         </div>
+ 
+-                        <Button
+-                          onClick={() => setEditingAreaModal(area)}
+-                          className="w-full bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 flex items-center justify-center gap-2 mt-2"
+-                        >
+-                          <Edit3 className="h-3.5 w-3.5" />
+-                          Input Capaian Bulanan
+-                        </Button>
++                        {monthEditState === "ACTIVE" ? (
++                          <Button
++                            onClick={() => setEditingAreaModal(area)}
++                            className="w-full bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 flex items-center justify-center gap-2 mt-2"
++                          >
++                            <Edit3 className="h-3.5 w-3.5" />
++                            Input Capaian Bulanan
++                          </Button>
++                        ) : (
++                          <Button
++                            disabled
++                            title={
++                              monthEditState === "LOCKED_FUTURE"
++                                ? `Aktif mulai Hari ke-${monthStartDay}`
++                                : `Terkunci sejak Hari ke-${monthGraceEndDay + 1} (lewat masa tenggang 7 hari)`
++                            }
++                            className="w-full bg-slate-100 text-slate-400 text-xs font-bold rounded-xl h-9 flex items-center justify-center gap-2 mt-2 cursor-not-allowed hover:bg-slate-100"
++                          >
++                            {monthEditState === "LOCKED_FUTURE" ? (
++                              <><Hourglass className="h-3.5 w-3.5" /> Aktif di Hari ke-{monthStartDay}</>
++                            ) : (
++                              <><Lock className="h-3.5 w-3.5" /> Terkunci</>
++                            )}
++                          </Button>
++                        )}
+                       </div>
+                     );
+                   })}
+@@ -1120,11 +1188,22 @@ export default function MonitoringPage() {
+         {/* ─── MODAL DRAWER: INPUT 4 DIMENSI INDIKATOR ─────────────────────── */}
+         {editingAreaModal && (
+           <Dialog open={!!editingAreaModal} onOpenChange={() => setEditingAreaModal(null)}>
+-            <DialogContent className="sm:max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-6">
++            {/* Mobile: bottom-sheet menempel di bawah layar, tinggi maks 90vh + scroll.
++                Desktop (sm ke atas): kembali ke dialog di tengah seperti semula. */}
++            <DialogContent
++              className="left-0 right-0 bottom-0 top-auto translate-x-0 translate-y-0 w-full max-w-full
++                         rounded-t-3xl rounded-b-none max-h-[90vh] overflow-y-auto
++                         sm:left-1/2 sm:right-auto sm:bottom-auto sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2
++                         sm:max-w-xl sm:rounded-2xl sm:max-h-[85vh]
++                         bg-white border border-slate-200 shadow-2xl p-5 sm:p-6"
++            >
++              {/* Drag handle indicator khusus mobile */}
++              <div className="sm:hidden mx-auto mb-2 h-1.5 w-10 rounded-full bg-slate-200" />
++
+               <DialogHeader className="border-b border-slate-100 pb-3">
+                 <DialogTitle className="text-base font-black text-navy-900 flex items-center gap-2">
+-                  <Target className="h-5 w-5 text-amber-600" />
+-                  Pelaporan Indikator: {editingAreaModal}
++                  <Target className="h-5 w-5 text-amber-600 shrink-0" />
++                  <span className="truncate">Pelaporan Indikator: {editingAreaModal}</span>
+                 </DialogTitle>
+                 <DialogDescription className="text-xs text-slate-500">
+                   Input realisasi bulan ke-{selectedMonth}. Skor keberhasilan dihitung otomatis.
+@@ -1136,6 +1215,33 @@ export default function MonitoringPage() {
+                 if (!rep) return null;
+                 const overallPct = calcAreaScore(rep);
+ 
++                if (monthEditState !== "ACTIVE") {
++                  return (
++                    <div className="py-6 space-y-3 text-center">
++                      {monthEditState === "LOCKED_FUTURE" ? (
++                        <>
++                          <Hourglass className="h-8 w-8 text-slate-300 mx-auto" />
++                          <p className="text-sm text-slate-600">
++                            Input untuk Bulan Ke-{selectedMonth} baru aktif mulai <b>Hari ke-{monthStartDay}</b>.
++                          </p>
++                        </>
++                      ) : (
++                        <>
++                          <Lock className="h-8 w-8 text-slate-300 mx-auto" />
++                          <p className="text-sm text-slate-600">
++                            Masa input Bulan Ke-{selectedMonth} sudah berakhir (masa tenggang 7 hari terlewati sejak Hari ke-{monthGraceEndDay}). Data tidak bisa diedit lagi.
++                          </p>
++                        </>
++                      )}
++                      <DialogFooter className="pt-2 justify-center">
++                        <Button variant="outline" onClick={() => setEditingAreaModal(null)} className="text-xs font-semibold rounded-xl h-9">
++                          Tutup
++                        </Button>
++                      </DialogFooter>
++                    </div>
++                  );
++                }
++
+                 return (
+                   <div className="space-y-4 py-2">
+                     {/* User PTP Target Context Banner */}
+@@ -1210,14 +1316,14 @@ export default function MonitoringPage() {
+                       </div>
+                     </div>
+ 
+-                    <DialogFooter className="border-t border-slate-100 pt-3">
+-                      <Button variant="outline" onClick={() => setEditingAreaModal(null)} className="text-xs font-semibold rounded-xl h-9">
++                    <DialogFooter className="border-t border-slate-100 pt-3 sticky bottom-0 bg-white">
++                      <Button variant="outline" onClick={() => setEditingAreaModal(null)} className="w-full sm:w-auto text-xs font-semibold rounded-xl h-11 sm:h-9">
+                         Batal
+                       </Button>
+                       <Button
+                         onClick={() => handleSaveIndReport(editingAreaModal)}
+                         disabled={savingArea === editingAreaModal}
+-                        className="bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 px-5"
++                        className="w-full sm:w-auto bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-11 sm:h-9 px-5"
+                       >
+                         {savingArea === editingAreaModal ? "Menyimpan..." : "Simpan Capaian Bulanan"}
+                       </Button>
