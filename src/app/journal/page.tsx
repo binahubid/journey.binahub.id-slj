@@ -86,6 +86,7 @@ interface JournalPost {
   dayNumber: number;
   dateStr: string;
   timeStr: string;
+  location: string;
   userFullName: string;
   userAvatar: string;
   content: string;
@@ -101,6 +102,7 @@ export default function RefactoredJournalPage() {
 
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("Faisal");
+  const [userLocation, setUserLocation] = useState("Jakarta");
   const [dayCount, setDayCount] = useState(24);
   const [dateFormatted, setDateFormatted] = useState("Rabu, 29 Juli 2026");
   const [dailyPrompt, setDailyPrompt] = useState("");
@@ -150,6 +152,7 @@ export default function RefactoredJournalPage() {
 
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Instagram-style Posts for Right Column
   const [posts, setPosts] = useState<JournalPost[]>([]);
@@ -172,6 +175,9 @@ export default function RefactoredJournalPage() {
       if (profile) {
         fName = profile.full_name || "Faisal";
         setUserName(fName.split(" ")[0]);
+        if (profile.location) {
+          setUserLocation(profile.location);
+        }
         if (profile.start_date) {
           const startD = new Date(profile.start_date);
           const diff = Math.floor((Date.now() - startD.getTime()) / 86400000);
@@ -223,6 +229,7 @@ export default function RefactoredJournalPage() {
               dayNumber: Math.max(1, currentDay - idx),
               dateStr,
               timeStr,
+              location: j.location || profile?.location || "Jakarta",
               userFullName: fName,
               userAvatar: fName.charAt(0).toUpperCase(),
               content: mainTxt,
@@ -235,51 +242,9 @@ export default function RefactoredJournalPage() {
           })
         );
       } else {
-        // Fallback demo posts if DB empty
-        setPosts([
-          {
-            id: "demo-23",
-            dayNumber: 23,
-            dateStr: "28 Juli 2026",
-            timeStr: "20.15 WIB",
-            userFullName: fName,
-            userAvatar: fName.charAt(0).toUpperCase(),
-            content: "Hari ini saya merasa sangat bersyukur bisa menunaikan sholat Subuh berjamaah... Rasanya hati lebih tenang dan fokus menjalani aktivitas.",
-            pelajaran: "Konsistensi waktu Subuh membawa keberkahan seluruh aktivitas harian.",
-            perbaikanBesok: "Tidur lebih awal sebelum jam 22.00 malam.",
-            mood: "Bersyukur",
-            isLiked: true,
-            likeCount: 4,
-          },
-          {
-            id: "demo-22",
-            dayNumber: 22,
-            dateStr: "27 Juli 2026",
-            timeStr: "21.00 WIB",
-            userFullName: fName,
-            userAvatar: fName.charAt(0).toUpperCase(),
-            content: "Saya belajar untuk lebih sabar dalam menghadapi kondisi di kantor. Ternyata menahan emosi itu jauh lebih sulit dari yang saya kira.",
-            pelajaran: "Sabar bukan sekadar menahan, melainkan memilih respon yang paling diridhai Allah.",
-            perbaikanBesok: "Mengambil jeda wudhu saat emosi terasa memuncak.",
-            mood: "Tenang",
-            isLiked: false,
-            likeCount: 2,
-          },
-          {
-            id: "demo-21",
-            dayNumber: 21,
-            dateStr: "26 Juli 2026",
-            timeStr: "19.30 WIB",
-            userFullName: fName,
-            userAvatar: fName.charAt(0).toUpperCase(),
-            content: "Alhamdulillah hari ini bisa menyelesaikan target tilawah 2 halaman. Meski lelah, rasanya ada ketenangan tersendiri setelah membaca Al-Qur'an.",
-            pelajaran: "Al-Qur'an adalah penawar lelah jiwa terbaik.",
-            perbaikanBesok: "Menjaga jadwal tilawah secara konsisten pasca Maghrib.",
-            mood: "Bersemangat",
-            isLiked: true,
-            likeCount: 5,
-          },
-        ]);
+        // Empty state — tidak ada data jurnal (jangan tampilkan data palsu)
+        setPosts([]);
+        setStreakCount(0);
       }
     } catch (err) {
       console.error("Gagal memuat jurnal:", err);
@@ -297,9 +262,13 @@ export default function RefactoredJournalPage() {
     if (!mainReflection.trim()) return;
 
     setSaving(true);
+    setSaveError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setSaveError("Sesi login telah berakhir. Silakan login ulang.");
+        return;
+      }
 
       const now = new Date();
       const todayStr = now.toISOString().split("T")[0];
@@ -319,15 +288,22 @@ export default function RefactoredJournalPage() {
         content: combinedContent,
         mood: selectedMood,
         is_private: true,
-        location: "Jakarta",
+        location: userLocation,
       }).select().single();
 
-      if (!error && data) {
+      if (error) {
+        console.error("Gagal menyimpan refleksi:", error);
+        setSaveError(`Gagal menyimpan refleksi: ${error.message}`);
+        return;
+      }
+
+      if (data) {
         const newPost: JournalPost = {
           id: data.id,
           dayNumber: dayCount,
           dateStr: now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
           timeStr,
+          location: userLocation,
           userFullName: userName,
           userAvatar: userName.charAt(0).toUpperCase(),
           content: mainReflection.trim(),
@@ -347,6 +323,7 @@ export default function RefactoredJournalPage() {
       }
     } catch (err) {
       console.error("Gagal menyimpan refleksi:", err);
+      setSaveError("Terjadi kesalahan jaringan. Silakan coba lagi.");
     } finally {
       setSaving(false);
     }
@@ -582,12 +559,29 @@ export default function RefactoredJournalPage() {
 
                 </div>
 
+                {/* ERROR ALERT */}
+                {saveError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium flex items-center gap-2">
+                    <X className="h-4 w-4 text-rose-500 shrink-0" />
+                    {saveError}
+                    <button onClick={() => setSaveError(null)} className="ml-auto text-rose-400 hover:text-rose-600">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 {/* FOOTER BAR */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-4 sm:pt-5">
-                  <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5 text-slate-400" />
-                    Jurnal ini bersifat privat dan terenkripsi.
-                  </span>
+                  <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-slate-400" />
+                      Jurnal ini bersifat privat dan terenkripsi.
+                    </span>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="text-slate-500 font-semibold flex items-center gap-1">
+                      📍 {userLocation}
+                    </span>
+                  </div>
 
                   <Button
                     onClick={handleSaveReflection}
@@ -631,6 +625,17 @@ export default function RefactoredJournalPage() {
               </div>
 
               {/* Instagram Feed Grid (2-Columns on Mobile, 3-Columns on Desktop) */}
+              {posts.length === 0 ? (
+                <div className="text-center py-10 px-4 space-y-3">
+                  <div className="h-14 w-14 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                    <Edit3 className="h-6 w-6" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-500">Belum ada refleksi</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed max-w-[200px] mx-auto">
+                    Mulai tulis refleksi pertamamu hari ini di kolom sebelah kiri.
+                  </p>
+                </div>
+              ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {posts.map((post) => (
                   <button
@@ -666,6 +671,7 @@ export default function RefactoredJournalPage() {
                   </button>
                 ))}
               </div>
+              )}
 
             </div>
 
@@ -688,7 +694,7 @@ export default function RefactoredJournalPage() {
                         Refleksi Hari ke-{selectedPost.dayNumber}
                       </DialogTitle>
                       <DialogDescription className="text-[11px] text-slate-400">
-                        {selectedPost.dateStr} • {selectedPost.timeStr}
+                        {selectedPost.dateStr} • {selectedPost.timeStr} • 📍 {selectedPost.location}
                       </DialogDescription>
                     </div>
                   </div>

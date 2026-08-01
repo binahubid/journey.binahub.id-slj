@@ -276,6 +276,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'journals' AND column_name = 'title') THEN
         ALTER TABLE public.journals ADD COLUMN title TEXT;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'journals' AND column_name = 'location') THEN
+        ALTER TABLE public.journals ADD COLUMN location TEXT DEFAULT 'Jakarta';
+    END IF;
 END $$;
 
 -- 8. Support Team Table

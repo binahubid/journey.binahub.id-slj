@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- 5. JOURNEYS TABLE (PTP Document)
 CREATE TABLE IF NOT EXISTS public.journeys (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(user_id) ON DELETE CASCADE,
+  user_id UUID NOT NULL UNIQUE REFERENCES public.profiles(user_id) ON DELETE CASCADE,
   status journey_status NOT NULL DEFAULT 'DRAFT',
   ptp_status TEXT NOT NULL DEFAULT 'EDITABLE', -- 'EDITABLE' | 'LOCKED'
   locked_at TIMESTAMP WITH TIME ZONE,
@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS public.journals (
   user_id UUID NOT NULL REFERENCES public.profiles(user_id) ON DELETE CASCADE,
   date TEXT NOT NULL, -- YYYY-MM-DD
   content TEXT NOT NULL,
+  location TEXT DEFAULT 'Jakarta',
   is_private BOOLEAN NOT NULL DEFAULT TRUE,
   ai_polished_content TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
@@ -231,79 +232,16 @@ ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_team ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- DROP EXISTING POLICIES TO AVOID DUPLICATE POLICY ERRORS
-DROP POLICY IF EXISTS "Public & Auth view companies" ON public.companies;
-DROP POLICY IF EXISTS "Auth manage companies" ON public.companies;
-DROP POLICY IF EXISTS "Public & Auth view batches" ON public.batches;
-DROP POLICY IF EXISTS "Auth manage batches" ON public.batches;
-DROP POLICY IF EXISTS "Users can view profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users manage own journey" ON public.journeys;
-DROP POLICY IF EXISTS "Users manage own habits" ON public.habits;
-DROP POLICY IF EXISTS "Users manage own habit logs" ON public.habit_logs;
-DROP POLICY IF EXISTS "Users manage own action plans" ON public.action_plans;
-DROP POLICY IF EXISTS "Users manage own journals" ON public.journals;
-DROP POLICY IF EXISTS "Users manage own monthly reviews" ON public.monthly_reviews;
-DROP POLICY IF EXISTS "Public view broadcast notifications" ON public.admin_notifications;
-DROP POLICY IF EXISTS "Auth send notifications" ON public.admin_notifications;
-DROP POLICY IF EXISTS "Users manage own settings" ON public.settings;
+-- ========================================================
+-- RLS POLICIES: lihat src/db/rls.sql sebagai source of truth
+-- Jalankan rls.sql terpisah setelah schema ini.
+-- ========================================================
 
 -- GRANT TABLE PERMISSIONS TO ALL ROLES (Prevents 403 Forbidden)
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
-
--- CREATE RLS POLICIES WITH TO PUBLIC ACCESS
-DROP POLICY IF EXISTS "Public & Auth view companies" ON public.companies;
-DROP POLICY IF EXISTS "Auth manage companies" ON public.companies;
-DROP POLICY IF EXISTS "Allow all for companies" ON public.companies;
-CREATE POLICY "Allow all for companies" ON public.companies FOR ALL TO public USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public & Auth view batches" ON public.batches;
-DROP POLICY IF EXISTS "Auth manage batches" ON public.batches;
-DROP POLICY IF EXISTS "Allow all for batches" ON public.batches;
-CREATE POLICY "Allow all for batches" ON public.batches FOR ALL TO public USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users can view profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-CREATE POLICY "Users can view profile" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (true);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own journey" ON public.journeys;
-CREATE POLICY "Users manage own journey" ON public.journeys FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own habits" ON public.habits;
-CREATE POLICY "Users manage own habits" ON public.habits FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own habit logs" ON public.habit_logs;
-CREATE POLICY "Users manage own habit logs" ON public.habit_logs FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own action plans" ON public.action_plans;
-CREATE POLICY "Users manage own action plans" ON public.action_plans FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own journals" ON public.journals;
-CREATE POLICY "Users manage own journals" ON public.journals FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own monthly reviews" ON public.monthly_reviews;
-CREATE POLICY "Users manage own monthly reviews" ON public.monthly_reviews FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public view broadcast notifications" ON public.admin_notifications;
-DROP POLICY IF EXISTS "Auth send notifications" ON public.admin_notifications;
-DROP POLICY IF EXISTS "Allow all for notifications" ON public.admin_notifications;
-CREATE POLICY "Allow all for notifications" ON public.admin_notifications FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own settings" ON public.settings;
-CREATE POLICY "Users manage own settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own support_team" ON public.support_team;
-CREATE POLICY "Users manage own support_team" ON public.support_team FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users manage own notifications" ON public.notifications;
-CREATE POLICY "Users manage own notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
 
 -- TRIGGER TO AUTOMATICALLY CREATE PROFILE ON SIGNUP
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -356,9 +294,9 @@ CREATE TABLE IF NOT EXISTS public.hadith_logs (
     UNIQUE(user_id, date)
 );
 
-ALTER TABLE public.prayer_logs DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.quran_logs DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.hadith_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prayer_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quran_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hadith_logs ENABLE ROW LEVEL SECURITY;
 
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;

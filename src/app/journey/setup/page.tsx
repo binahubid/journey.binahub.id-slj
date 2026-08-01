@@ -58,6 +58,7 @@ export default function JourneySetupPage() {
   // Commitment State
   const [isCommitted, setIsCommitted] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
   const totalSteps = 8;
 
@@ -96,98 +97,147 @@ export default function JourneySetupPage() {
 
   const handleCommit = async () => {
     setCommitting(true);
+    setCommitError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const currentUserId = user?.id || userId;
 
-      if (currentUserId) {
-        // 1. Upsert Profile
-        const startDate = new Date();
-        const endDate = new Date();
-        endDate.setDate(startDate.getDate() + 90);
+      if (!currentUserId) {
+        setCommitError("Sesi login telah berakhir. Silakan login ulang.");
+        setCommitting(false);
+        return;
+      }
 
-        await supabase.from("profiles").upsert({
-          user_id: currentUserId,
-          full_name: user?.user_metadata?.full_name || "Peserta SLJ",
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          role: "participant",
-        });
+      // 1. Upsert Profile
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(startDate.getDate() + 90);
 
-        // 1b. Ensure profile start_date is set to TODAY if not already
-        const todayStr = new Date().toISOString().split("T")[0];
-        await supabase
-          .from("profiles")
-          .update({ start_date: new Date().toISOString() })
-          .eq("user_id", currentUserId)
-          .is("start_date", null);
+      const { error: profileErr } = await supabase.from("profiles").upsert({
+        user_id: currentUserId,
+        full_name: user?.user_metadata?.full_name || "Peserta SLJ",
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        role: "participant",
+      });
+      if (profileErr) {
+        console.error("Error upsert profile:", profileErr);
+        setCommitError(`Gagal menyimpan profil: ${profileErr.message}`);
+        setCommitting(false);
+        return;
+      }
 
-        // 2. Save Journey (ACTIVE + EDITABLE)
-        const { data: journey } = await supabase.from("journeys").upsert({
-          user_id: currentUserId,
-          status: "ACTIVE",
-          ptp_status: "EDITABLE",
-          muhasabah,
-          niat,
-          area_transformasi: selectedAreas,
-          main_target: mainTarget,
-          success_indicators: indicators.filter((i) => i.trim() !== ""),
-        }).select().maybeSingle();
+      // 1b. Ensure profile start_date is set to TODAY if not already
+      const todayStr = new Date().toISOString().split("T")[0];
+      await supabase
+        .from("profiles")
+        .update({ start_date: new Date().toISOString() })
+        .eq("user_id", currentUserId)
+        .is("start_date", null);
 
-        // 3. Save Action Plans & Habits
-        if (journey) {
-          for (const ap of actionPlans) {
-            const { data: apData } = await supabase.from("action_plans").insert({
-              journey_id: journey.id,
-              user_id: currentUserId,
-              title: ap.title,
-              category: "general",
-              frequency: ap.frequency,
-            }).select().maybeSingle();
+      // 2. Save Journey (ACTIVE + EDITABLE) — with onConflict to prevent duplicates
+      const { data: journey, error: journeyErr } = await supabase.from("journeys").upsert({
+        user_id: currentUserId,
+        status: "ACTIVE",
+        ptp_status: "EDITABLE",
+        muhasabah,
+        niat,
+        area_transformasi: selectedAreas,
+        main_target: mainTarget,
+        success_indicators: indicators.filter((i) => i.trim() !== ""),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" }).select().maybeSingle();
 
-            await supabase.from("habits").insert({
-              user_id: currentUserId,
-              action_plan_id: apData?.id || null,
-              title: ap.title,
-              category: "general",
-              frequency: ap.frequency,
-              source: "action_plan",
-              effective_from: todayStr,
-              is_archived: false,
-            });
-          }
+      if (journeyErr) {
+        console.error("Error upsert journey:", journeyErr);
+        setCommitError(`Gagal menyimpan journey: ${journeyErr.message}`);
+        setCommitting(false);
+        return;
+      }
 
-          // Save Initial PTP Snapshot
-          await supabase.from("ptp_snapshots").insert({
+      // 3. Save Action Plans & Habits
+      if (journey) {
+        const errors: string[] = [];
+
+        for (const ap of actionPlans) {
+          const { data: apData, error: apErr } = await supabase.from("action_plans").insert({
             journey_id: journey.id,
             user_id: currentUserId,
-            version: 1,
-            trigger_type: "INITIAL",
-            snapshot_data: {
-              muhasabah,
-              niat,
-              area_transformasi: selectedAreas,
-              main_target: mainTarget,
-              success_indicators: indicators.filter((i) => i.trim() !== ""),
-              action_plans: actionPlans,
-            },
+            title: ap.title,
+            category: "general",
+            frequency: ap.frequency,
+          }).select().maybeSingle();
+
+          if (apErr) {
+            console.error("Error insert action_plan:", apErr);
+            errors.push(`Action plan "${ap.title}": ${apErr.message}`);
+            continue;
+          }
+
+          const { error: habitErr } = await supabase.from("habits").insert({
+            user_id: currentUserId,
+            action_plan_id: apData?.id || null,
+            title: ap.title,
+            category: "general",
+            frequency: ap.frequency,
+            source: "action_plan",
+            effective_from: todayStr,
+            is_archived: false,
           });
 
-          // 4. Save Support Team
-          if (sahabatSafar) {
-            await supabase.from("support_team").insert({
-              journey_id: journey.id,
-              user_id: currentUserId,
-              sahabat_safar_name: sahabatSafar,
-            });
+          if (habitErr) {
+            console.error("Error insert habit:", habitErr);
+            errors.push(`Habit "${ap.title}": ${habitErr.message}`);
           }
         }
+
+        // Save Initial PTP Snapshot
+        const { error: snapshotErr } = await supabase.from("ptp_snapshots").insert({
+          journey_id: journey.id,
+          user_id: currentUserId,
+          version: 1,
+          trigger_type: "INITIAL",
+          snapshot_data: {
+            muhasabah,
+            niat,
+            area_transformasi: selectedAreas,
+            main_target: mainTarget,
+            success_indicators: indicators.filter((i) => i.trim() !== ""),
+            action_plans: actionPlans,
+          },
+        });
+
+        if (snapshotErr) {
+          console.error("Error insert ptp_snapshot:", snapshotErr);
+          errors.push(`PTP Snapshot: ${snapshotErr.message}`);
+        }
+
+        // 4. Save Support Team
+        if (sahabatSafar) {
+          const { error: stErr } = await supabase.from("support_team").insert({
+            journey_id: journey.id,
+            user_id: currentUserId,
+            sahabat_safar_name: sahabatSafar,
+          });
+
+          if (stErr) {
+            console.error("Error insert support_team:", stErr);
+            errors.push(`Sahabat Safar: ${stErr.message}`);
+          }
+        }
+
+        if (errors.length > 0) {
+          setCommitError(`Journey berhasil dibuat, tapi beberapa item gagal tersimpan:\n${errors.join("; ")}`);
+        }
       }
+
+      // Hanya set committed jika journey berhasil dibuat
+      setIsCommitted(true);
     } catch (err) {
       console.error("Error saving journey to Supabase:", err);
+      setCommitError("Terjadi kesalahan jaringan. Silakan coba lagi.");
     } finally {
       setCommitting(false);
-      setIsCommitted(true);
     }
   };
 
@@ -712,6 +762,19 @@ export default function JourneySetupPage() {
                         </span>
                       )}
                     </Button>
+
+                    {commitError && (
+                      <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium text-left">
+                        <p className="font-bold mb-1">⚠️ Terjadi Kesalahan:</p>
+                        <p>{commitError}</p>
+                        <button
+                          onClick={() => setCommitError(null)}
+                          className="mt-2 text-[11px] text-rose-500 hover:text-rose-700 underline"
+                        >
+                          Tutup pesan ini
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (

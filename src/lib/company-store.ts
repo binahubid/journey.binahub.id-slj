@@ -93,6 +93,7 @@ export async function fetchCompaniesFromSupabase(): Promise<Company[]> {
       .order("created_at", { ascending: false });
 
     if (error || !companies) {
+      console.warn("[company-store] Gagal fetch companies dari Supabase, menggunakan cache lokal.", error?.message);
       return getStoredCompanies();
     }
 
@@ -127,7 +128,8 @@ export async function fetchCompaniesFromSupabase(): Promise<Company[]> {
     }
 
     return mapped;
-  } catch {
+  } catch (err) {
+    console.warn("[company-store] Error fetch companies, menggunakan cache lokal:", err);
     return getStoredCompanies();
   }
 }
@@ -175,6 +177,7 @@ export async function fetchBatchesFromSupabase(): Promise<Batch[]> {
       .order("created_at", { ascending: false });
 
     if (error || !batches) {
+      console.warn("[company-store] Gagal fetch batches dari Supabase, menggunakan cache lokal.", error?.message);
       return getStoredBatches();
     }
 
@@ -207,7 +210,8 @@ export async function fetchBatchesFromSupabase(): Promise<Batch[]> {
     }
 
     return mapped;
-  } catch {
+  } catch (err) {
+    console.warn("[company-store] Error fetch batches, menggunakan cache lokal:", err);
     return getStoredBatches();
   }
 }
@@ -264,6 +268,7 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
       .order("created_at", { ascending: false });
 
     if (error || !profiles || profiles.length === 0) {
+      console.warn("[company-store] Gagal fetch participants dari Supabase, menggunakan cache lokal.", error?.message);
       return getStoredParticipants();
     }
 
@@ -324,7 +329,8 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
     }
 
     return mapped;
-  } catch {
+  } catch (err) {
+    console.warn("[company-store] Error fetch participants, menggunakan cache lokal:", err);
     return getStoredParticipants();
   }
 }
@@ -403,7 +409,8 @@ export async function fetchCoachesFromSupabase(): Promise<AdminCoach[]> {
     }
 
     return mapped;
-  } catch {
+  } catch (err) {
+    console.warn("[company-store] Error fetch coaches, menggunakan cache lokal:", err);
     return getStoredCoaches();
   }
 }

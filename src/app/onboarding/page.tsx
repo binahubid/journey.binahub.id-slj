@@ -60,54 +60,79 @@ export default function OnboardingPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      if (user) {
-        // Update user profile in Supabase with Identity, Company & Access Code
-        const startDate = new Date();
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 90);
-
-        await supabase
-          .from("profiles")
-          .update({
-            full_name: data.fullName,
-            company_name: data.companyName,
-            program_code: data.programCode,
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString(),
-          })
-          .eq("user_id", user.id);
-
-        // Update journey status to ACTIVE
-        const { data: journey } = await supabase
-          .from("journeys")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (journey) {
-          await supabase
-            .from("journeys")
-            .update({
-              status: "ACTIVE",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", journey.id);
-        } else {
-          await supabase.from("journeys").insert({
-            user_id: user.id,
-            status: "ACTIVE",
-          });
-        }
-      } else {
+      if (!user) {
         router.push("/login");
         return;
+      }
+
+      // Update user profile in Supabase with Identity, Company & Access Code
+      const startDate = new Date();
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 90);
+
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: data.fullName,
+          company_name: data.companyName,
+          program_code: data.programCode,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+        })
+        .eq("user_id", user.id);
+
+      if (profileErr) {
+        console.error("Error update profile:", profileErr);
+        setErrorMsg(`Gagal memperbarui profil: ${profileErr.message}`);
+        return;
+      }
+
+      // Update journey status to ACTIVE — use order + limit to safely handle duplicates
+      const { data: journey, error: journeyFetchErr } = await supabase
+        .from("journeys")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (journeyFetchErr) {
+        console.error("Error fetching journey:", journeyFetchErr);
+        // Non-blocking — continue with insert if needed
+      }
+
+      if (journey) {
+        const { error: updateErr } = await supabase
+          .from("journeys")
+          .update({
+            status: "ACTIVE",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", journey.id);
+
+        if (updateErr) {
+          console.error("Error update journey:", updateErr);
+          setErrorMsg(`Gagal memperbarui journey: ${updateErr.message}`);
+          return;
+        }
+      } else {
+        const { error: insertErr } = await supabase.from("journeys").insert({
+          user_id: user.id,
+          status: "ACTIVE",
+        });
+
+        if (insertErr) {
+          console.error("Error insert journey:", insertErr);
+          setErrorMsg(`Gagal membuat journey baru: ${insertErr.message}`);
+          return;
+        }
       }
 
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
       console.error("Gagal menyimpan identitas onboarding:", err);
-      setErrorMsg("Terjadi gangguan saat memverifikasi kode program. Silakan coba lagi.");
+      setErrorMsg("Terjadi gangguan jaringan saat memverifikasi data. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }
