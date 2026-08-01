@@ -659,7 +659,7 @@ export default function RefactoredJournalPage() {
                     </p>
 
                     {/* Bottom: Heart / Action */}
-                    <div className="flex items-center justify-between w-full text-[9px] text-slate-400 pt-1 border-t border-slate-100">
+                    <div className="flex items-center justify-between w-full text-[10px] text-slate-400 pt-1 border-t border-slate-100">
                       <span className="flex items-center gap-0.5 text-rose-500 font-bold">
                         <Heart className="h-2.5 w-2.5 fill-rose-500" />
                         {post.likeCount}
@@ -717,8 +717,8 @@ export default function RefactoredJournalPage() {
 
                 {selectedPost.pelajaran && (
                   <div className="space-y-1 bg-amber-50/60 p-3.5 rounded-2xl border border-amber-100">
-                    <span className="font-extrabold text-amber-900 text-[11px] block">
-                      📖 Pelajaran Hari Ini:
+                    <span className="font-extrabold text-amber-900 text-xs flex items-center gap-1.5">
+                      <BookOpen className="h-3.5 w-3.5 text-amber-700" /> Pelajaran Hari Ini:
                     </span>
                     <p className="text-slate-700 italic font-serif leading-relaxed">
                       {selectedPost.pelajaran}
@@ -728,8 +728,8 @@ export default function RefactoredJournalPage() {
 
                 {selectedPost.perbaikanBesok && (
                   <div className="space-y-1 bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100">
-                    <span className="font-extrabold text-emerald-900 text-[11px] block">
-                      🎯 Rencana Perbaikan Besok:
+                    <span className="font-extrabold text-emerald-900 text-xs flex items-center gap-1.5">
+                      <Target className="h-3.5 w-3.5 text-emerald-700" /> Rencana Perbaikan Besok:
                     </span>
                     <p className="text-slate-700 italic font-serif leading-relaxed">
                       {selectedPost.perbaikanBesok}

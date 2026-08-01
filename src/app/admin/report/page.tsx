@@ -366,27 +366,27 @@ export default function AdminImpactReportPage() {
               {/* Right Column: 4 KPI Cards Bahasa Direksi */}
               <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                 <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
-                  <span className="text-[10px] text-blue-200 font-bold uppercase block">TOTAL ROI</span>
+                  <span className="text-xs text-blue-200 font-bold uppercase block">TOTAL ROI</span>
                   <div className="text-2xl font-black text-amber-400">177%</div>
-                  <span className="text-[9px] text-blue-300 font-medium block">Return on Investment</span>
+                  <span className="text-[11px] text-blue-300 font-medium block">Return on Investment</span>
                 </div>
 
                 <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
-                  <span className="text-[10px] text-blue-200 font-bold uppercase block">NET BENEFIT</span>
+                  <span className="text-xs text-blue-200 font-bold uppercase block">NET BENEFIT</span>
                   <div className="text-lg font-black text-emerald-400 mt-1">Rp 620M</div>
-                  <span className="text-[9px] text-blue-300 font-medium block">Keuntungan Bersih</span>
+                  <span className="text-[11px] text-blue-300 font-medium block">Keuntungan Bersih</span>
                 </div>
 
                 <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
-                  <span className="text-[10px] text-blue-200 font-bold uppercase block">PAYBACK PERIOD</span>
+                  <span className="text-xs text-blue-200 font-bold uppercase block">PAYBACK PERIOD</span>
                   <div className="text-2xl font-black text-amber-300">4.2 Bln</div>
-                  <span className="text-[9px] text-blue-300 font-medium block">Modal Kembali</span>
+                  <span className="text-[11px] text-blue-300 font-medium block">Modal Kembali</span>
                 </div>
 
                 <div className="p-3 bg-white/5 rounded-2xl border border-white/10 space-y-1">
-                  <span className="text-[10px] text-blue-200 font-bold uppercase block">PTP COMPLETION</span>
+                  <span className="text-xs text-blue-200 font-bold uppercase block">PTP COMPLETION</span>
                   <div className="text-2xl font-black text-emerald-400">92%</div>
-                  <span className="text-[9px] text-blue-300 font-medium block">Target Tercapai</span>
+                  <span className="text-[11px] text-blue-300 font-medium block">Target Tercapai</span>
                 </div>
               </div>
             </div>

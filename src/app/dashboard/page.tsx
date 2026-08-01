@@ -888,27 +888,25 @@ export default function DashboardPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/60 pointer-events-none"></div>
 
           {/* TOP ROW: Greeting (Top-Left) & Next Prayer (Top-Right) */}
-          <div className="relative z-10 flex flex-row items-start justify-between gap-1.5 sm:gap-4">
-            {/* Left: Sapaan & Day badge */}
-            <div className="space-y-0.5 sm:space-y-1.5 min-w-0 flex-1 pr-1">
-              <h1 className="text-xs sm:text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-md leading-tight truncate sm:whitespace-normal">
-                Assalamu&apos;alaikum, {userName.split(" ")[0]}!
-              </h1>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="text-amber-900 font-extrabold bg-amber-400/90 px-2.5 py-0.5 rounded-full text-[9px] sm:text-xs shadow-2xs whitespace-nowrap">
+          <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 sm:gap-4">
+            {/* Left: Day badge (TOP) & Assalamu'alaikum Greeting (BOTTOM) */}
+            <div className="space-y-1.5 min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-amber-900 font-extrabold bg-amber-400/90 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs shadow-2xs whitespace-nowrap">
                   Hari ke-{dayCount} dari 90
                 </span>
                 <button
                   type="button"
                   onClick={handleRemindSafar}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all shadow-sm ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-sm ${
                     safarRemindedToday
                       ? "bg-emerald-500/90 text-white border border-emerald-300"
                       : "bg-white/20 hover:bg-white/30 text-amber-200 border border-white/30 backdrop-blur-md"
                   }`}
                 >
                   <Heart className={`h-3 w-3 ${safarRemindedToday ? "fill-white text-white" : "text-amber-300"}`} />
-                  <span>{safarRemindedToday ? "✓ Ingatkan Sahabat Safar (Terkirim)" : "Ingatkan Sahabat Safar"}</span>
+                  <span>{safarRemindedToday ? "Ingatkan Sahabat Safar (Terkirim)" : "Ingatkan Sahabat Safar"}</span>
+                  {safarRemindedToday && <Check className="h-3 w-3 text-white ml-0.5" />}
                 </button>
 
                 <button
@@ -920,81 +918,85 @@ export default function DashboardPage() {
                   <Maximize2 className="h-4 w-4" />
                 </button>
               </div>
+
+              <h1 className="text-lg sm:text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-md leading-tight pt-0.5">
+                Assalamu&apos;alaikum, {userName.split(" ")[0]}!
+              </h1>
             </div>
 
-            {/* Right: Next Prayer Card */}
-            <div className={`p-2 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md flex items-center gap-2 sm:gap-3 shrink-0 shadow-md transition-all duration-500 w-44 sm:min-w-[240px] md:min-w-[260px] sm:max-w-[280px] ${
+            {/* Right: Next Prayer Card (Desktop Only: inside Hero top-right) */}
+            <div className={`hidden sm:flex p-2.5 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-md transition-all duration-500 w-auto sm:min-w-[240px] md:min-w-[260px] sm:max-w-[280px] ${
               nextPrayerInfo.isGracePeriod
-                ? "bg-emerald-950/70 border border-emerald-400/60 shadow-emerald-950/40"
+                ? "bg-emerald-950/80 border border-emerald-400/60 shadow-emerald-950/40 p-4"
                 : "bg-black/20 border border-white/15"
             }`}>
-              {/* Left: Prayer Icon */}
-              <div className="h-9 sm:h-14 md:h-16 w-auto shrink-0 flex items-center justify-center">
-                <img
-                  src={prayerIconMap[nextPrayerInfo.name] || "/icon_subuh.webp"}
-                  alt={nextPrayerInfo.name}
-                  className="h-9 sm:h-14 md:h-16 w-auto object-contain drop-shadow-xl"
-                />
-              </div>
+              {/* Left: Prayer Icon (Only when NOT grace period) */}
+              {!nextPrayerInfo.isGracePeriod && (
+                <div className="h-10 sm:h-14 md:h-16 w-auto shrink-0 flex items-center justify-center">
+                  <img
+                    src={prayerIconMap[nextPrayerInfo.name] || "/icon_subuh.webp"}
+                    alt={nextPrayerInfo.name}
+                    className="h-10 sm:h-14 md:h-16 w-auto object-contain drop-shadow-xl"
+                  />
+                </div>
+              )}
 
               {/* Center: Prayer Details */}
               {nextPrayerInfo.isGracePeriod ? (
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <span className="text-[8px] sm:text-[9px] font-black text-emerald-300 uppercase tracking-wider block leading-none animate-pulse">
-                    🤲 Waktu Sholat Tiba
+                <div className="min-w-0 flex-1 space-y-1">
+                  <span className="text-[11px] sm:text-xs font-black text-emerald-300 uppercase tracking-wider flex items-center gap-1 leading-none animate-pulse">
+                    <Sparkles className="h-3 w-3 text-amber-300" /> Waktu Sholat Tiba
                   </span>
-                  <span className="text-[10px] sm:text-xs font-bold text-white block leading-tight">
+                  <span className="text-xs sm:text-sm font-extrabold text-white block leading-snug">
                     Selamat Menunaikan Ibadah Sholat {nextPrayerInfo.name}
-                  </span>
-                  <span className="text-[9px] font-mono font-bold text-amber-300 block leading-none pt-0.5">
-                    {nextPrayerInfo.time} WIB
                   </span>
                 </div>
               ) : (
                 <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
-                  <span className="text-[8px] sm:text-[10px] font-bold text-slate-300 uppercase tracking-wider block leading-none">
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider block leading-none">
                     Sholat Berikutnya
                   </span>
-                  <span className="text-xs sm:text-xl font-black text-white block leading-tight truncate">
+                  <span className="text-sm sm:text-xl font-black text-white block leading-tight truncate">
                     {nextPrayerInfo.name}
                   </span>
-                  <span className="text-[10px] sm:text-sm font-mono font-bold text-amber-300 block leading-none">
+                  <span className="text-xs sm:text-sm font-mono font-bold text-amber-300 block leading-none">
                     {nextPrayerInfo.time}
                   </span>
                 </div>
               )}
 
-              {/* Right: Circular Progress with Countdown */}
-              <div className="flex flex-col items-center shrink-0 gap-0.5">
-                <div className="relative h-11 w-11 sm:h-14 sm:w-14">
-                  <svg className="h-full w-full -rotate-90" viewBox="0 0 64 64">
-                    <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="5" />
-                    <circle
-                      cx="32" cy="32" r="28"
-                      fill="none"
-                      stroke="url(#prayerGrad)"
-                      strokeWidth="5"
-                      strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 28}`}
-                      strokeDashoffset={`${2 * Math.PI * 28 * (1 - nextPrayerProgress / 100)}`}
-                      className="transition-all duration-1000"
-                    />
-                    <defs>
-                      <linearGradient id="prayerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#FBBF24" />
-                        <stop offset="100%" stopColor="#F59E0B" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  {/* Countdown inside circle */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[8px] sm:text-[9px] font-black text-amber-300 leading-none text-center px-0.5">
-                      {nextPrayerInfo.isGracePeriod ? "Jeda 3m" : nextPrayerInfo.text}
-                    </span>
+              {/* Right: Circular Progress with Countdown (Only when NOT grace period) */}
+              {!nextPrayerInfo.isGracePeriod && (
+                <div className="flex flex-col items-center shrink-0 gap-0.5">
+                  <div className="relative h-11 w-11 sm:h-14 sm:w-14">
+                    <svg className="h-full w-full -rotate-90" viewBox="0 0 64 64">
+                      <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="5" />
+                      <circle
+                        cx="32" cy="32" r="28"
+                        fill="none"
+                        stroke="url(#prayerGrad)"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 28}`}
+                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - nextPrayerProgress / 100)}`}
+                        className="transition-all duration-1000"
+                      />
+                      <defs>
+                        <linearGradient id="prayerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#FBBF24" />
+                          <stop offset="100%" stopColor="#F59E0B" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[10px] sm:text-xs font-black text-amber-300 leading-none text-center px-0.5">
+                        {nextPrayerInfo.text}
+                      </span>
+                    </div>
                   </div>
+                  <span className="text-[10px] font-semibold text-slate-300 hidden sm:inline">sisa waktu</span>
                 </div>
-                <span className="text-[8px] font-semibold text-slate-300 hidden sm:inline">remaining</span>
-              </div>
+              )}
             </div>
           </div>
 
@@ -1006,7 +1008,7 @@ export default function DashboardPage() {
                 {heroClockMain}
               </h2>
               <div className="flex flex-wrap items-baseline gap-1 sm:gap-2.5 pt-0.5">
-                <span className="text-[9px] sm:text-base font-bold text-amber-200/90 truncate">{heroDate}</span>
+                <span className="text-xs sm:text-base font-bold text-amber-200/90 truncate">{heroDate}</span>
                 <span className="text-white/30 text-xs sm:text-lg">|</span>
                 <span className="text-xs sm:text-3xl font-mono font-bold text-white/80">:{heroClockSeconds}</span>
                 <span className="text-xs sm:text-3xl font-mono font-bold text-white/80">{timeZoneStr}</span>
@@ -1016,7 +1018,7 @@ export default function DashboardPage() {
             {/* Right: Progress Hari Ini Card */}
             <div className="bg-black/20 p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-white/15 backdrop-blur-md space-y-1.5 sm:space-y-3 shrink-0 w-36 sm:w-auto min-w-0 sm:min-w-[260px] md:max-w-xs shadow-md">
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[8px] sm:text-xs font-bold text-slate-200 uppercase tracking-wider truncate">
+                <span className="text-[11px] sm:text-xs font-bold text-slate-200 uppercase tracking-wider truncate">
                   Progress Hari Ini
                 </span>
                 <button

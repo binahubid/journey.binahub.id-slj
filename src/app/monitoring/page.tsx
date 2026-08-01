@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -29,9 +30,12 @@ import {
   BookOpen,
   BarChart2,
   Users,
+  Lock,
+  ArrowRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface MonthlyReviewItem {
@@ -101,6 +105,39 @@ function calcAreaScore(rep: AreaReport): number {
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }
 
+function normalizeAreaKey(a: string): string {
+  if (!a) return "";
+  const lower = a.toLowerCase().trim();
+  if (lower.includes("spiritual")) return "spiritual_growth";
+  if (lower.includes("personal")) return "personal_development";
+  if (lower.includes("relationship")) return "relationship";
+  if (lower.includes("leadership") || lower.includes("profesional") || lower.includes("professional")) return "leadership_excellence";
+  if (lower.includes("community") || lower.includes("dampak")) return "community_impact";
+  return lower;
+}
+
+function getMonthLockStatus(month: 1 | 2 | 3, dayCount: number): { allowed: boolean; reason: string } {
+  if (month === 1) {
+    if (dayCount < 1) return { allowed: false, reason: "Bulan 1 belum dimulai" };
+    if (dayCount > 37) return { allowed: false, reason: "Masa pengisian Bulan 1 dikunci pada Hari ke-38" };
+    if (dayCount > 30) return { allowed: true, reason: "Masa Tenggat (+7 hari)" };
+    return { allowed: true, reason: "Bulan 1 Aktif" };
+  }
+  if (month === 2) {
+    if (dayCount < 31) return { allowed: false, reason: "Bulan 2 terbuka pada Hari ke-31" };
+    if (dayCount > 67) return { allowed: false, reason: "Masa pengisian Bulan 2 dikunci pada Hari ke-68" };
+    if (dayCount > 60) return { allowed: true, reason: "Masa Tenggat (+7 hari)" };
+    return { allowed: true, reason: "Bulan 2 Aktif" };
+  }
+  if (month === 3) {
+    if (dayCount < 61) return { allowed: false, reason: "Bulan 3 terbuka pada Hari ke-61" };
+    if (dayCount > 97) return { allowed: false, reason: "Masa pengisian Bulan 3 telah berakhir" };
+    if (dayCount > 90) return { allowed: true, reason: "Masa Tenggat (+7 hari)" };
+    return { allowed: true, reason: "Bulan 3 Aktif" };
+  }
+  return { allowed: true, reason: "" };
+}
+
 // Unified SLJ Brand Color Mapping
 const AREA_COLORS: Record<string, string> = {
   "Spiritual Growth": "#D97706", // Gold / Amber
@@ -114,6 +151,7 @@ const AREA_COLORS: Record<string, string> = {
 };
 
 export default function MonitoringPage() {
+  const router = useRouter();
   const supabase = createClient();
 
   const [userName, setUserName] = useState("Peserta SLJ");
@@ -148,6 +186,7 @@ export default function MonitoringPage() {
   const [chartData, setChartData] = useState<{ day: string; scores: Record<string, number> }[]>([]);
   const [heatmapData, setHeatmapData] = useState<{ date: string; level: number; pct: number }[]>([]);
   const [habitConsistencyPct, setHabitConsistencyPct] = useState<number>(0);
+  const [baselineScoresMap, setBaselineScoresMap] = useState<Record<string, number>>({});
 
   // Modal Drawer for 4-Dimension Indicator Update
   const [editingAreaModal, setEditingAreaModal] = useState<string | null>(null);
@@ -160,13 +199,15 @@ export default function MonitoringPage() {
       if (!user) return;
 
       // Profile & Day Count
+      let currentDayCount = dayCount;
       const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
       if (profile) {
         setUserName(profile.full_name || "Peserta SLJ");
         if (profile.start_date) {
           const startD = new Date(profile.start_date);
           const diff = Math.floor((Date.now() - startD.getTime()) / 86400000);
-          setDayCount(Math.max(1, diff + 1));
+          currentDayCount = Math.max(1, diff + 1);
+          setDayCount(currentDayCount);
         }
       }
 
@@ -195,7 +236,7 @@ export default function MonitoringPage() {
 
       // Journey (areas + targets)
       const { data: journey } = await supabase.from("journeys")
-        .select("id, area_transformasi, main_target, final_reflection")
+        .select("id, area_transformasi, main_target, success_indicators, final_reflection")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1).maybeSingle();
@@ -212,53 +253,59 @@ export default function MonitoringPage() {
       const { data: team } = await supabase.from("support_team").select("coach_name").eq("journey_id", journey.id).maybeSingle();
       if (team?.coach_name) setCoachName(team.coach_name);
 
-      // Parse targets per-area from journey.main_target JSON
+      // Parse targets per-area from journey.main_target (JSON or plain text)
       const targetsMap: Record<string, AreaIndicatorTargets & { kuantitasBaseline?: string }> = {};
+      let parsedJson: any = null;
       try {
-        const parsed = JSON.parse(journey.main_target || "{}");
-        if (parsed && typeof parsed === "object") {
-          areas.forEach(area => {
-            const d = parsed[area] || {};
-            targetsMap[area] = {
-              mainTarget: d.mainTarget || d.target || "",
-              kualitas: d.kualitas || "",
-              kuantitas: d.kuantitas || "",
-              kuantitasBaseline: d.kuantitasBaseline || "",
-              waktu: d.waktu || "",
-              biaya: d.biaya || "",
-            };
-          });
+        if (journey.main_target && journey.main_target.trim().startsWith("{")) {
+          parsedJson = JSON.parse(journey.main_target);
         }
       } catch {}
+
+      areas.forEach(area => {
+        if (parsedJson && typeof parsedJson === "object") {
+          const d = parsedJson[area] || {};
+          targetsMap[area] = {
+            mainTarget: d.mainTarget || d.target || journey.main_target || "",
+            kualitas: d.kualitas || "",
+            kuantitas: d.kuantitas || "",
+            kuantitasBaseline: d.kuantitasBaseline || "",
+            waktu: d.waktu || "",
+            biaya: d.biaya || "",
+          };
+        } else {
+          // Plain text fallback from PTP setup
+          targetsMap[area] = {
+            mainTarget: journey.main_target || "",
+            kualitas: Array.isArray(journey.success_indicators) ? journey.success_indicators.join("; ") : "",
+            kuantitas: "",
+            kuantitasBaseline: "",
+            waktu: "",
+            biaya: "",
+          };
+        }
+      });
 
       // Fetch Baseline Assessment Answers if available
       const { data: bAnswers } = await supabase.from("baseline_answers")
         .select("area, score").eq("user_id", user.id);
       
-      const baselineScoresMap: Record<string, number> = {};
+      const bScores: Record<string, number> = {};
       if (bAnswers && bAnswers.length > 0) {
         const areaSums: Record<string, { sum: number; count: number }> = {};
         bAnswers.forEach((ans: any) => {
-          const aKey = ans.area;
-          if (!areaSums[aKey]) areaSums[aKey] = { sum: 0, count: 0 };
-          areaSums[aKey].sum += ans.score;
-          areaSums[aKey].count += 1;
+          const rawArea = ans.area || "";
+          const nKey = normalizeAreaKey(rawArea);
+          if (!areaSums[nKey]) areaSums[nKey] = { sum: 0, count: 0 };
+          areaSums[nKey].sum += ans.score;
+          areaSums[nKey].count += 1;
         });
 
-        // Map area DB enum keys to PTP Area titles
-        const keyMapping: Record<string, string> = {
-          spiritual_growth: "Spiritual Growth",
-          personal_development: "Personal Development",
-          leadership_excellence: "Leadership Excellence",
-          relationship: "Relationship",
-          community_impact: "Community Impact",
-        };
-
-        Object.entries(areaSums).forEach(([aKey, val]) => {
-          const title = keyMapping[aKey] || aKey;
-          baselineScoresMap[title] = Math.round((val.sum / (val.count * 10)) * 100);
+        Object.entries(areaSums).forEach(([nKey, val]) => {
+          bScores[nKey] = Math.round((val.sum / (val.count * 10)) * 100);
         });
       }
+      setBaselineScoresMap(bScores);
 
       // Load saved monthly_indicator_reports
       const { data: indReports } = await supabase.from("monthly_indicator_reports")
@@ -269,11 +316,21 @@ export default function MonitoringPage() {
         [1, 2, 3].forEach(month => {
           const saved = (indReports || []).find((r: any) => r.month_number === month && r.area === area);
           const ptpBaseline = targetsMap[area]?.kuantitasBaseline || "";
-          const bScore = baselineScoresMap[area];
+          const nKey = normalizeAreaKey(area);
+          const bScore = bScores[nKey] !== undefined ? bScores[nKey] : (bScores[area] || 0);
+
+          const loadedTargets: AreaIndicatorTargets = {
+            mainTarget: targetsMap[area]?.mainTarget || journey.main_target || "",
+            kualitas: saved?.kualitas_target || targetsMap[area]?.kualitas || "",
+            kuantitas: saved?.kuantitas_target?.toString() || targetsMap[area]?.kuantitas || "",
+            waktu: saved?.waktu_target_days?.toString() || targetsMap[area]?.waktu || "",
+            biaya: saved?.biaya_target?.toString() || targetsMap[area]?.biaya || "",
+          };
+
           newReports[month][area] = saved
             ? {
                 area,
-                targets: targetsMap[area] || { mainTarget: "", kualitas: "", kuantitas: "", waktu: "", biaya: "" },
+                targets: loadedTargets,
                 kualitasRating: saved.kualitas_actual_rating || 4,
                 kuantitasBaseline: saved.kuantitas_baseline?.toString() || ptpBaseline,
                 kuantitasActual: saved.kuantitas_actual?.toString() || "",
@@ -282,7 +339,7 @@ export default function MonitoringPage() {
                 isSaved: true,
                 baselineScore: bScore,
               }
-            : buildEmptyReport(area, targetsMap[area] || { mainTarget: "", kualitas: "", kuantitas: "", waktu: "", biaya: "" }, bScore);
+            : buildEmptyReport(area, loadedTargets, bScore);
 
           if (!saved && ptpBaseline) {
             newReports[month][area].kuantitasBaseline = ptpBaseline;
@@ -291,9 +348,33 @@ export default function MonitoringPage() {
       });
       setAreaReports(newReports);
 
-      // Fetch Action Plans
-      const { data: actionPlans } = await supabase.from("action_plans")
-        .select("id, area_category, quantity").eq("user_id", user.id);
+      // Fetch Action Plans from action_plans AND habits table
+      let userActionPlans: any[] = [];
+      const { data: apByUser } = await supabase.from("action_plans")
+        .select("id, title, area_category, category, quantity, journey_id")
+        .eq("user_id", user.id);
+
+      if (apByUser && apByUser.length > 0) {
+        userActionPlans = apByUser;
+      } else if (journey?.id) {
+        const { data: apByJourney } = await supabase.from("action_plans")
+          .select("id, title, area_category, category, quantity, journey_id")
+          .eq("journey_id", journey.id);
+        if (apByJourney) userActionPlans = apByJourney;
+      }
+
+      // Merge habits from habits table if available
+      const { data: hTable } = await supabase.from("habits")
+        .select("id, title, area_category, quantity")
+        .eq("user_id", user.id);
+
+      if (hTable && hTable.length > 0) {
+        hTable.forEach((h: any) => {
+          if (!userActionPlans.some((ap: any) => ap.id === h.id || ap.title === h.title)) {
+            userActionPlans.push(h);
+          }
+        });
+      }
 
       // Build Dynamic Chart based on timeframe (1d, 7d, 1m, 3m)
       const numDays = timeframe === "1d" ? 1 : timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
@@ -309,39 +390,47 @@ export default function MonitoringPage() {
         .select("habit_id, date, completed, completed_count")
         .eq("user_id", user.id).in("date", datesArr);
 
-      if (actionPlans && actionPlans.length > 0) {
-        const sampledDates = numDays > 30 
-          ? datesArr.filter((_, idx) => idx % 3 === 0 || idx === datesArr.length - 1)
-          : numDays > 7 
-          ? datesArr.filter((_, idx) => idx % 2 === 0 || idx === datesArr.length - 1)
-          : datesArr;
+      const sampledDates = numDays > 30 
+        ? datesArr.filter((_, idx) => idx % 3 === 0 || idx === datesArr.length - 1)
+        : numDays > 7 
+        ? datesArr.filter((_, idx) => idx % 2 === 0 || idx === datesArr.length - 1)
+        : datesArr;
 
-        const chart = sampledDates.map((dateStr) => {
-          const dObj = new Date(dateStr);
-          const label = numDays === 1 
-            ? "Hari Ini" 
-            : numDays <= 7 
-            ? dObj.toLocaleDateString("id-ID", { weekday: "short" }) 
-            : `${dObj.getDate()}/${dObj.getMonth() + 1}`;
-          
-          const logsForDay = (habitLogs || []).filter((l: any) => l.date === dateStr);
-          const scores: Record<string, number> = {};
-          areas.forEach(area => {
-            const areaAPs = (actionPlans as any[]).filter(ap => (ap.area_category || "Spiritual Growth") === area);
-            if (areaAPs.length === 0) { scores[area] = 0; return; }
-            let total = 0;
-            areaAPs.forEach(ap => {
-              const log = logsForDay.find((l: any) => l.habit_id === ap.id);
-              const qty = ap.quantity || 1;
-              const cnt = log ? (log.completed_count || (log.completed ? qty : 0)) : 0;
-              total += Math.min(1, cnt / qty);
-            });
-            scores[area] = Math.round((total / areaAPs.length) * 100);
+      const chart = sampledDates.map((dateStr) => {
+        const dObj = new Date(dateStr);
+        const label = numDays === 1 
+          ? "Hari Ini" 
+          : numDays <= 7 
+          ? dObj.toLocaleDateString("id-ID", { weekday: "short" }) 
+          : `${dObj.getDate()}/${dObj.getMonth() + 1}`;
+        
+        const logsForDay = (habitLogs || []).filter((l: any) => l.date === dateStr);
+        const scores: Record<string, number> = {};
+
+        areas.forEach(area => {
+          const areaAPs = userActionPlans.filter(ap => {
+            const cat = ap.area_category || ap.category || "";
+            return normalizeAreaKey(cat) === normalizeAreaKey(area);
           });
-          return { day: label, scores };
+
+          if (areaAPs.length === 0) {
+            const logsForArea = logsForDay.filter((l: any) => l.completed === true || l.completed === 1 || Boolean(l.completed) || (l.completed_count && Number(l.completed_count) > 0));
+            scores[area] = logsForArea.length > 0 ? 100 : 0;
+            return;
+          }
+
+          let total = 0;
+          areaAPs.forEach(ap => {
+            const log = logsForDay.find((l: any) => l.habit_id === ap.id || l.habit_id === ap.title);
+            const qty = ap.quantity || 1;
+            const cnt = log ? (log.completed_count || (log.completed ? qty : 0)) : 0;
+            total += Math.min(1, cnt / qty);
+          });
+          scores[area] = Math.round((total / areaAPs.length) * 100);
         });
-        setChartData(chart);
-      }
+        return { day: label, scores };
+      });
+      setChartData(chart);
 
       // Build 90-Day Heatmap Data & Calculate Real Habit Consistency %
       const dates90: string[] = [];
@@ -351,26 +440,29 @@ export default function MonitoringPage() {
         dates90.push(d.toISOString().split("T")[0]);
       }
       const { data: logs90 } = await supabase.from("habit_logs")
-        .select("date, completed")
+        .select("date, completed, completed_count, habit_id")
         .eq("user_id", user.id).in("date", dates90);
 
-      const totalAPCount = (actionPlans || []).length || 1;
+      const totalAPCount = userActionPlans.length || 1;
       let totalCompletedDays = 0;
 
       const heatmap = dates90.map(dateStr => {
-        const dayLogs = (logs90 || []).filter((l: any) => l.date === dateStr && l.completed);
-        const pct = Math.round((dayLogs.length / totalAPCount) * 100);
-        if (pct >= 50) totalCompletedDays++;
+        const dayLogs = (logs90 || []).filter((l: any) => l.date === dateStr && (l.completed === true || l.completed === 1 || Boolean(l.completed) || (l.completed_count && Number(l.completed_count) > 0)));
+        const cnt = dayLogs.length;
         let level = 0;
-        if (pct > 0 && pct < 40) level = 1;
-        else if (pct >= 40 && pct < 80) level = 2;
-        else if (pct >= 80) level = 3;
+        if (cnt > 0) {
+          if (cnt === 1) level = 1;
+          else if (cnt <= 3) level = 2;
+          else level = 3;
+          totalCompletedDays++;
+        }
+        const pct = Math.min(100, Math.round((cnt / totalAPCount) * 100));
         return { date: dateStr, level, pct };
       });
       setHeatmapData(heatmap);
 
       // Real calculated habit consistency % over active days
-      const activeDaysSoFar = Math.min(dayCount, 90);
+      const activeDaysSoFar = Math.min(currentDayCount, 90);
       const realHabitPct = Math.min(100, Math.round((totalCompletedDays / Math.max(1, activeDaysSoFar)) * 100));
       setHabitConsistencyPct(realHabitPct);
 
@@ -428,13 +520,21 @@ export default function MonitoringPage() {
     const overallPct = calcAreaScore(rep);
     try {
       await supabase.from("monthly_indicator_reports").upsert({
-        user_id: user.id, journey_id: journeyId, month_number: selectedMonth, area,
+        user_id: user.id,
+        journey_id: journeyId,
+        month_number: selectedMonth,
+        area,
+        kualitas_target: rep.targets.kualitas || null,
         kualitas_actual_rating: rep.kualitasRating,
+        kuantitas_target: parseFloat(rep.targets.kuantitas) || null,
         kuantitas_baseline: parseFloat(rep.kuantitasBaseline) || null,
         kuantitas_actual: parseFloat(rep.kuantitasActual) || null,
+        waktu_target_days: parseFloat(rep.targets.waktu) || null,
         waktu_actual_days: parseFloat(rep.waktuActualDays) || null,
+        biaya_target: parseFloat((rep.targets.biaya || "").replace(/[^0-9.]/g, "")) || null,
         biaya_actual: parseFloat(rep.biayaActual.replace(/[^0-9.]/g, "")) || null,
-        score_percentage: overallPct, updated_at: new Date().toISOString(),
+        score_percentage: overallPct,
+        updated_at: new Date().toISOString(),
       }, { onConflict: "user_id,month_number,area" });
     } catch (err) { console.error(err); } finally {
       setTimeout(() => {
@@ -472,9 +572,11 @@ export default function MonitoringPage() {
     const areaScores: Record<string, number> = {};
     let highest = { area: selectedAreas[0] || "", score: -1 };
     let lowest = { area: selectedAreas[0] || "", score: 999 };
+    let hasSavedMonthlyReport = false;
 
     selectedAreas.forEach(area => {
       const rep = areaReports[selectedMonth]?.[area];
+      if (rep?.isSaved) hasSavedMonthlyReport = true;
       const score = rep ? calcAreaScore(rep) : 0;
       areaScores[area] = score;
       sum += score;
@@ -482,7 +584,26 @@ export default function MonitoringPage() {
       if (score > highest.score) highest = { area, score };
       if (score < lowest.score) lowest = { area, score };
     });
-    const overall = Math.round(sum / selectedAreas.length);
+
+    let overall = Math.round(sum / selectedAreas.length);
+
+    // Fallback to baseline score average if no monthly report saved yet for current month
+    if (!hasSavedMonthlyReport || overall === 0) {
+      let bSum = 0;
+      let bCount = 0;
+      selectedAreas.forEach(area => {
+        const nKey = normalizeAreaKey(area);
+        const bVal = baselineScoresMap[nKey] !== undefined ? baselineScoresMap[nKey] : (baselineScoresMap[area] || 0);
+        if (bVal > 0) {
+          bSum += bVal;
+          bCount++;
+        }
+      });
+      if (bCount > 0) {
+        overall = Math.round(bSum / bCount);
+      }
+    }
+
     return { overall, areas: areaScores, highestArea: highest.area, lowestArea: lowest.area };
   };
 
@@ -502,6 +623,40 @@ export default function MonitoringPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
         <div className="animate-spin h-8 w-8 border-4 border-amber-500 border-t-transparent rounded-full" />
       </div>
+    );
+  }
+
+  if (!journeyId) {
+    return (
+      <ParticipantLayout activePath="/monitoring" pageTitle="Monitoring Perjalanan SLJ">
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-12 pb-20 font-sans text-slate-800">
+          <Card className="bg-white p-8 sm:p-12 rounded-3xl border border-slate-200 shadow-xs text-center space-y-6">
+            <div className="h-16 w-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200/80 shadow-2xs">
+              <Lock className="h-8 w-8" />
+            </div>
+            <div className="space-y-2 max-w-md mx-auto">
+              <Badge className="bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold px-3 py-1">
+                🔒 Fitur Monitoring Dikunci
+              </Badge>
+              <h2 className="text-xl sm:text-2xl font-black text-[#071A33]">
+                Halaman Monitoring Belum Terbuka
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                Anda perlu merumuskan Niat, Target 90 Hari, dan memilih Area Transformasi di Personal Transformation Project (PTP) terlebih dahulu untuk membuka Halaman Monitoring.
+              </p>
+            </div>
+            <div className="pt-2">
+              <Button
+                onClick={() => router.push("/journey/setup")}
+                className="bg-[#071A33] hover:bg-slate-900 text-amber-300 font-extrabold text-xs rounded-2xl px-8 h-12 shadow-md inline-flex items-center gap-2 cursor-pointer"
+              >
+                <span>Mulai PTP Setup Sekarang</span>
+                <ArrowRight className="h-4 w-4 text-amber-400" />
+              </Button>
+            </div>
+          </Card>
+        </main>
+      </ParticipantLayout>
     );
   }
 
@@ -586,10 +741,12 @@ export default function MonitoringPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {selectedAreas.map(area => {
-                  const score = healthData.areas[area] || 0;
-                  const color = AREA_COLORS[area] || "#0B2C6B";
                   const rep = areaReports[selectedMonth]?.[area];
-                  const hasFilledData = rep && (rep.kuantitasActual || rep.waktuActualDays || rep.biayaActual);
+                  const isSavedReport = rep?.isSaved;
+                  const nKey = normalizeAreaKey(area);
+                  const bVal = baselineScoresMap[nKey] !== undefined ? baselineScoresMap[nKey] : (baselineScoresMap[area] || 0);
+                  const score = isSavedReport ? calcAreaScore(rep) : bVal;
+                  const color = AREA_COLORS[area] || "#0B2C6B";
 
                   return (
                     <div
@@ -598,29 +755,31 @@ export default function MonitoringPage() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[140px]" style={{ color }}>{area}</span>
+                        {!isSavedReport && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+                            Skor Baseline
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-baseline justify-between">
                         <span className="text-2xl font-black" style={{ color }}>
-                          {!hasFilledData && isEarlyStage ? "--" : `${score}%`}
+                          {score}%
                         </span>
 
-                        {/* Guilt-Free UX Badge: Neutral status if early stage or unsubmitted */}
-                        {!hasFilledData && isEarlyStage ? (
-                          <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Belum ada data
-                          </span>
-                        ) : score >= 80 ? (
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                            Sangat Baik
-                          </span>
-                        ) : score >= 50 ? (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
-                            Cukup Baik
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Perlu Fokus
-                          </span>
+                        {isSavedReport && (
+                          score >= 80 ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                              Sangat Baik
+                            </span>
+                          ) : score >= 50 ? (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+                              Cukup Baik
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                              Perlu Fokus
+                            </span>
+                          )
                         )}
                       </div>
                       <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -714,7 +873,7 @@ export default function MonitoringPage() {
                       })}
                     </svg>
                     {/* Labels */}
-                    <div className="flex justify-between text-[9px] text-slate-400 font-bold mt-1">
+                    <div className="flex justify-between text-[11px] text-slate-400 font-bold mt-1">
                       {chartData.map((row, i) => (
                         <span key={i}>{row.day}</span>
                       ))}
@@ -803,9 +962,17 @@ export default function MonitoringPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {selectedAreas.map(area => {
                     const rep = areaReports[selectedMonth]?.[area];
-                    const score = rep ? calcAreaScore(rep) : 0;
+                    const isSavedReport = rep?.isSaved;
+                    const nKey = normalizeAreaKey(area);
+                    const bVal = baselineScoresMap[nKey] !== undefined ? baselineScoresMap[nKey] : (baselineScoresMap[area] || 0);
+                    const score = isSavedReport ? calcAreaScore(rep) : bVal;
                     const color = AREA_COLORS[area] || "#0B2C6B";
-                    const hasFilledData = rep && (rep.kuantitasActual || rep.waktuActualDays || rep.biayaActual);
+                    const monthLock = getMonthLockStatus(selectedMonth, dayCount);
+
+                    const hasKualitas = Boolean(rep?.targets?.kualitas && rep.targets.kualitas.trim().length > 0);
+                    const hasKuantitas = Boolean(rep?.targets?.kuantitas && rep.targets.kuantitas.trim().length > 0);
+                    const hasWaktu = Boolean(rep?.targets?.waktu && rep.targets.waktu.trim().length > 0);
+                    const hasBiaya = Boolean(rep?.targets?.biaya && rep.targets.biaya.trim().length > 0);
 
                     return (
                       <div
@@ -816,13 +983,11 @@ export default function MonitoringPage() {
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                             <span className="text-xs font-extrabold text-navy-900">{area}</span>
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                              !hasFilledData && isEarlyStage
-                                ? "bg-slate-100 text-slate-600"
-                                : score >= 80 ? "bg-emerald-50 text-emerald-700"
-                                : score >= 50 ? "bg-amber-50 text-amber-700"
-                                : "bg-slate-100 text-slate-600"
+                              isSavedReport
+                                ? score >= 80 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                : "bg-amber-50 text-amber-800 border border-amber-200"
                             }`}>
-                              {!hasFilledData && isEarlyStage ? "Belum Diisi" : `${score}% Capaian`}
+                              {isSavedReport ? `${score}% Capaian` : `${score}% Skor Baseline`}
                             </span>
                           </div>
 
@@ -832,30 +997,52 @@ export default function MonitoringPage() {
                             </p>
                           )}
 
-                          {/* 4 Dimensi Non-Contradictory Real Metrics */}
+                          {/* Filtered Dynamic Target Indicators */}
                           <div className="space-y-1.5 pt-1 text-xs">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-slate-500">Rating Target PTP</span>
-                              <span className="font-bold text-amber-700">{rep?.targets?.kualitas || "4★ Khusyu"}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-slate-500">Realisasi Kuantitas</span>
-                              <span className="font-bold text-navy-900">{rep?.kuantitasActual || "Belum Diisi"}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-slate-500">Waktu Tepat Hari</span>
-                              <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/30 hari` : "Belum Diisi"}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-slate-500">Biaya / Anggaran</span>
-                              <span className="font-bold text-emerald-700">{rep?.biayaActual ? `Rp ${rep.biayaActual}` : "Belum Diisi"}</span>
-                            </div>
+                            {hasKualitas && (
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500">Kualitas</span>
+                                <span className="font-bold text-amber-700">{rep?.kualitasRating ? `${rep.kualitasRating}/5 ★` : rep.targets.kualitas}</span>
+                              </div>
+                            )}
+                            {hasKuantitas && (
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500">Kuantitas Target</span>
+                                <span className="font-bold text-navy-900">{rep?.kuantitasActual || rep.targets.kuantitas || "Belum Diisi"}</span>
+                              </div>
+                            )}
+                            {hasWaktu && (
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500">Waktu Target</span>
+                                <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/30 hari` : rep.targets.waktu || "Belum Diisi"}</span>
+                              </div>
+                            )}
+                            {hasBiaya && (
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500">Biaya / Anggaran</span>
+                                <span className="font-bold text-emerald-700">{rep?.biayaActual ? `Rp ${rep.biayaActual}` : rep.targets.biaya || "Belum Diisi"}</span>
+                              </div>
+                            )}
+                            {!hasKualitas && !hasKuantitas && !hasWaktu && !hasBiaya && (
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500">Penilaian Capaian</span>
+                                <span className="font-bold text-amber-700">{rep?.kualitasRating ? `${rep.kualitasRating}/5 ★` : "Evaluasi Bulanan"}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
                         <Button
-                          onClick={() => setEditingAreaModal(area)}
-                          className="w-full bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 flex items-center justify-center gap-2 mt-2"
+                          disabled={!monthLock.allowed}
+                          onClick={() => {
+                            if (!monthLock.allowed) return;
+                            setEditingAreaModal(area);
+                          }}
+                          className={`w-full text-xs font-bold rounded-xl h-10 flex items-center justify-center gap-2 mt-2 transition-all ${
+                            monthLock.allowed
+                              ? "bg-[#071A33] hover:bg-slate-900 text-amber-300 shadow-xs cursor-pointer"
+                              : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed pointer-events-none opacity-50"
+                          }`}
                         >
                           <Edit3 className="h-3.5 w-3.5" />
                           Input Capaian Bulanan
@@ -987,33 +1174,54 @@ export default function MonitoringPage() {
               </div>
             </div>
 
-            {/* ─── 6. REFLEKSI AKHIR 90 HARI (Border-free) ────────────────── */}
+            {/* ─── 6. REFLEKSI AKHIR 90 HARI (Dikunci hingga Hari Ke-89) ────────────── */}
             <div className="bg-white p-6 rounded-2xl space-y-4 shadow-2xs">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-bold text-navy-900 flex items-center gap-2">
-                  Refleksi Akhir Program (90 Hari)
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Tuliskan pembelajaran utama, perubahan nyata, dan komitmen keberlanjutan setelah 90 hari.
-                </p>
-              </div>
-              <Textarea
-                rows={4}
-                value={finalReflection}
-                onChange={e => setFinalReflection(e.target.value)}
-                placeholder="Tuliskan refleksi & komitmen keberlanjutan Anda..."
-                className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none"
-              />
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <span className="text-[10px] text-slate-400 font-medium">{finalReflection.length} karakter</span>
-                <Button
-                  onClick={handleSaveReflection}
-                  disabled={savingReflection || !journeyId}
-                  className="font-bold text-xs bg-[#071A33] text-amber-300 hover:bg-black rounded-xl px-5 h-9"
-                >
-                  {savingReflection ? "Menyimpan..." : savedReflection ? "✓ Tersimpan!" : "Simpan Refleksi Akhir"}
-                </Button>
-              </div>
+              {dayCount < 89 ? (
+                <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 text-center space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto border border-amber-200 shadow-2xs">
+                    <Lock className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1.5 max-w-md mx-auto">
+                    <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs">
+                      🔒 Terkunci &bull; Hari ke-{dayCount} dari 90
+                    </Badge>
+                    <h3 className="text-sm font-extrabold text-navy-900 pt-1">
+                      Refleksi Akhir Program (90 Hari)
+                    </h3>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Fitur Refleksi Akhir Program ini akan terbuka secara otomatis pada <strong>Hari ke-89</strong> perjalanan Anda. Di sini Anda akan merangkum pencapaian, dampak perubahan, serta komitmen istiqamah pasca 90 hari.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="border-b border-slate-100 pb-3">
+                    <h3 className="text-base font-bold text-navy-900 flex items-center gap-2">
+                      Refleksi Akhir Program (90 Hari)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Tuliskan pembelajaran utama, perubahan nyata, dan komitmen keberlanjutan setelah 90 hari.
+                    </p>
+                  </div>
+                  <Textarea
+                    rows={4}
+                    value={finalReflection}
+                    onChange={e => setFinalReflection(e.target.value)}
+                    placeholder="Tuliskan refleksi & komitmen keberlanjutan Anda..."
+                    className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none"
+                  />
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[10px] text-slate-400 font-medium">{finalReflection.length} karakter</span>
+                    <Button
+                      onClick={handleSaveReflection}
+                      disabled={savingReflection || !journeyId}
+                      className="font-bold text-xs bg-[#071A33] text-amber-300 hover:bg-black rounded-xl px-5 h-9"
+                    >
+                      {savingReflection ? "Menyimpan..." : savedReflection ? "✓ Tersimpan!" : "Simpan Refleksi Akhir"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
 
           </div>
@@ -1117,16 +1325,16 @@ export default function MonitoringPage() {
 
         </div>
 
-        {/* ─── MODAL DRAWER: INPUT 4 DIMENSI INDIKATOR ─────────────────────── */}
+        {/* ─── MODAL DRAWER: INPUT INDIKATOR BULANAN ─────────────────────── */}
         {editingAreaModal && (
           <Dialog open={!!editingAreaModal} onOpenChange={() => setEditingAreaModal(null)}>
-            <DialogContent className="sm:max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-6">
+            <DialogContent className="w-[94vw] sm:max-w-xl max-h-[88vh] overflow-y-auto bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-6">
               <DialogHeader className="border-b border-slate-100 pb-3">
-                <DialogTitle className="text-base font-black text-navy-900 flex items-center gap-2">
-                  <Target className="h-5 w-5 text-amber-600" />
+                <DialogTitle className="text-sm sm:text-base font-black text-navy-900 flex items-center gap-2">
+                  <Target className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0" />
                   Pelaporan Indikator: {editingAreaModal}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500">
+                <DialogDescription className="text-[11px] sm:text-xs text-slate-500">
                   Input realisasi bulan ke-{selectedMonth}. Skor keberhasilan dihitung otomatis.
                 </DialogDescription>
               </DialogHeader>
@@ -1135,6 +1343,13 @@ export default function MonitoringPage() {
                 const rep = areaReports[selectedMonth]?.[editingAreaModal];
                 if (!rep) return null;
                 const overallPct = calcAreaScore(rep);
+
+                const hasKualitas = Boolean(rep.targets.kualitas && rep.targets.kualitas.trim().length > 0);
+                const hasKuantitas = Boolean(rep.targets.kuantitas && rep.targets.kuantitas.trim().length > 0);
+                const hasWaktu = Boolean(rep.targets.waktu && rep.targets.waktu.trim().length > 0);
+                const hasBiaya = Boolean(rep.targets.biaya && rep.targets.biaya.trim().length > 0);
+
+                const showDefaultRating = !hasKualitas && !hasKuantitas && !hasWaktu && !hasBiaya;
 
                 return (
                   <div className="space-y-4 py-2">
@@ -1147,77 +1362,110 @@ export default function MonitoringPage() {
                     )}
 
                     <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
-                      <span className="text-xs font-bold text-slate-600">Skor Capaian Area:</span>
-                      <span className="text-sm font-extrabold text-emerald-600">{overallPct}% Berhasil</span>
+                      <span className="text-xs font-bold text-slate-600">Evaluasi Indikator Area:</span>
+                      <span className="text-xs sm:text-sm font-extrabold text-navy-900">{editingAreaModal}</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                       {/* 1. Kualitas */}
-                      <div className="bg-purple-50/50 p-3.5 rounded-xl border border-purple-200 space-y-2">
-                        <label className="font-bold text-purple-800 block">1. Kualitas (Mutu / Kekhusyukan)</label>
-                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kualitas || "Khusyu & Tepat waktu"}</p>
-                        <div className="flex gap-1 py-1">
-                          {[1, 2, 3, 4, 5].map(star => (
-                            <button
-                              key={star}
-                              onClick={() => updateAreaReport(editingAreaModal, "kualitasRating", star)}
-                              className="transition-transform hover:scale-125"
-                            >
-                              <Star className={`h-5 w-5 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
-                            </button>
-                          ))}
-                          <span className="text-xs font-bold text-slate-600 ml-1 self-center">{rep.kualitasRating}/5 ★</span>
+                      {hasKualitas && (
+                        <div className="bg-purple-50/50 p-3.5 rounded-xl border border-purple-200 space-y-2">
+                          <label className="font-bold text-purple-800 block">1. Kualitas (Mutu / Kekhusyukan)</label>
+                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kualitas}</p>
+                          <div className="flex items-center gap-1.5 py-1 flex-wrap">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <button
+                                key={star}
+                                type="button"
+                                onClick={() => updateAreaReport(editingAreaModal, "kualitasRating", star)}
+                                className="transition-transform hover:scale-125 p-1 cursor-pointer"
+                              >
+                                <Star className={`h-6 w-6 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
+                              </button>
+                            ))}
+                            <span className="text-xs font-bold text-slate-600 ml-1">{rep.kualitasRating}/5 ★</span>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* 2. Kuantitas */}
-                      <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-200 space-y-2">
-                        <label className="font-bold text-blue-800 block">2. Kuantitas (Realisasi)</label>
-                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kuantitas || "Target PTP"}</p>
-                        <div className="space-y-1.5">
-                          <Input
-                            value={rep.kuantitasActual}
-                            onChange={e => updateAreaReport(editingAreaModal, "kuantitasActual", e.target.value)}
-                            placeholder="Realisasi bulan ini (misal: 95)"
-                            className="text-xs h-8 border-slate-200 rounded-lg bg-white"
-                          />
+                      {hasKuantitas && (
+                        <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-200 space-y-2">
+                          <label className="font-bold text-blue-800 block">2. Kuantitas (Realisasi)</label>
+                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.kuantitas}</p>
+                          <div className="space-y-1.5">
+                            <Input
+                              value={rep.kuantitasActual}
+                              onChange={e => updateAreaReport(editingAreaModal, "kuantitasActual", e.target.value)}
+                              placeholder="Realisasi bulan ini"
+                              className="text-xs h-10 sm:h-8 border-slate-200 rounded-lg bg-white"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* 3. Waktu */}
-                      <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 space-y-2">
-                        <label className="font-bold text-amber-800 block">3. Waktu (Hari Tepat Waktu)</label>
-                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.waktu || "Jadwal Tepat Waktu"}</p>
-                        <Input
-                          type="number" min={0} max={30}
-                          value={rep.waktuActualDays}
-                          onChange={e => updateAreaReport(editingAreaModal, "waktuActualDays", e.target.value)}
-                          placeholder="Hari tepat waktu dari 30 (misal: 25)"
-                          className="text-xs h-8 border-slate-200 rounded-lg bg-white"
-                        />
-                      </div>
+                      {hasWaktu && (
+                        <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 space-y-2">
+                          <label className="font-bold text-amber-800 block">3. Waktu (Hari Tepat Waktu)</label>
+                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.waktu}</p>
+                          <Input
+                            type="number" min={0} max={30}
+                            value={rep.waktuActualDays}
+                            onChange={e => updateAreaReport(editingAreaModal, "waktuActualDays", e.target.value)}
+                            placeholder="Hari tepat waktu dari 30 (misal: 25)"
+                            className="text-xs h-10 sm:h-8 border-slate-200 rounded-lg bg-white"
+                          />
+                        </div>
+                      )}
 
                       {/* 4. Biaya */}
-                      <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 space-y-2">
-                        <label className="font-bold text-emerald-800 block">4. Biaya / Anggaran (Nominal)</label>
-                        <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.biaya || "Nominal Rp"}</p>
-                        <Input
-                          value={rep.biayaActual}
-                          onChange={e => updateAreaReport(editingAreaModal, "biayaActual", e.target.value)}
-                          placeholder="Nominal realisasi (misal: 600000)"
-                          className="text-xs h-8 border-slate-200 rounded-lg bg-white"
-                        />
-                      </div>
+                      {hasBiaya && (
+                        <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 space-y-2">
+                          <label className="font-bold text-emerald-800 block">4. Biaya / Anggaran (Nominal)</label>
+                          <p className="text-[10px] text-slate-500">Target PTP: {rep.targets.biaya}</p>
+                          <Input
+                            value={rep.biayaActual}
+                            onChange={e => updateAreaReport(editingAreaModal, "biayaActual", e.target.value)}
+                            placeholder="Nominal realisasi (misal: 600000)"
+                            className="text-xs h-10 sm:h-8 border-slate-200 rounded-lg bg-white"
+                          />
+                        </div>
+                      )}
+
+                      {/* Default Rating Input if no specific 4D targets were configured */}
+                      {showDefaultRating && (
+                        <div className="col-span-1 sm:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-center">
+                          <label className="font-extrabold text-navy-900 block text-xs sm:text-sm">
+                            Penilaian Pencapaian Target Bulanan (1–5★)
+                          </label>
+                          <div className="flex items-center justify-center gap-2">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <button
+                                key={star}
+                                type="button"
+                                onClick={() => updateAreaReport(editingAreaModal, "kualitasRating", star)}
+                                className="transition-transform hover:scale-125 p-1 cursor-pointer"
+                              >
+                                <Star className={`h-7 w-7 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
+                              </button>
+                            ))}
+                          </div>
+                          <span className="text-xs font-bold text-slate-600 block">
+                            Rating: {rep.kualitasRating} dari 5 Bintang ({rep.kualitasRating * 20}% Capaian)
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    <DialogFooter className="border-t border-slate-100 pt-3">
-                      <Button variant="outline" onClick={() => setEditingAreaModal(null)} className="text-xs font-semibold rounded-xl h-9">
+                    <DialogFooter className="border-t border-slate-100 pt-3 flex flex-col-reverse sm:flex-row gap-2">
+                      <Button variant="outline" onClick={() => setEditingAreaModal(null)} className="w-full sm:w-auto text-xs font-semibold rounded-xl h-10 sm:h-9">
                         Batal
                       </Button>
                       <Button
                         onClick={() => handleSaveIndReport(editingAreaModal)}
                         disabled={savingArea === editingAreaModal}
-                        className="bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 px-5"
+                        className="w-full sm:w-auto bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-10 sm:h-9 px-6"
                       >
                         {savingArea === editingAreaModal ? "Menyimpan..." : "Simpan Capaian Bulanan"}
                       </Button>

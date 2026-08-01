@@ -47,7 +47,6 @@ const SECTIONS = [
   { num: 2, title: "Niat Perubahan", subtitle: "Landasan komitmen ibadah karena Allah ﷻ" },
   { num: 3, title: "Area Transformasi", subtitle: "Pilih area fokus dan tetapkan target 90 hari" },
   { num: 4, title: "Action Plan (Habit Engine)", subtitle: "Kebiasaan harian/mingguan yang dipantau" },
-  { num: 5, title: "Refleksi Akhir (90 Hari)", subtitle: "Evaluasi akhir perjalanan dan komitmen istiqamah" },
 ];
 
 // ─── Area List ───────────────────────────────────────────────────
@@ -104,13 +103,6 @@ const SECTION_TIPS: Record<number, { title: string; tips: { icon: string; title:
       { icon: "✦", title: "Mulai dari yang kecil", desc: "Kebiasaan kecil yang konsisten lebih efektif dari yang besar tapi tidak dilakukan." },
       { icon: "✦", title: "Harian lebih baik dari mingguan", desc: "Frekuensi tinggi membangun otot kebiasaan lebih cepat." },
       { icon: "✦", title: "Kaitkan dengan area transformasi", desc: "Pilih kebiasaan yang langsung mendukung area yang dipilih." },
-    ],
-  },
-  5: {
-    title: "Tips Refleksi Akhir (90 Hari)",
-    tips: [
-      { icon: "✦", title: "Merangkum 90 Hari", desc: "Tuliskan milestone dan transformasi terbesar yang Anda alami selama 90 hari." },
-      { icon: "✦", title: "Menjaga Istiqamah", desc: "Tetapkan komitmen nyata yang akan terus dijalankan setelah program selesai." },
     ],
   },
 };
@@ -454,7 +446,6 @@ interface BatchMate {
       case 2: return niat.trim().length > 0;
       case 3: return selectedAreas.length > 0 && Object.values(areaTargetsMap).some(t => t.mainTarget && t.mainTarget.trim().length > 0);
       case 4: return actionPlans.length > 0;
-      case 5: return dayCount >= 89;
       default: return false;
     }
   };
@@ -516,11 +507,11 @@ interface BatchMate {
   const SaveIndicator = () => (
     <div className="flex items-center gap-1.5 text-xs">
       {saveStatus === "saving" ? (
-        <><div className="h-1.5 w-1.5 bg-amber-400 rounded-full animate-pulse" /><span className="text-slate-400">Menyimpan...</span></>
+        <><div className="h-1.5 w-1.5 bg-amber-400 rounded-full animate-pulse" /><span className="text-slate-600 font-medium">Menyimpan...</span></>
       ) : saveStatus === "saved" ? (
-        <><div className="h-1.5 w-1.5 bg-green-500 rounded-full" /><span className="text-slate-400">Tersimpan otomatis {getLastSavedText()}</span></>
+        <><div className="h-1.5 w-1.5 bg-green-500 rounded-full" /><span className="text-slate-600 font-medium">Tersimpan otomatis {getLastSavedText()}</span></>
       ) : (
-        <><div className="h-1.5 w-1.5 bg-slate-200 rounded-full" /><span className="text-slate-300">Siap disimpan</span></>
+        <><div className="h-1.5 w-1.5 bg-slate-400 rounded-full" /><span className="text-slate-600 font-medium">Siap disimpan</span></>
       )}
     </div>
   );
@@ -532,27 +523,29 @@ interface BatchMate {
       case 1:
         return (
           <div className="space-y-4">
-            {/* Collapsible Reflection Guide */}
-            <button
-              type="button"
-              onClick={() => setGuideOpen(v => !v)}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-left hover:bg-amber-100/60 transition-colors group"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-amber-500 text-sm">✦</span>
-                <span className="text-sm font-bold text-amber-800">Reflection Guide</span>
-              </div>
-              <ChevronRight className={`h-4 w-4 text-amber-500 transition-transform duration-200 ${guideOpen ? "rotate-90" : ""}`} />
-            </button>
-            {guideOpen && (
-              <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-3 -mt-2">
-                <ul className="text-sm text-amber-900 space-y-2">
-                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">1.</span> Kondisi hati dan aspek mana dalam hidup Anda saat ini yang paling membutuhkan petunjuk dan perbaikan dari Allah SWT?</li>
-                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">2.</span> Kebiasaan, kekhilafan, atau kendala apa yang selama ini paling menghambat tumbuh kembang Anda sebagai hamba dan pemimpin?</li>
-                  <li className="flex items-start gap-2"><span className="text-amber-500 font-bold shrink-0">3.</span> Jika perjalanan hidup Anda berakhir hari ini, hal penting apa yang paling Anda harapkan telah diperbaiki?</li>
-                </ul>
-              </div>
-            )}
+            {/* Collapsible Reflection Guide (Solid Background) */}
+            <div className="bg-[#071A33] border-l-4 border-amber-400 rounded-xl overflow-hidden shadow-xs">
+              <button
+                type="button"
+                onClick={() => setGuideOpen(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 text-sm font-black">✦</span>
+                  <span className="text-sm font-extrabold text-white">Reflection Guide</span>
+                </div>
+                <ChevronRight className={`h-4 w-4 text-amber-400 transition-transform duration-200 ${guideOpen ? "rotate-90" : ""}`} />
+              </button>
+              {guideOpen && (
+                <div className="px-4 pb-4 pt-1 border-t border-slate-700/60 bg-[#071A33]">
+                  <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Kondisi hati dan aspek mana dalam hidup Anda saat ini yang paling membutuhkan petunjuk dan perbaikan dari Allah SWT?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Kebiasaan, kekhilafan, atau kendala apa yang selama ini paling menghambat tumbuh kembang Anda sebagai hamba dan pemimpin?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Jika perjalanan hidup Anda berakhir hari ini, hal penting apa yang paling Anda harapkan telah diperbaiki?</li>
+                  </ul>
+                </div>
+              )}
+            </div>
             <div>
               <p className="text-xs text-slate-500 mb-2 font-medium">Tuliskan Muhasabah diri Anda secara jujur dan mendalam.</p>
               <Textarea disabled={locked} value={muhasabah} onChange={e => { setMuhasabah(e.target.value); scheduleAutosave(1); }} placeholder="Tulis di sini..." className="min-h-[180px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={2000} />
@@ -1179,54 +1172,6 @@ interface BatchMate {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        );
-      }
-
-      case 5: {
-        const isLockedDay89 = dayCount < 89;
-        if (isLockedDay89) {
-          return (
-            <div className="space-y-4">
-              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-8 text-center space-y-4 shadow-2xs">
-                <div className="h-14 w-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-2xs border border-amber-200">
-                  <Lock className="h-7 w-7" />
-                </div>
-                <div className="space-y-1.5 max-w-md mx-auto">
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-bold text-xs mb-1">
-                    Terkunci &bull; Hari ke-{dayCount} dari 90
-                  </Badge>
-                  <h3 className="text-base font-extrabold text-navy-900">
-                    Refleksi Akhir Program (90 Hari)
-                  </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Fitur Refleksi Akhir Program ini akan terbuka secara otomatis pada <strong>Hari ke-89</strong> perjalanan Anda. Di sini Anda akan merangkum pencapaian, dampak perubahan, serta komitmen istiqamah pasca 90 hari.
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        }
-
-        return (
-          <div className="space-y-4">
-            <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 space-y-1">
-              <h3 className="text-sm font-black text-navy-900 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-500 fill-amber-400" />
-                Refleksi Akhir & Komitmen Istiqamah
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Tuliskan pencapaian terbesar, pembelajaran paling berharga, dan janji istiqamah Anda pasca 90 hari program.
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2 font-medium">1. Apa transformasi terbesar yang Anda rasakan selama 90 hari ini?</p>
-              <Textarea disabled={locked} placeholder="Tuliskan refleksi pencapaian Anda..." className="min-h-[140px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={2000} />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2 font-medium">2. Komitmen konkret apa yang akan terus Anda jaga secara konsisten di masa mendatang?</p>
-              <Textarea disabled={locked} placeholder="Tuliskan komitmen istiqamah Anda..." className="min-h-[100px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={1000} />
             </div>
           </div>
         );

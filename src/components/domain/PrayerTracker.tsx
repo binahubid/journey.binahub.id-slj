@@ -257,18 +257,9 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
                     </tr>
                     {activeSunnahList.map((p) => (
                       <tr key={p.key} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-2 pr-2 font-semibold text-slate-800 flex items-center justify-between gap-1">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                            <span className="truncate text-xs">{p.label}</span>
-                          </div>
-                          <button
-                            onClick={() => toggleSunnahActive(p.key)}
-                            className="text-slate-400 hover:text-red-500 p-0.5 rounded-md hover:bg-slate-100 shrink-0"
-                            title="Hapus dari display"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
+                        <td className="py-2 pr-2 font-semibold text-slate-800 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                          <span className="truncate text-xs">{p.label}</span>
                         </td>
                         {days.map((d) => {
                           const isChecked = !!logs[`${d.dateStr}_${p.key}`];

@@ -17,6 +17,7 @@ import {
   LogOut,
   User,
   BarChart3,
+  HeartHandshake,
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/companies", label: "Companies", icon: Building2 },
     { href: "/admin/batches", label: "Batches", icon: Layers },
     { href: "/admin/participants", label: "Participants", icon: Users },
+    { href: "/admin/sahabat-safar", label: "Sahabat Safar", icon: HeartHandshake },
     { href: "/admin/coaches", label: "Coaches", icon: UserCheck },
     { href: "/admin/monitoring", label: "Monitoring", icon: Activity },
     { href: "/admin/report", label: "Impact Report", icon: BarChart3 },

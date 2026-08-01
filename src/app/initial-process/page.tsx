@@ -269,16 +269,17 @@ export default function InitialProcessPage() {
         updated_at: new Date().toISOString(),
       };
 
-      // Try upserting to Supabase
+      // Upsert to Supabase
       const { error } = await supabase
         .from("sahabat_safar_profiles")
         .upsert(payload, { onConflict: "user_id" });
 
       if (error) {
-        console.warn("Supabase upsert error (table may not exist yet, falling back to local):", error.message);
+        console.error("Supabase upsert error:", error);
+        throw new Error(`Gagal menyimpan instrumen ke server: ${error.message}`);
       }
 
-      // Save locally to mark completed
+      // Save locally as optimistic backup
       localStorage.setItem("sahabat_safar_profile_draft", JSON.stringify({
         ...payload,
         submitted: true,
@@ -316,7 +317,7 @@ export default function InitialProcessPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white">Initial Process: Sahabat Safar Matching Profile</h1>
-              <p className="text-xs text-slate-300">Instrumen rekomendasi pairing Sahabat Safar oleh Admin Fasilitator.</p>
+              <p className="text-xs text-slate-300">Instrumen rekomendasi pairing Sahabat Safar oleh Tim binaJourney.</p>
             </div>
           </div>
 
@@ -339,8 +340,8 @@ export default function InitialProcessPage() {
                     : "bg-white/5 text-slate-400 border-white/10"
                 }`}
               >
-                <div className="text-[10px] uppercase tracking-wider">Step {s.num}</div>
-                <div className="truncate text-xs">{s.label}</div>
+                <div className="text-[11px] sm:text-[10px] uppercase tracking-wider font-extrabold">Step {s.num}</div>
+                <div className="truncate text-xs hidden sm:block">{s.label}</div>
               </button>
             ))}
           </div>
@@ -521,7 +522,7 @@ export default function InitialProcessPage() {
                 onClick={() => handleStepChange(2)}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
-                Lanjut ke Layer 2: Prioritas <ChevronRight className="h-4 w-4" />
+                Lanjut<span className="hidden sm:inline"> ke Layer 2: Prioritas</span> <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </Card>
@@ -553,11 +554,11 @@ export default function InitialProcessPage() {
 
             <div className="space-y-4">
               {[
-                { key: "spiritual_growth", title: "Spiritual Growth (Pertumbuhan Spiritual)", desc: "Kualitas ibadah, hubungan dengan Allah, keikhlasan, ketenangan hati." },
-                { key: "personal_development", title: "Personal Development (Pengembangan Diri)", desc: "Disiplin, pengendalian emosi, kebiasaan positif, percaya diri." },
-                { key: "relationship", title: "Relationship (Hubungan)", desc: "Pasangan, anak, orang tua, rekan kerja, komunikasi." },
-                { key: "leadership_excellence", title: "Leadership & Professional Excellence", desc: "Kepemimpinan, amanah, produktivitas, kinerja." },
-                { key: "community_impact", title: "Community Impact (Kontribusi Masyarakat)", desc: "Kegiatan sosial, dakwah, memberi manfaat bagi umat." },
+                { key: "spiritual_growth", title: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT" },
+                { key: "personal_development", title: "Personal Development", desc: "hubungan kita dengan diri sendiri" },
+                { key: "leadership_excellence", title: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan" },
+                { key: "relationship", title: "Relationship", desc: "hubungan kita dengan orang lain" },
+                { key: "community_impact", title: "Community Impact", desc: "dampak terhadap lingkungan sekitar" },
               ].map((item) => {
                 const val = layer2[item.key as keyof Layer2Points] || 0;
                 return (
@@ -568,7 +569,7 @@ export default function InitialProcessPage() {
                         <p className="text-[11px] text-slate-500">{item.desc}</p>
                       </div>
                       <span className="text-sm font-black text-amber-700 bg-white px-3 py-1 rounded-xl border border-amber-200 shadow-2xs">
-                        {val} Poin
+                        {val}
                       </span>
                     </div>
 
@@ -612,7 +613,7 @@ export default function InitialProcessPage() {
                 }}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
-                Lanjut ke Layer 3: Support Exchange <ChevronRight className="h-4 w-4" />
+                Lanjut<span className="hidden sm:inline"> ke Layer 3: Support Exchange</span> <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </Card>
@@ -691,7 +692,7 @@ export default function InitialProcessPage() {
                 onClick={() => handleStepChange(4)}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10 flex items-center gap-2"
               >
-                Lanjut ke Journey Preference <ChevronRight className="h-4 w-4" />
+                Lanjut<span className="hidden sm:inline"> ke Journey Preference</span> <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </Card>
@@ -866,9 +867,18 @@ export default function InitialProcessPage() {
               <Button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl px-8 h-11 shadow-md flex items-center gap-2"
+                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl px-5 sm:px-8 h-11 shadow-md flex items-center gap-2"
               >
-                {submitting ? "Menyimpan Profil..." : "Kirim Profil Sahabat Safar"}
+                <span>
+                  {submitting ? (
+                    "Menyimpan..."
+                  ) : (
+                    <>
+                      <span className="sm:hidden">Submit</span>
+                      <span className="hidden sm:inline">Kirim Profil Sahabat Safar</span>
+                    </>
+                  )}
+                </span>
                 <Send className="h-4 w-4" />
               </Button>
             </div>
@@ -884,7 +894,7 @@ export default function InitialProcessPage() {
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-navy-900">Profil Sahabat Safar Berhasil Disimpan!</h2>
               <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                Data instrumen ini telah masuk ke sistem. Admin Fasilitator akan menggunakan profil ini untuk menentukan pairing Sahabat Safar terbaik bagi Anda.
+                Data instrumen ini telah masuk ke sistem. Tim binaJourney akan menggunakan profil ini untuk menentukan pairing Sahabat Safar terbaik bagi Anda.
               </p>
             </div>
 
@@ -900,15 +910,15 @@ export default function InitialProcessPage() {
               <Button
                 variant="outline"
                 onClick={() => { setSubmitted(false); setActiveStep(1); }}
-                className="rounded-xl h-10 text-xs border-slate-200"
+                className="rounded-xl h-10 text-xs font-bold border-slate-200"
               >
-                Edit Jawaban Profil
+                Edit Jawaban
               </Button>
               <Button
                 onClick={() => router.push("/dashboard")}
                 className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10"
               >
-                Kembali ke Dashboard
+                Ke Dashboard
               </Button>
             </div>
           </Card>

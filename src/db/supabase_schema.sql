@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   start_date TIMESTAMP WITH TIME ZONE,
   end_date TIMESTAMP WITH TIME ZONE,
   coach_id UUID,
+  sahabat_safar_user_id UUID REFERENCES public.profiles(user_id) ON DELETE SET NULL,
+  sahabat_safar_name TEXT,
   last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
@@ -140,7 +142,8 @@ CREATE TABLE IF NOT EXISTS public.habit_logs (
   date TEXT NOT NULL, -- YYYY-MM-DD
   completed BOOLEAN NOT NULL DEFAULT FALSE,
   note TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  CONSTRAINT habit_logs_habit_id_date_unique UNIQUE (habit_id, date)
 );
 
 -- 9. JOURNALS TABLE
@@ -189,6 +192,19 @@ CREATE TABLE IF NOT EXISTS public.settings (
   journal_privacy_default BOOLEAN NOT NULL DEFAULT TRUE,
   preferred_prayer_city TEXT NOT NULL DEFAULT 'Jakarta',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- 13. SAHABAT SAFAR PROFILES TABLE (Initial Process)
+CREATE TABLE IF NOT EXISTS public.sahabat_safar_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL UNIQUE REFERENCES public.profiles(user_id) ON DELETE CASCADE,
+  layer1 JSONB DEFAULT '{}'::jsonb,
+  layer2 JSONB DEFAULT '{}'::jsonb,
+  layer3 JSONB DEFAULT '{}'::jsonb,
+  preferences JSONB DEFAULT '{}'::jsonb,
+  is_completed BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
 -- ========================================================

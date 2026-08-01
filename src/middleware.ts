@@ -48,6 +48,8 @@ export async function middleware(request: NextRequest) {
   const protectedRoutes = [
     "/dashboard",
     "/onboarding",
+    "/baseline",
+    "/initial-process",
     "/journey",
     "/monitoring",
     "/journal",

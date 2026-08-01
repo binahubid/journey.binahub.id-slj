@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, MapPin, Calendar, Building2, Layers } from "lucide-react";
+import { ArrowLeft, User, MapPin, Calendar, Building2, Layers, HeartHandshake } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 
@@ -19,6 +19,7 @@ interface UserProfileData {
   batchName: string;
   status: string;
   areaTransformasi: string[];
+  sahabatSafarName?: string | null;
 }
 
 export default function ProfilePage() {
@@ -75,6 +76,16 @@ export default function ProfilePage() {
           }
         }
 
+        // 4. Fetch Support Team for Sahabat Safar name fallback
+        const { data: teamData } = await supabase
+          .from("support_team")
+          .select("sahabat_safar_name")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        const sahabatSafarName =
+          userProfile?.sahabat_safar_name || teamData?.sahabat_safar_name || null;
+
         const fullName = userProfile?.full_name || user.email?.split("@")[0] || "Peserta SLJ";
         const roleLabel =
           userProfile?.role === "admin"
@@ -102,6 +113,7 @@ export default function ProfilePage() {
           batchName,
           status: journey?.status || "ONBOARDING",
           areaTransformasi: Array.isArray(journey?.area_transformasi) ? journey.area_transformasi : [],
+          sahabatSafarName,
         });
       } catch (err) {
         console.error("Gagal memuat profil:", err);
@@ -168,6 +180,23 @@ export default function ProfilePage() {
                 <Layers className="h-4 w-4 text-gray-400" /> Batch Rombongan
               </span>
               <span className="font-semibold text-[#0B2C6B]">{profile.batchName}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-warm-border">
+              <span className="text-gray-500 flex items-center gap-2">
+                <HeartHandshake className="h-4 w-4 text-amber-600" /> Sahabat Safar
+              </span>
+              <span>
+                {profile.sahabatSafarName ? (
+                  <span className="text-amber-900 bg-amber-100 font-extrabold px-3 py-1 rounded-full text-xs flex items-center gap-1 border border-amber-300">
+                    🤝 {profile.sahabatSafarName}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-normal italic text-xs">
+                    Belum dipasangkan oleh Admin
+                  </span>
+                )}
+              </span>
             </div>
 
             <div className="py-2 space-y-2">

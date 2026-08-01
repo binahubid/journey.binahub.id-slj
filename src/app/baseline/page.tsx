@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Sparkles,
   Heart,
   ArrowRight,
@@ -261,6 +262,17 @@ export default function BaselinePage() {
   const saveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const answersMapRef = useRef<Record<number, number>>({});
   useEffect(() => { answersMapRef.current = answersMap; }, [answersMap]);
+
+  // Jeda Refleksi expand/collapse state
+  const [isRefleksiExpanded, setIsRefleksiExpanded] = useState(true);
+
+  // Scroll to top & reset refleksi expanded when step changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    setIsRefleksiExpanded(true);
+  }, [currentStepIndex, isIntro]);
 
   // Batch save current answers map to Supabase
   const batchSaveAnswersToSupabase = async (mapToSave?: Record<number, number>) => {
@@ -717,7 +729,7 @@ export default function BaselinePage() {
                   Ringkasan Skor Baseline Self-Discovery
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Titik awal kondisi diri Anda sebelum memasuki Peta Perjalanan Transformasi (PTP).
+                  Titik awal kondisi diri Anda sebelum memasuki Personal Transformation Project.
                 </p>
               </div>
             </div>
@@ -797,15 +809,30 @@ export default function BaselinePage() {
               </div>
             </div>
 
-            {/* Pause Card (Paragraf Pengantar Reflektif / Muhasabah) */}
-            <div className="bg-[#FAF8F4] border-l-4 border-amber-500 p-5 rounded-r-2xl space-y-2">
-              <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-amber-600" />
-                Jeda Refleksi — {currentStep.title}
-              </span>
-              <p className="text-xs sm:text-sm text-slate-700 italic leading-relaxed">
-                &ldquo;{currentStep.muhasabahText}&rdquo;
-              </p>
+            {/* Pause Card (Paragraf Pengantar Reflektif / Muhasabah - Expandable / Collapsible with Solid Color) */}
+            <div className="bg-[#071A33] border-l-4 border-amber-400 rounded-2xl overflow-hidden transition-all shadow-xs">
+              <button
+                type="button"
+                onClick={() => setIsRefleksiExpanded((prev) => !prev)}
+                className="w-full p-4 flex items-center justify-between gap-2 text-left transition-colors cursor-pointer"
+              >
+                <span className="text-xs font-extrabold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+                  Jeda Refleksi — {currentStep.title}
+                </span>
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-300 shrink-0">
+                  <span>{isRefleksiExpanded ? "Sembunyikan" : "Tampilkan Refleksi"}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isRefleksiExpanded ? "rotate-180" : ""}`} />
+                </div>
+              </button>
+
+              {isRefleksiExpanded && (
+                <div className="px-5 pb-5 pt-1 border-t border-slate-700/60 bg-[#071A33] space-y-2 animate-fadeIn">
+                  <p className="text-xs sm:text-sm text-slate-100 italic leading-relaxed">
+                    &ldquo;{currentStep.muhasabahText}&rdquo;
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Questions List */}

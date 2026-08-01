@@ -16,7 +16,31 @@ ALTER TABLE public.hadith_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ptp_snapshots ENABLE ROW LEVEL SECURITY;
 
 -- ──────────────────────────────────────────────────────────────────────
--- 1. PROFILES — user baca/update milik sendiri, coach baca assigned, admin baca semua
+-- HELPER FUNCTIONS (SECURITY DEFINER untuk Mencegah RLS Recursion)
+-- ──────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE user_id = auth.uid() AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.is_coach_of(participant_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE user_id = participant_id AND coach_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- ──────────────────────────────────────────────────────────────────────
+-- 1. PROFILES
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users can view profile" ON public.profiles;
@@ -24,223 +48,215 @@ DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Coach can read assigned participants profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users and admin read profiles" ON public.profiles;
 
-CREATE POLICY "Users can read own profile" ON public.profiles
+CREATE POLICY "Users and admin read profiles" ON public.profiles
   FOR SELECT USING (
     auth.uid() = user_id
-    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.user_id = auth.uid() AND p.role = 'admin')
-  );
-
-CREATE POLICY "Coach can read assigned participants profile" ON public.profiles
-  FOR SELECT USING (
-    coach_id = auth.uid()
+    OR coach_id = auth.uid()
+    OR public.is_admin()
   );
 
 CREATE POLICY "Users can insert own profile" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own profile" ON public.profiles
-  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = user_id OR public.is_admin()) WITH CHECK (auth.uid() = user_id OR public.is_admin());
 
 -- ──────────────────────────────────────────────────────────────────────
--- 2. JOURNEYS — user manage own, coach & admin read assigned
+-- 2. JOURNEYS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own journey" ON public.journeys;
 DROP POLICY IF EXISTS "Participants can read own journey" ON public.journeys;
 DROP POLICY IF EXISTS "Coach can read assigned participant journey" ON public.journeys;
 DROP POLICY IF EXISTS "Participants can insert/update own journey" ON public.journeys;
+DROP POLICY IF EXISTS "Participants manage own journey" ON public.journeys;
+DROP POLICY IF EXISTS "Coach and admin read assigned participant journey" ON public.journeys;
 
 CREATE POLICY "Participants manage own journey" ON public.journeys
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Coach can read assigned participant journey" ON public.journeys
+CREATE POLICY "Coach and admin read assigned participant journey" ON public.journeys
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = journeys.user_id AND coach_id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+    public.is_coach_of(journeys.user_id) OR public.is_admin()
   );
 
 -- ──────────────────────────────────────────────────────────────────────
--- 3. ACTION_PLANS — user manage own, coach & admin read
+-- 3. ACTION_PLANS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own action plans" ON public.action_plans;
 DROP POLICY IF EXISTS "Participants manage own action plans" ON public.action_plans;
 DROP POLICY IF EXISTS "Coach view participant action plans" ON public.action_plans;
+DROP POLICY IF EXISTS "Coach and admin view participant action plans" ON public.action_plans;
 
 CREATE POLICY "Participants manage own action plans" ON public.action_plans
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Coach view participant action plans" ON public.action_plans
+CREATE POLICY "Coach and admin view participant action plans" ON public.action_plans
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = action_plans.user_id AND coach_id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+    public.is_coach_of(action_plans.user_id) OR public.is_admin()
   );
 
 -- ──────────────────────────────────────────────────────────────────────
--- 4. SUPPORT_TEAM — user manage own, coach & admin read
+-- 4. SUPPORT_TEAM
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own support_team" ON public.support_team;
 DROP POLICY IF EXISTS "Participants manage own support team" ON public.support_team;
+DROP POLICY IF EXISTS "Coach view participant support team" ON public.support_team;
+DROP POLICY IF EXISTS "Coach and admin view participant support team" ON public.support_team;
 
 CREATE POLICY "Participants manage own support team" ON public.support_team
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Coach view participant support team" ON public.support_team
+CREATE POLICY "Coach and admin view participant support team" ON public.support_team
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = support_team.user_id AND coach_id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+    public.is_coach_of(support_team.user_id) OR public.is_admin()
   );
 
 -- ──────────────────────────────────────────────────────────────────────
--- 5. PTP_SNAPSHOTS — user manage own, admin read
+-- 5. PTP_SNAPSHOTS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own ptp_snapshots" ON public.ptp_snapshots;
+DROP POLICY IF EXISTS "Participants manage own ptp snapshots" ON public.ptp_snapshots;
+DROP POLICY IF EXISTS "Admin view all ptp snapshots" ON public.ptp_snapshots;
 
 CREATE POLICY "Participants manage own ptp snapshots" ON public.ptp_snapshots
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Admin view all ptp snapshots" ON public.ptp_snapshots
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- ──────────────────────────────────────────────────────────────────────
--- 6. HABITS — user manage own, coach & admin read
+-- 6. HABITS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own habits" ON public.habits;
 DROP POLICY IF EXISTS "Participants manage own habits" ON public.habits;
 DROP POLICY IF EXISTS "Coach view participant habits" ON public.habits;
+DROP POLICY IF EXISTS "Coach and admin view participant habits" ON public.habits;
 
 CREATE POLICY "Participants manage own habits" ON public.habits
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Coach view participant habits" ON public.habits
+CREATE POLICY "Coach and admin view participant habits" ON public.habits
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = habits.user_id AND coach_id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+    public.is_coach_of(habits.user_id) OR public.is_admin()
   );
 
 -- ──────────────────────────────────────────────────────────────────────
--- 7. HABIT_LOGS — user manage own, coach & admin read
+-- 7. HABIT_LOGS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own habit logs" ON public.habit_logs;
 DROP POLICY IF EXISTS "Participants manage own habit logs" ON public.habit_logs;
 DROP POLICY IF EXISTS "Coach view participant habit logs" ON public.habit_logs;
+DROP POLICY IF EXISTS "Coach and admin view participant habit logs" ON public.habit_logs;
 
 CREATE POLICY "Participants manage own habit logs" ON public.habit_logs
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Coach view participant habit logs" ON public.habit_logs
+CREATE POLICY "Coach and admin view participant habit logs" ON public.habit_logs
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = habit_logs.user_id AND coach_id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+    public.is_coach_of(habit_logs.user_id) OR public.is_admin()
   );
 
 -- ──────────────────────────────────────────────────────────────────────
--- 8. JOURNALS — user manage own, coach read non-private, admin read all
+-- 8. JOURNALS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own journals" ON public.journals;
 DROP POLICY IF EXISTS "Participants full control on own journals" ON public.journals;
 DROP POLICY IF EXISTS "Coach read non-private journals of assigned participant" ON public.journals;
+DROP POLICY IF EXISTS "Coach and admin read non-private journals" ON public.journals;
 
 CREATE POLICY "Participants full control on own journals" ON public.journals
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Coach read non-private journals of assigned participant" ON public.journals
+CREATE POLICY "Coach and admin read non-private journals" ON public.journals
   FOR SELECT USING (
     is_private = false AND (
-      EXISTS (SELECT 1 FROM public.profiles WHERE user_id = journals.user_id AND coach_id = auth.uid())
-      OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+      public.is_coach_of(journals.user_id) OR public.is_admin()
     )
   );
 
 -- ──────────────────────────────────────────────────────────────────────
--- 9. MONTHLY_REVIEWS — user manage own, coach & admin read/update
+-- 9. MONTHLY_REVIEWS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own monthly reviews" ON public.monthly_reviews;
-DROP POLICY IF EXISTS "Participants & Coach view monthly reviews" ON public.monthly_reviews;
-DROP POLICY IF EXISTS "Participants update own review notes" ON public.monthly_reviews;
-DROP POLICY IF EXISTS "Coach update coach notes" ON public.monthly_reviews;
+DROP POLICY IF EXISTS "Participants manage own monthly reviews" ON public.monthly_reviews;
+DROP POLICY IF EXISTS "Coach view and update monthly reviews" ON public.monthly_reviews;
+DROP POLICY IF EXISTS "Coach and admin view/update monthly reviews" ON public.monthly_reviews;
 
 CREATE POLICY "Participants manage own monthly reviews" ON public.monthly_reviews
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Coach view and update monthly reviews" ON public.monthly_reviews
+CREATE POLICY "Coach and admin view/update monthly reviews" ON public.monthly_reviews
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = monthly_reviews.user_id AND coach_id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+    public.is_coach_of(monthly_reviews.user_id) OR public.is_admin()
   );
 
 -- ──────────────────────────────────────────────────────────────────────
--- 10. PRAYER_LOGS — user manage own, admin read
+-- 10. PRAYER_LOGS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own prayer logs" ON public.prayer_logs;
+DROP POLICY IF EXISTS "Admin view all prayer logs" ON public.prayer_logs;
 
 CREATE POLICY "Users manage own prayer logs" ON public.prayer_logs
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Admin view all prayer logs" ON public.prayer_logs
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- ──────────────────────────────────────────────────────────────────────
--- 11. QURAN_LOGS — user manage own, admin read
+-- 11. QURAN_LOGS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own quran logs" ON public.quran_logs;
+DROP POLICY IF EXISTS "Admin view all quran logs" ON public.quran_logs;
 
 CREATE POLICY "Users manage own quran logs" ON public.quran_logs
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Admin view all quran logs" ON public.quran_logs
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- ──────────────────────────────────────────────────────────────────────
--- 12. HADITH_LOGS — user manage own, admin read
+-- 12. HADITH_LOGS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own hadith logs" ON public.hadith_logs;
+DROP POLICY IF EXISTS "Admin view all hadith logs" ON public.hadith_logs;
 
 CREATE POLICY "Users manage own hadith logs" ON public.hadith_logs
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Admin view all hadith logs" ON public.hadith_logs
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- ──────────────────────────────────────────────────────────────────────
--- 13. ADMIN_NOTIFICATIONS — admin manage, authenticated read
+-- 13. ADMIN_NOTIFICATIONS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Allow all for notifications" ON public.admin_notifications;
 DROP POLICY IF EXISTS "Public view broadcast notifications" ON public.admin_notifications;
 DROP POLICY IF EXISTS "Auth send notifications" ON public.admin_notifications;
+DROP POLICY IF EXISTS "Admin manage broadcast notifications" ON public.admin_notifications;
+DROP POLICY IF EXISTS "Authenticated users read broadcast notifications" ON public.admin_notifications;
 
 CREATE POLICY "Admin manage broadcast notifications" ON public.admin_notifications
-  FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
-  ) WITH CHECK (
-    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 CREATE POLICY "Authenticated users read broadcast notifications" ON public.admin_notifications
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- ──────────────────────────────────────────────────────────────────────
--- 14. USER NOTIFICATIONS — user manage own
+-- 14. USER NOTIFICATIONS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own notifications" ON public.notifications;
@@ -249,7 +265,7 @@ CREATE POLICY "Users manage own notifications" ON public.notifications
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ──────────────────────────────────────────────────────────────────────
--- 15. SETTINGS — user manage own
+-- 15. SETTINGS
 -- ──────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Users manage own settings" ON public.settings;
@@ -258,12 +274,17 @@ CREATE POLICY "Users manage own settings" ON public.settings
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ──────────────────────────────────────────────────────────────────────
--- 16. COMPANIES & BATCHES — tetap open (data referensi)
---     Companies dan batches bersifat referensi yang perlu diakses semua user
+-- 16. COMPANIES & BATCHES
 -- ──────────────────────────────────────────────────────────────────────
 
--- (Tidak diubah — tetap USING (true) karena ini data publik/referensi)
+DROP POLICY IF EXISTS "Allow all for companies" ON public.companies;
+CREATE POLICY "Allow all for companies" ON public.companies
+  FOR ALL TO public USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all for batches" ON public.batches;
+CREATE POLICY "Allow all for batches" ON public.batches
+  FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- ====================================================================
--- SELESAI. Semua tabel sekarang memiliki RLS policy yang proper.
+-- SELESAI. Semua RLS aman & tanpa rekursi.
 -- ====================================================================

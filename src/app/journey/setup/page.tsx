@@ -59,18 +59,51 @@ export default function JourneySetupPage() {
   const [isCommitted, setIsCommitted] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [baselineScores, setBaselineScores] = useState<Record<string, number>>({});
 
   const totalSteps = 8;
 
   useEffect(() => {
-    async function loadUser() {
+    async function loadUserData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
+        try {
+          const { data: bAnswers } = await supabase
+            .from("baseline_answers")
+            .select("area, score")
+            .eq("user_id", user.id);
+
+          if (bAnswers && bAnswers.length > 0) {
+            const areaSums: Record<string, { sum: number; count: number }> = {};
+            bAnswers.forEach((ans: any) => {
+              const aKey = ans.area;
+              if (!areaSums[aKey]) areaSums[aKey] = { sum: 0, count: 0 };
+              areaSums[aKey].sum += ans.score;
+              areaSums[aKey].count += 1;
+            });
+
+            const keyMapping: Record<string, string> = {
+              spiritual_growth: "Spiritual Growth",
+              personal_development: "Personal Development",
+              leadership_excellence: "Leadership Excellence",
+              relationship: "Relationship",
+              community_impact: "Community Impact",
+            };
+
+            const mapResult: Record<string, number> = {};
+            Object.entries(areaSums).forEach(([aKey, val]) => {
+              const title = keyMapping[aKey] || aKey;
+              mapResult[title] = Math.round((val.sum / (val.count * 10)) * 100);
+            });
+            setBaselineScores(mapResult);
+          }
+        } catch (err) {
+          console.error("Error fetching baseline scores for PTP setup:", err);
+        }
       }
-      router.replace("/journey");
     }
-    loadUser();
+    loadUserData();
   }, []);
 
   const toggleArea = (areaId: string) => {
@@ -265,6 +298,7 @@ export default function JourneySetupPage() {
                   className="h-8 w-auto object-contain"
                 />
               </Link>
+              <h1 className="sr-only">Setup Personal Transformation Project</h1>
             </div>
 
             <div className="flex items-center space-x-3">
@@ -287,7 +321,7 @@ export default function JourneySetupPage() {
           {step === 1 && (
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h1 className="text-3xl font-serif font-bold text-navy-900">1. Muhasabah</h1>
+                <h2 className="text-3xl font-serif font-bold text-navy-900">1. Muhasabah</h2>
                 <p className="text-xs text-gray-600">
                   Apa hal terbesar yang ingin Anda perbaiki dan transformasikan selama 90 hari ke depan?
                 </p>
@@ -334,9 +368,9 @@ export default function JourneySetupPage() {
           {step === 2 && (
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h1 className="text-3xl font-serif font-bold text-navy-900 flex items-center gap-2">
+                <h2 className="text-3xl font-serif font-bold text-navy-900 flex items-center gap-2">
                   2. Niat Perubahan <Heart className="h-6 w-6 text-accent fill-accent" />
-                </h1>
+                </h2>
                 <p className="text-xs text-gray-600">
                   Landasi seluruh ikhtiar perubahan ini semata-mata karena Allah SWT.
                 </p>
@@ -375,7 +409,7 @@ export default function JourneySetupPage() {
             <div className="space-y-6 py-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-warm-border/60 pb-3">
                 <div className="space-y-1">
-                  <h1 className="text-3xl font-serif font-bold text-navy-900">3. Pilih Area Transformasi</h1>
+                  <h2 className="text-3xl font-serif font-bold text-navy-900">3. Pilih Area Transformasi</h2>
                   <p className="text-xs text-gray-600">
                     Pilih area fokus utama yang menjadi prioritas pertumbuhan Anda (<strong>maksimal 3 area</strong>).
                   </p>
@@ -398,40 +432,76 @@ export default function JourneySetupPage() {
                 </div>
               )}
 
+              {/* Baseline recommendation note if baseline answers exist */}
+              {Object.keys(baselineScores).length > 0 && (
+                <div className="p-3 rounded-lg bg-blue-50/80 border border-blue-200 text-xs text-blue-900 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span>Rekomendasi area diselaraskan dengan hasil asesmen Baseline 50 Soal Anda.</span>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {areaOptions.map((area) => {
-                  const isSelected = selectedAreas.includes(area.id);
-                  const isMaxedOut = !isSelected && selectedAreas.length >= 3;
-                  return (
-                    <div
-                      key={area.id}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedAreas(selectedAreas.filter((a) => a !== area.id));
-                        } else {
-                          if (selectedAreas.length >= 3) return;
-                          setSelectedAreas([...selectedAreas, area.id]);
-                        }
-                      }}
-                      className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
-                        isMaxedOut
-                          ? "opacity-50 cursor-not-allowed border-gray-200 bg-gray-50"
-                          : isSelected
-                          ? "border-navy-900 bg-navy-50/60 text-navy-900 font-semibold shadow-2xs cursor-pointer"
-                          : "border-warm-border bg-white text-gray-600 hover:border-gray-300 cursor-pointer"
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <area.icon className="h-5 w-5 text-accent shrink-0" />
-                        <div>
-                          <h4 className="font-bold text-xs">{area.label}</h4>
-                          <p className="text-[11px] text-gray-500">{area.desc}</p>
+                {(() => {
+                  const lowestEntry = Object.entries(baselineScores).sort((a, b) => a[1] - b[1])[0];
+                  const lowestAreaKey = lowestEntry ? lowestEntry[0] : null;
+
+                  return areaOptions.map((area) => {
+                    const isSelected = selectedAreas.includes(area.id);
+                    const isMaxedOut = !isSelected && selectedAreas.length >= 3;
+                    const areaScore = baselineScores[area.id];
+                    const isRecommended = area.id === lowestAreaKey;
+
+                    return (
+                      <div
+                        key={area.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedAreas(selectedAreas.filter((a) => a !== area.id));
+                          } else {
+                            if (selectedAreas.length >= 3) return;
+                            setSelectedAreas([...selectedAreas, area.id]);
+                          }
+                        }}
+                        className={`p-4 rounded-xl border flex flex-col justify-between space-y-3 transition-all ${
+                          isMaxedOut
+                            ? "opacity-50 cursor-not-allowed border-gray-200 bg-gray-50"
+                            : isSelected
+                            ? "border-navy-900 bg-navy-50/60 text-navy-900 font-semibold shadow-2xs cursor-pointer"
+                            : "border-warm-border bg-white text-gray-600 hover:border-gray-300 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between w-full">
+                          <div className="flex items-center space-x-3">
+                            <area.icon className="h-5 w-5 text-accent shrink-0" />
+                            <div>
+                              <h4 className="font-bold text-xs">{area.label}</h4>
+                              <p className="text-[11px] text-gray-500">{area.desc}</p>
+                            </div>
+                          </div>
+                          <Checkbox checked={isSelected} disabled={isMaxedOut} className="rounded-md border-gray-300 mt-1" />
                         </div>
+
+                        {/* Baseline score badge */}
+                        {(areaScore !== undefined || isRecommended) && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
+                            {areaScore !== undefined && (
+                              <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                                Skor Baseline: {areaScore}%
+                              </span>
+                            )}
+                            {isRecommended && (
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                                💡 Direkomendasikan
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <Checkbox checked={isSelected} disabled={isMaxedOut} className="rounded-md border-gray-300" />
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
 
               <div className="flex justify-between items-center pt-4 border-t border-warm-border/60">
@@ -452,7 +522,7 @@ export default function JourneySetupPage() {
           {step === 4 && (
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h1 className="text-3xl font-serif font-bold text-navy-900">4. Target 90 Hari & Indikator</h1>
+                <h2 className="text-3xl font-serif font-bold text-navy-900">4. Target 90 Hari & Indikator</h2>
                 <p className="text-xs text-gray-600">Tentukan 1 target utama dan 3 indikator keberhasilan terukur.</p>
               </div>
 
@@ -536,7 +606,7 @@ export default function JourneySetupPage() {
           {step === 5 && (
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h1 className="text-3xl font-serif font-bold text-navy-900">5. Susun Action Plan (Habits)</h1>
+                <h2 className="text-3xl font-serif font-bold text-navy-900">5. Susun Action Plan (Habits)</h2>
                 <p className="text-xs text-gray-600">
                   Aktivitas harian/mingguan yang akan otomatis menjadi Habit Engine Anda.
                 </p>
@@ -597,7 +667,7 @@ export default function JourneySetupPage() {
           {step === 6 && (
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h1 className="text-3xl font-serif font-bold text-navy-900">6. Tim Pendukung & Coach</h1>
+                <h2 className="text-3xl font-serif font-bold text-navy-900">6. Tim Pendukung & Coach</h2>
                 <p className="text-xs text-gray-600">
                   Pendamping yang akan memantau & memandu perjalanan 90 hari Anda.
                 </p>
@@ -648,7 +718,7 @@ export default function JourneySetupPage() {
           {step === 7 && (
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h1 className="text-3xl font-serif font-bold text-navy-900">7. Peninjauan Akhir Draft PTP</h1>
+                <h2 className="text-3xl font-serif font-bold text-navy-900">7. Peninjauan Akhir Draft PTP</h2>
                 <p className="text-xs text-gray-600">
                   Periksa seluruh isi dokumen PTP Anda sebelum melakukan komitmen final.
                 </p>
@@ -738,9 +808,9 @@ export default function JourneySetupPage() {
                     <Badge className="bg-amber-100 text-amber-900 font-bold text-xs uppercase border-none px-3 py-1">
                       SIMPAN PTP & MULAI JOURNEY
                     </Badge>
-                    <h1 className="text-3xl md:text-4xl font-serif font-bold text-navy-900">
+                    <h2 className="text-3xl md:text-4xl font-serif font-bold text-navy-900">
                       Langkah 8: Simpan & Mulai Perjalanan
-                    </h1>
+                    </h2>
                     <p className="text-xs text-gray-600 max-w-md mx-auto leading-relaxed">
                       Setelah menekan tombol di bawah, Perjalanan 90 Hari Anda resmi dimulai (**Hari ke-1**). Personal Transformation Project Anda masih dapat disempurnakan selama masa revisi sebelum dikunci oleh Admin.
                     </p>
@@ -794,6 +864,21 @@ export default function JourneySetupPage() {
                       Perjalanan 90 Hari Anda telah dimulai hari ini (Hari ke-1). Personal Transformation Project Anda masih dapat direvisi selama belum dikunci oleh Admin.
                     </p>
                   </div>
+
+                  {commitError && (
+                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 font-medium text-left max-w-md mx-auto space-y-1 shadow-2xs">
+                      <p className="font-bold flex items-center gap-1.5 text-amber-800">
+                        ⚠️ Perhatian (Penyimpanan Parsial):
+                      </p>
+                      <p className="whitespace-pre-line leading-relaxed">{commitError}</p>
+                      <button
+                        onClick={() => setCommitError(null)}
+                        className="mt-1 text-[11px] text-amber-700 hover:text-amber-900 underline"
+                      >
+                        Tutup pesan ini
+                      </button>
+                    </div>
+                  )}
 
                   <div className="pt-4 max-w-sm mx-auto">
                     <Button

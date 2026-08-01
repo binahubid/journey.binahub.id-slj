@@ -42,11 +42,14 @@ const config: Config = {
         sm: "6px",
         md: "12px",
         lg: "20px",
+        xl: "16px",
+        "2xl": "24px",
+        "3xl": "32px",
       },
       fontFamily: {
         sans: ["var(--font-jakarta-sans)", "Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"],
         secondary: ["var(--font-inter)", "Inter", "sans-serif"],
-        serif: ["var(--font-jakarta-sans)", "Plus Jakarta Sans", "Georgia", "serif"],
+        serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
       },
       boxShadow: {
         sm: "0 1px 2px rgba(15, 30, 61, 0.06)",
