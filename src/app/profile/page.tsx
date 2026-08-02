@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 
 interface UserProfileData {
+  displayId: string;
   fullName: string;
   email: string;
   role: string;
@@ -36,6 +37,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfileData>({
+    displayId: "-",
     fullName: "Peserta SLJ",
     email: "-",
     role: "Peserta Program (Jamaah / Leader)",
@@ -127,6 +129,7 @@ export default function ProfilePage() {
         };
 
         setProfile({
+          displayId: userProfile?.display_id || "-",
           fullName,
           email,
           role: roleLabel,
@@ -178,7 +181,12 @@ export default function ProfilePage() {
             </div>
             <div>
               <h2 className="text-xl font-bold text-navy-900">{profile.fullName}</h2>
-              <p className="text-xs text-gray-500">{profile.role}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  ID: {profile.displayId}
+                </span>
+                <p className="text-xs text-gray-500">{profile.role}</p>
+              </div>
               <Badge variant="accent" className="mt-2 text-[10px] uppercase font-semibold">
                 Status: {profile.status}
               </Badge>

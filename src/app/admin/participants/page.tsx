@@ -14,6 +14,7 @@ import { MonitoringRow, RawMonitoringRow, mapMonitoringRow } from "@/lib/admin-t
 
 export interface ParticipantReal {
   userId: string;
+  displayId: string;
   name: string;
   companyId: string;
   companyName: string;
@@ -64,6 +65,7 @@ export default function ParticipantsPage() {
         else if (needsSupport) status = "NEED_SUPPORT";
         return {
           userId: row.userId,
+          displayId: "-",
           name: row.fullName,
           companyId: row.companyId,
           companyName: row.companyName,
@@ -81,6 +83,21 @@ export default function ParticipantsPage() {
       });
 
       setParticipants(mapped);
+
+      // Fetch display_ids separately
+      const userIds = mapped.map((p) => p.userId);
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, display_id")
+          .in("user_id", userIds);
+        if (profiles) {
+          const idMap = new Map(profiles.map((p: any) => [p.user_id, p.display_id]));
+          setParticipants((prev) =>
+            prev.map((p) => ({ ...p, displayId: idMap.get(p.userId) || "-" }))
+          );
+        }
+      }
     } catch (err: any) {
       const errorText = formatSupabaseError(err, "Data peserta belum dapat dimuat. Pastikan migration 018 berhasil dan akun memiliki role admin.");
       console.error("Gagal load peserta:", errorText, err);
@@ -100,7 +117,8 @@ export default function ParticipantsPage() {
     const matchesSearch =
       p.name.toLowerCase().includes(q) ||
       p.companyName.toLowerCase().includes(q) ||
-      p.batchName.toLowerCase().includes(q);
+      p.batchName.toLowerCase().includes(q) ||
+      p.displayId.includes(q);
     const matchesCompany = selectedCompanyFilter === "all" || p.companyId === selectedCompanyFilter;
     const matchesBatch = selectedBatchFilter === "all" || p.batchId === selectedBatchFilter;
     return matchesSearch && matchesCompany && matchesBatch;
@@ -151,7 +169,7 @@ export default function ParticipantsPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari nama, perusahaan, atau batch..."
+            placeholder="Cari nama, ID, perusahaan, atau batch..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#EAE5D9] bg-white text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
@@ -206,6 +224,7 @@ export default function ParticipantsPage() {
             <thead>
               <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
                 <th className="p-4 font-semibold">Nama Peserta</th>
+                <th className="p-4 font-semibold">ID</th>
                 <th className="p-4 font-semibold">Company</th>
                 <th className="p-4 font-semibold">Batch</th>
                 <th className="p-4 font-semibold">Coach</th>
@@ -218,14 +237,14 @@ export default function ParticipantsPage() {
             <tbody className="divide-y divide-[#EAE5D9]">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={9} className="py-12 text-center text-xs text-slate-500">
                     <div className="animate-spin h-6 w-6 border-2 border-amber-600 border-t-transparent rounded-full mx-auto mb-2" />
                     Memuat data peserta dari canonical view...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={9} className="py-12 text-center text-xs text-slate-500">
                     {errorMsg ? errorMsg : "Tidak ada peserta yang cocok dengan filter saat ini."}
                   </td>
                 </tr>
@@ -237,6 +256,11 @@ export default function ParticipantsPage() {
                       <div className="text-slate-400 text-[11px] font-normal">
                         PTP: {p.ptpStatus === "LOCKED" ? "Terlocked" : "Editable"}
                       </div>
+                    </td>
+                    <td className="p-4">
+                      <span className="font-mono font-bold text-[#C79A3C] bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">
+                        {p.displayId}
+                      </span>
                     </td>
                     <td className="p-4 font-bold text-slate-700">
                       <div className="flex items-center gap-1.5">
