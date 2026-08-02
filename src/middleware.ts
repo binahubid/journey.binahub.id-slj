@@ -6,6 +6,10 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    const protectedPrefixes = ["/admin", "/company", "/dashboard", "/onboarding", "/baseline", "/initial-process", "/journey", "/monitoring", "/journal", "/profile", "/settings", "/notifications"];
+    if (protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix))) {
+      return new NextResponse("Service configuration unavailable", { status: 503 });
+    }
     return NextResponse.next({ request });
   }
 
@@ -58,6 +62,7 @@ export async function middleware(request: NextRequest) {
     "/profile",
     "/settings",
     "/notifications",
+    "/company",
   ];
 
   const isProtectedRoute = protectedRoutes.some((route) =>

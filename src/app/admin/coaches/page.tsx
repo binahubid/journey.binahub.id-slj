@@ -2,16 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { UserCheck, ShieldAlert, Building2, Layers, Search, Mail } from "lucide-react";
-import { fetchCoachesFromSupabase, AdminCoach } from "@/lib/company-store";
+import { fetchCoachesFromSupabase, formatSupabaseError, AdminCoach } from "@/lib/company-store";
 
 export default function CoachesPage() {
   const [coaches, setCoaches] = useState<AdminCoach[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadCoaches() {
-      const data = await fetchCoachesFromSupabase();
-      setCoaches(data);
+      setLoading(true);
+      try {
+        const data = await fetchCoachesFromSupabase();
+        setCoaches(data);
+      } catch (err: any) {
+        setErrorMsg(formatSupabaseError(err, "Gagal memuat data coach."));
+      } finally {
+        setLoading(false);
+      }
     }
     loadCoaches();
   }, []);
@@ -36,6 +45,12 @@ export default function CoachesPage() {
         </div>
       </div>
 
+      {errorMsg && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+          {errorMsg}
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="relative max-w-md">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -49,45 +64,51 @@ export default function CoachesPage() {
       </div>
 
       {/* Coaches Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((c) => (
-          <div
-            key={c.id}
-            className="p-6 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs space-y-5"
-          >
-            <div className="flex items-center justify-between">
-              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
-                <UserCheck className="h-5 w-5" />
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
-                {c.status}
-              </span>
-            </div>
+      {loading ? (
+        <p className="text-xs text-slate-500 font-medium">Memuat data coach...</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.length === 0 ? (
+            <p className="text-xs text-slate-500 font-medium col-span-full text-center py-8">
+              {errorMsg ? errorMsg : "Tidak ada coach ditemukan."}
+            </p>
+          ) : (
+            filtered.map((c) => (
+              <div
+                key={c.id}
+                className="p-6 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs space-y-5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
+                    <UserCheck className="h-5 w-5" />
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                    {c.status}
+                  </span>
+                </div>
 
-            <div>
-              <h2 className="text-lg font-bold text-[#071A33]">{c.name}</h2>
-              <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
-                <Mail className="h-3 w-3" /> {c.email}
-              </p>
-            </div>
+                <div>
+                  <h2 className="text-lg font-bold text-[#071A33]">{c.name}</h2>
+                  <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                    <Mail className="h-3 w-3" /> {c.email || "\u2014"}
+                  </p>
+                </div>
 
-            <div className="space-y-2 pt-2 border-t border-[#EAE5D9]">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500 font-medium">Bimbingan Peserta:</span>
-                <span className="font-extrabold text-[#071A33]">{c.participantCount} Peserta</span>
+                <div className="space-y-2 pt-2 border-t border-[#EAE5D9]">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Bimbingan Peserta:</span>
+                    <span className="font-extrabold text-[#071A33]">{c.participantCount} Peserta</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Perusahaan Mitra:</span>
+                    <span className="font-medium text-slate-700">{c.assignedCompanies.join(", ")}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500 font-medium">Flag Perhatian:</span>
-                <span className="font-bold text-amber-600">{c.activeFlagsCount} Active Flags</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500 font-medium">Perusahaan Mitra:</span>
-                <span className="font-medium text-slate-700">{c.assignedCompanies.join(", ")}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

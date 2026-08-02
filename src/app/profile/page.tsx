@@ -5,12 +5,13 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, MapPin, Calendar, Building2, Layers, HeartHandshake } from "lucide-react";
+import { ArrowLeft, User, MapPin, Calendar, Building2, Layers, HeartHandshake, Mail, Shield, Briefcase, MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 
 interface UserProfileData {
   fullName: string;
+  email: string;
   role: string;
   location: string;
   startDate: string;
@@ -20,6 +21,14 @@ interface UserProfileData {
   status: string;
   areaTransformasi: string[];
   sahabatSafarName?: string | null;
+  gender?: string;
+  birthYear?: string;
+  city?: string;
+  division?: string;
+  position?: string;
+  commTime?: string;
+  commMedia?: string[];
+  umrahExperience?: string;
 }
 
 export default function ProfilePage() {
@@ -28,6 +37,7 @@ export default function ProfilePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfileData>({
     fullName: "Peserta SLJ",
+    email: "-",
     role: "Peserta Program (Jamaah / Leader)",
     location: "Jakarta",
     startDate: "-",
@@ -63,7 +73,7 @@ export default function ProfilePage() {
         if (journeyError) throw journeyError;
 
         // 3. Fetch Batch & Company info
-        let companyName = userProfile?.company_name || "Corporate Mitra";
+        let companyName = userProfile?.company_name || "Belum ditentukan";
         let batchName = userProfile?.program_code || "Batch 1";
 
         if (userProfile?.program_code) {
@@ -89,7 +99,17 @@ export default function ProfilePage() {
         const sahabatSafarName =
           userProfile?.sahabat_safar_name || teamData?.sahabat_safar_name || null;
 
+        // 5. Fetch Initial Process (Sahabat Safar Profile) Step 1
+        const { data: safarData } = await supabase
+          .from("sahabat_safar_profiles")
+          .select("layer1")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        const layer1 = safarData?.layer1 as Record<string, unknown> | undefined;
+
         const fullName = userProfile?.full_name || user.email?.split("@")[0] || "Peserta SLJ";
+        const email = user.email || "-";
         const roleLabel =
           userProfile?.role === "admin"
             ? "Administrator Program"
@@ -108,6 +128,7 @@ export default function ProfilePage() {
 
         setProfile({
           fullName,
+          email,
           role: roleLabel,
           location: userProfile?.location || "Jakarta",
           startDate: formatDate(userProfile?.start_date),
@@ -117,6 +138,14 @@ export default function ProfilePage() {
           status: journey?.status || "ONBOARDING",
           areaTransformasi: Array.isArray(journey?.area_transformasi) ? journey.area_transformasi : [],
           sahabatSafarName,
+          gender: (layer1?.gender as string) || undefined,
+          birthYear: (layer1?.birthYear as string) || undefined,
+          city: (layer1?.city as string) || undefined,
+          division: (layer1?.division as string) || undefined,
+          position: (layer1?.role as string) || undefined,
+          commTime: (layer1?.commTime as string) || undefined,
+          commMedia: Array.isArray(layer1?.commMedia) ? layer1.commMedia as string[] : undefined,
+          umrahExperience: (layer1?.umrahExperience as string) || undefined,
         });
       } catch (err) {
         console.error("Gagal memuat profil:", err);
@@ -157,6 +186,13 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-4 text-sm text-navy-900">
+            <div className="flex items-center justify-between py-2 border-b border-warm-border">
+              <span className="text-gray-500 flex items-center gap-2">
+                <Mail className="h-4 w-4 text-gray-400" /> Email Akun
+              </span>
+              <span className="font-semibold">{profile.email}</span>
+            </div>
+
             <div className="flex items-center justify-between py-2 border-b border-warm-border">
               <span className="text-gray-500 flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-gray-400" /> Lokasi (Waktu Sholat)
@@ -203,6 +239,85 @@ export default function ProfilePage() {
                 )}
               </span>
             </div>
+
+            {/* ─── INITIAL PROCESS STEP 1 DATA ─── */}
+            {(profile.gender || profile.birthYear || profile.city || profile.division || profile.position) && (
+              <div className="pt-4 border-t border-warm-border space-y-3">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Informasi Diri</h3>
+                
+                {profile.gender && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <User className="h-4 w-4 text-gray-400" /> Gender
+                    </span>
+                    <span className="font-semibold">{profile.gender}</span>
+                  </div>
+                )}
+
+                {profile.birthYear && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-400" /> Tahun Lahir
+                    </span>
+                    <span className="font-semibold">{profile.birthYear}</span>
+                  </div>
+                )}
+
+                {profile.city && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-400" /> Kota Domisili
+                    </span>
+                    <span className="font-semibold">{profile.city}</span>
+                  </div>
+                )}
+
+                {profile.division && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-gray-400" /> Divisi
+                    </span>
+                    <span className="font-semibold">{profile.division}</span>
+                  </div>
+                )}
+
+                {profile.position && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-gray-400" /> Posisi / Jabatan
+                    </span>
+                    <span className="font-semibold">{profile.position}</span>
+                  </div>
+                )}
+
+                {profile.commTime && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-gray-400" /> Waktu Komunikasi
+                    </span>
+                    <span className="font-semibold">{profile.commTime}</span>
+                  </div>
+                )}
+
+                {profile.commMedia && profile.commMedia.length > 0 && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-gray-400" /> Media Komunikasi
+                    </span>
+                    <span className="font-semibold">{profile.commMedia.join(", ")}</span>
+                  </div>
+                )}
+
+                {profile.umrahExperience && (
+                  <div className="flex items-center justify-between py-2 border-b border-warm-border">
+                    <span className="text-gray-500 flex items-center gap-2">
+                      <HeartHandshake className="h-4 w-4 text-amber-600" /> Pengalaman Umrah
+                    </span>
+                    <span className="font-semibold">{profile.umrahExperience}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="py-2 space-y-2">
               <span className="text-gray-500 block">Area Transformasi Terpilih (PTP):</span>

@@ -14,10 +14,9 @@ import {
   Search,
 } from "lucide-react";
 import {
-  getStoredCompanies,
-  saveCompanies,
   fetchCompaniesFromSupabase,
   createCompanyInSupabase,
+  parseSupabaseError,
   Company,
 } from "@/lib/company-store";
 
@@ -26,6 +25,8 @@ export default function CompaniesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // New Company form
   const [name, setName] = useState("");
@@ -34,8 +35,12 @@ export default function CompaniesPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await fetchCompaniesFromSupabase();
-      setCompanies(data);
+      try {
+        const data = await fetchCompaniesFromSupabase();
+        setCompanies(data);
+      } catch {
+        setErrorMsg("Data perusahaan belum dapat dimuat. Periksa koneksi lalu coba lagi.");
+      }
       setLoading(false);
     }
     loadData();
@@ -44,35 +49,34 @@ export default function CompaniesPage() {
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !code.trim()) return;
+    setSaving(true);
+    setErrorMsg(null);
 
-    const created = await createCompanyInSupabase({
-      name,
-      code: code.toUpperCase(),
-      status: "Active",
-    });
+    try {
+      const created = await createCompanyInSupabase({
+        name,
+        code: code.toUpperCase(),
+        status: "Active",
+      });
 
-    const newComp = created || {
-      id: `comp-${Date.now()}`,
-      name,
-      code: code.toUpperCase(),
-      status: "Active" as const,
-      participantCount: 0,
-      batchCount: 0,
-      coachCount: 0,
-      healthScore: 100,
-      habitCompletionPercent: 100,
-      checkpointCompletionPercent: 100,
-      needSupportCount: 0,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+      const updated = [created, ...companies];
+      setCompanies(updated);
+      setName("");
+      setCode("");
+    } catch (err) {
+      const parsed = parseSupabaseError(err);
+      if (parsed.kind === "duplicate") {
+        setErrorMsg(`Kode "${code.toUpperCase()}" sudah digunakan. Gunakan kode berbeda.`);
+      } else if (parsed.kind === "permission") {
+        setErrorMsg("Anda tidak memiliki izin untuk membuat perusahaan baru.");
+      } else if (parsed.kind === "network") {
+        setErrorMsg("Gagal terhubung ke server. Periksa koneksi internet lalu coba lagi.");
+      } else {
+        setErrorMsg(parsed.message || "Perusahaan belum tersimpan. Coba lagi.");
+      }
+    }
 
-    const updated = [newComp, ...companies];
-    setCompanies(updated);
-    saveCompanies(updated);
-
-    setName("");
-    setCode("");
-    setShowAddModal(false);
+    setSaving(false);
   };
 
   const filtered = companies.filter(
@@ -115,7 +119,13 @@ export default function CompaniesPage() {
       </div>
 
       {/* Companies Grid */}
+      {errorMsg && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+          {errorMsg}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading && <p className="text-xs font-semibold text-slate-500">Memuat data perusahaan...</p>}
         {filtered.map((c) => (
           <div
             key={c.id}
@@ -218,11 +228,12 @@ export default function CompaniesPage() {
                 >
                   Batal
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg bg-[#0B2C6B] hover:bg-[#071A33] text-white text-xs font-bold shadow-md"
+                 <button
+                   type="submit"
+                   disabled={saving}
+                   className="px-5 py-2 rounded-lg bg-[#0B2C6B] hover:bg-[#071A33] text-white text-xs font-bold shadow-md"
                 >
-                  Simpan Perusahaan
+                   {saving ? "Menyimpan..." : "Simpan Perusahaan"}
                 </button>
               </div>
             </form>

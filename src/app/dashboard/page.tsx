@@ -23,6 +23,7 @@ import { DailyHadithWidget } from "@/components/domain/DailyHadithWidget";
 import { createClient } from "@/lib/supabase/client";
 import { parseJournalContent } from "@/lib/journal";
 import { getActiveProgramMonth, getProgramDay } from "@/lib/program-timeline";
+import { DEFAULT_TIME_ZONE, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import {
   Compass,
@@ -57,6 +58,7 @@ export default function DashboardPage() {
   const [userId, setUserId] = useState<string>("");
   const [userName, setUserName] = useState("Peserta");
   const [userLocation, setUserLocation] = useState("Jakarta");
+  const [userTimeZone, setUserTimeZone] = useState(DEFAULT_TIME_ZONE);
   const [dayCount, setDayCount] = useState(1);
   const [journeyStatus, setJourneyStatus] = useState<string>("ONBOARDING");
   const [progressPercent, setProgressPercent] = useState(0);
@@ -84,15 +86,28 @@ export default function DashboardPage() {
   const [habitSaveError, setHabitSaveError] = useState<string | null>(null);
 
   // Modals
-  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
   const [todayTasksModalOpen, setTodayTasksModalOpen] = useState(false);
   const [consistencyModalOpen, setConsistencyModalOpen] = useState(false);
-  const [allPrayerModalOpen, setAllPrayerModalOpen] = useState(false);
 
-  // Dedicated Analytics Modals for Sholat, Tilawah, Hadits
+  // Dedicated Analytics Modals
   const [sholatAnalyticsOpen, setSholatAnalyticsOpen] = useState(false);
   const [quranAnalyticsOpen, setQuranAnalyticsOpen] = useState(false);
   const [hadithAnalyticsOpen, setHadithAnalyticsOpen] = useState(false);
+
+  // Sholat analytics data (fetched on modal open)
+  const [sholatAnalytics, setSholatAnalytics] = useState<{
+    wajibDays: number; sunnahCount: number; streak: number; totalDays: number;
+  } | null>(null);
+
+  // Quran analytics data
+  const [quranAnalytics, setQuranAnalytics] = useState<{
+    totalDays: number; totalPages: number; streak: number;
+  } | null>(null);
+
+  // Hadith analytics data
+  const [hadithAnalytics, setHadithAnalytics] = useState<{
+    totalRead: number; streak: number;
+  } | null>(null);
 
   // Real stats
   const [accountCreatedDate, setAccountCreatedDate] = useState<string>("");
@@ -321,6 +336,128 @@ export default function DashboardPage() {
     fetchHeroPrayerTimes();
   }, [userLocation]);
 
+  // Fetch sholat analytics data when modal opens
+  useEffect(() => {
+    if (!sholatAnalyticsOpen || !userId) return;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const today = new Date();
+        const dates: string[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          dates.push(d.toISOString().split("T")[0]);
+        }
+        const { data: logs } = await supabase
+          .from("prayer_logs")
+          .select("date, prayer_name, is_completed")
+          .eq("user_id", userId)
+          .in("date", dates)
+          .eq("is_completed", true);
+
+        const WAJIB = ["subuh", "dzuhur", "ashar", "maghrib", "isya"];
+        let wajibDays = 0;
+        let sunnahCount = 0;
+        let streak = 0;
+
+        for (const date of dates) {
+          const dayLogs = (logs || []).filter((r: any) => r.date === date);
+          const wajibDone = WAJIB.filter((w) => dayLogs.some((r: any) => r.prayer_name === w)).length;
+          if (wajibDone === 5) wajibDays++;
+          sunnahCount += dayLogs.filter((r: any) => !WAJIB.includes(r.prayer_name)).length;
+        }
+
+        // Calculate streak (consecutive days with all 5 wajib from today backwards)
+        for (let i = dates.length - 1; i >= 0; i--) {
+          const dayLogs = (logs || []).filter((r: any) => r.date === dates[i]);
+          const wajibDone = WAJIB.filter((w) => dayLogs.some((r: any) => r.prayer_name === w)).length;
+          if (wajibDone === 5) streak++;
+          else break;
+        }
+
+        setSholatAnalytics({ wajibDays, sunnahCount, streak, totalDays: 7 });
+      } catch {
+        setSholatAnalytics({ wajibDays: 0, sunnahCount: 0, streak: 0, totalDays: 7 });
+      }
+    })();
+  }, [sholatAnalyticsOpen, userId]);
+
+  // Fetch quran analytics data when modal opens
+  useEffect(() => {
+    if (!quranAnalyticsOpen || !userId) return;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const today = new Date();
+        const dates: string[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          dates.push(d.toISOString().split("T")[0]);
+        }
+        const { data: logs } = await supabase
+          .from("quran_logs")
+          .select("date, pages_read")
+          .eq("user_id", userId)
+          .in("date", dates);
+
+        const dayMap = new Map<string, number>();
+        (logs || []).forEach((r: any) => {
+          dayMap.set(r.date, (dayMap.get(r.date) || 0) + (r.pages_read || 1));
+        });
+
+        const totalDays = dayMap.size;
+        let totalPages = 0;
+        dayMap.forEach((v) => { totalPages += v; });
+
+        let streak = 0;
+        for (let i = dates.length - 1; i >= 0; i--) {
+          if (dayMap.has(dates[i])) streak++;
+          else break;
+        }
+
+        setQuranAnalytics({ totalDays, totalPages, streak });
+      } catch {
+        setQuranAnalytics({ totalDays: 0, totalPages: 0, streak: 0 });
+      }
+    })();
+  }, [quranAnalyticsOpen, userId]);
+
+  // Fetch hadith analytics data when modal opens
+  useEffect(() => {
+    if (!hadithAnalyticsOpen || !userId) return;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const today = new Date();
+        const dates: string[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          dates.push(d.toISOString().split("T")[0]);
+        }
+        const { data: logs } = await supabase
+          .from("hadith_logs")
+          .select("date, is_read")
+          .eq("user_id", userId)
+          .in("date", dates)
+          .eq("is_read", true);
+
+        const readDates = new Set((logs || []).map((r: any) => r.date));
+        let streak = 0;
+        for (let i = dates.length - 1; i >= 0; i--) {
+          if (readDates.has(dates[i])) streak++;
+          else break;
+        }
+
+        setHadithAnalytics({ totalRead: readDates.size, streak });
+      } catch {
+        setHadithAnalytics({ totalRead: 0, streak: 0 });
+      }
+    })();
+  }, [hadithAnalyticsOpen, userId]);
+
   // Load Dashboard Data
   useEffect(() => {
     async function loadDashboard() {
@@ -351,11 +488,21 @@ export default function DashboardPage() {
             profile.full_name || user.email?.split("@")[0] || "Peserta"
           );
           if (profile.location) setUserLocation(profile.location);
+          const resolvedTimeZone = resolveParticipantTimeZone(profile.timezone, profile.timezone_mode || "AUTO");
+          setUserTimeZone(resolvedTimeZone);
+          if ((profile.timezone_mode || "AUTO") === "AUTO" && profile.timezone !== resolvedTimeZone) {
+            const { error: timeZoneUpdateError } = await supabase
+              .from("profiles")
+              .update({ timezone: resolvedTimeZone })
+              .eq("user_id", user.id);
+            if (timeZoneUpdateError) console.error("Gagal memperbarui timezone perjalanan:", timeZoneUpdateError);
+          }
           setSafarPartnerName(profile.sahabat_safar_user_id ? profile.sahabat_safar_name || "Sahabat Safar" : null);
-          const cDate = profile.created_at ? new Date(profile.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
+          const profileTimeZone = resolveParticipantTimeZone(profile.timezone, profile.timezone_mode || "AUTO");
+          const cDate = profile.created_at ? getLocalDateString(new Date(profile.created_at), profileTimeZone) : getLocalDateString(new Date(), profileTimeZone);
           setAccountCreatedDate(cDate);
         } else {
-          setAccountCreatedDate(new Date().toISOString().split("T")[0]);
+          setAccountCreatedDate(getLocalDateString(new Date(), DEFAULT_TIME_ZONE));
         }
 
         // Check if reminded safar today
@@ -396,7 +543,8 @@ export default function DashboardPage() {
         }
 
         // 3. Habits: Query habits table + action_plans, ensuring valid habits.id FK
-        const todayStr = new Date().toISOString().split("T")[0];
+        const profileTimeZone = resolveParticipantTimeZone(profile?.timezone, profile?.timezone_mode || "AUTO");
+        const todayStr = getLocalDateString(new Date(), profileTimeZone);
         let userHabits: any[] = [];
 
         // Query action_plans from PTP
@@ -670,7 +818,7 @@ export default function DashboardPage() {
   const handlePrayerToggleFromTracker = (dateStr: string, prayerName: string, isCompleted: boolean) => {
     setPrayerLogsMap((prev) => ({ ...prev, [`${dateStr}_${prayerName}`]: isCompleted }));
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = getLocalDateString(new Date(), userTimeZone);
     if (dateStr !== todayStr) return;
 
     setHabits((prevHabits) => {
@@ -716,7 +864,7 @@ export default function DashboardPage() {
 
   // Toggle habit check state — saves to the correct tracker table with realtime sync
   const toggleHabitToday = async (habitId: string) => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = getLocalDateString(new Date(), userTimeZone);
     const target = habits.find((h) => h.id === habitId);
     if (!target) return;
     setHabitSaveError(null);
@@ -827,7 +975,7 @@ export default function DashboardPage() {
 
   // Increment one sub-step for habits with quantity > 1
   const incrementHabitCount = async (habitId: string) => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = getLocalDateString(new Date(), userTimeZone);
     const target = habits.find((h) => h.id === habitId);
     if (!target || target.category !== 'general') return;
     setHabitSaveError(null);
@@ -915,7 +1063,7 @@ export default function DashboardPage() {
   // Save new reflection journal
   const handleSaveJournal = async () => {
     if (!journalContent.trim() || !userId) return;
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = getLocalDateString(new Date(), userTimeZone);
     setJournalSaveError(null);
 
     try {
@@ -1177,7 +1325,6 @@ export default function DashboardPage() {
           {/* Card 1: Jadwal Sholat Hari Ini */}
           <PrayerTimesWidget
             location={userLocation}
-            onViewAll={() => setAllPrayerModalOpen(true)}
           />
 
           {/* Card 2: Habits Hari Ini (Participant PTP Habits) */}
@@ -1259,7 +1406,7 @@ export default function DashboardPage() {
 
                   {/* Habit Checklist Preview — supports quantity sub-step counter */}
                   <div className="space-y-1.5 pt-1">
-                    {habits.slice(0, 5).map((h) => {
+                    {habits.slice(0, 4).map((h) => {
                       const isMultiStep = h.category === 'general' && h.quantity > 1;
                       return (
                         <div
@@ -1327,7 +1474,7 @@ export default function DashboardPage() {
             className="cursor-pointer group relative transition-all hover:scale-[1.005]"
             title="Klik untuk membuka Analitik & Tadabbur Hadits"
           >
-            <DailyHadithWidget userId={userId} />
+            <DailyHadithWidget userId={userId} timeZone={userTimeZone} />
           </div>
         </div>
 
@@ -1338,13 +1485,14 @@ export default function DashboardPage() {
             <button
               onClick={() => setSholatAnalyticsOpen(true)}
               title="Buka Analitik Sholat"
-              className="absolute top-4.5 right-4 z-20 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer p-1"
+              className="absolute top-5 right-4 z-20 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer p-1"
             >
               <Maximize2 className="h-4 w-4" />
             </button>
             <PrayerTracker
               userId={userId}
               accountCreatedDate={accountCreatedDate}
+              timeZone={userTimeZone}
               externalLogs={prayerLogsMap}
               onPrayerToggle={handlePrayerToggleFromTracker}
             />
@@ -1356,7 +1504,7 @@ export default function DashboardPage() {
             className="relative group cursor-pointer transition-all hover:scale-[1.005]"
             title="Klik untuk membuka Analitik Tilawah Al-Qur'an"
           >
-            <QuranTracker userId={userId} onQuranLogged={handleQuranLoggedFromTracker} />
+            <QuranTracker userId={userId} timeZone={userTimeZone} onQuranLogged={handleQuranLoggedFromTracker} />
           </div>
         </div>
 
@@ -1430,17 +1578,18 @@ export default function DashboardPage() {
 
             {/* Clickable button to open Analytics Modal */}
             <div className="pt-3 border-t border-warm-border/60">
-              <Button
-                onClick={() => setAnalyticsModalOpen(true)}
-                variant="outline"
-                className="w-full justify-between text-xs font-bold text-navy-900 border-warm-border hover:bg-warm-bg rounded-xl py-2.5"
-              >
-                <span className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-amber-600" />
-                  Lihat Analitik Lengkap
-                </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
-              </Button>
+              <Link href="/monitoring">
+                <Button
+                  variant="outline"
+                  className="w-full justify-between text-xs font-bold text-navy-900 border-warm-border hover:bg-warm-bg rounded-xl py-2.5"
+                >
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-amber-600" />
+                    Lihat Analitik Lengkap
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                </Button>
+              </Link>
             </div>
           </Card>
 
@@ -1636,124 +1785,7 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 2. MODAL DASHBOARD ANALITIK LENGKAP */}
-      <Dialog open={analyticsModalOpen} onOpenChange={setAnalyticsModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto p-6 space-y-6">
-          <DialogHeader className="border-b border-warm-border pb-3">
-            <DialogTitle className="text-lg font-black text-navy-900 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-amber-600" />
-              Dashboard Analitik Perjalanan 90 Hari
-            </DialogTitle>
-          </DialogHeader>
-
-          {/* Overview Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-            <div className="bg-navy-900 text-white p-4 rounded-2xl space-y-1">
-              <span className="text-2xl font-black text-amber-300 block">
-                {progressPercent}%
-              </span>
-              <span className="text-[10px] text-slate-300 font-bold uppercase block">
-                Total Perjalanan
-              </span>
-            </div>
-            <div className="bg-warm-bg border border-warm-border p-4 rounded-2xl space-y-1">
-              <span className="text-2xl font-black text-navy-900 block">
-                {dayCount}/90
-              </span>
-              <span className="text-[10px] text-slate-500 font-bold uppercase block">
-                Hari Berjalan
-              </span>
-            </div>
-            <div className="bg-warm-bg border border-warm-border p-4 rounded-2xl space-y-1">
-              <span className="text-2xl font-black text-emerald-700 block">
-                {habitPercentage}%
-              </span>
-              <span className="text-[10px] text-slate-500 font-bold uppercase block">
-                Tingkat Habit
-              </span>
-            </div>
-            <div className="bg-warm-bg border border-warm-border p-4 rounded-2xl space-y-1">
-              <span className="text-2xl font-black text-amber-700 block">
-                {userJournals.length}
-              </span>
-              <span className="text-[10px] text-slate-500 font-bold uppercase block">
-                Refleksi Journal
-              </span>
-            </div>
-          </div>
-
-          {/* Phase Milestones Breakdown */}
-          <div className="space-y-3 border-t border-warm-border pt-4">
-            <h4 className="text-xs font-extrabold text-navy-900 uppercase tracking-wider">
-              Status Checkpoint & Evaluasi Bulanan
-            </h4>
-
-            <div className="space-y-2.5">
-              <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-                  <div>
-                    <span className="font-bold text-navy-900 block">
-                      Checkpoint 1 (Hari ke-30) &bull; Fondasi & Niat
-                    </span>
-                    <span className="text-slate-500 text-[11px]">
-                      Evaluasi keselarasan PTP & kebiasaan awal
-                    </span>
-                  </div>
-                </div>
-                <Badge className="bg-emerald-600 text-white font-bold text-[10px]">
-                  ON TRACK
-                </Badge>
-              </div>
-
-              <div className="bg-warm-bg border border-warm-border p-3.5 rounded-xl flex items-center justify-between text-xs opacity-80">
-                <div className="flex items-center space-x-3">
-                  <Clock className="h-5 w-5 text-amber-600 shrink-0" />
-                  <div>
-                    <span className="font-bold text-navy-900 block">
-                      Checkpoint 2 (Hari ke-60) &bull; Puncak Mujahadah
-                    </span>
-                    <span className="text-slate-500 text-[11px]">
-                      Mendatang &bull; Pertahankan konsistensi
-                    </span>
-                  </div>
-                </div>
-                <Badge className="bg-amber-100 text-amber-800 font-bold text-[10px]">
-                  MENUNGGU
-                </Badge>
-              </div>
-
-              <div className="bg-warm-bg border border-warm-border p-3.5 rounded-xl flex items-center justify-between text-xs opacity-60">
-                <div className="flex items-center space-x-3">
-                  <Award className="h-5 w-5 text-slate-400 shrink-0" />
-                  <div>
-                    <span className="font-bold text-navy-900 block">
-                      Checkpoint 3 (Hari ke-90) &bull; Istiqamah Sejati
-                    </span>
-                    <span className="text-slate-500 text-[11px]">
-                      Final review & penyusunan action plan mandiri
-                    </span>
-                  </div>
-                </div>
-                <Badge className="bg-slate-200 text-slate-700 font-bold text-[10px]">
-                  MENUNGGU
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-3 border-t border-warm-border">
-            <Button
-              onClick={() => setAnalyticsModalOpen(false)}
-              className="bg-navy-900 text-white font-bold text-xs rounded-xl"
-            >
-              Tutup Analitik
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 3. MODAL TODAY'S TASKS & HABITS DETAIL */}
+      {/* 2. MODAL TODAY'S TASKS & HABITS DETAIL */}
       <Dialog open={todayTasksModalOpen} onOpenChange={setTodayTasksModalOpen}>
         <DialogContent className="max-w-md p-6">
           <DialogHeader className="border-b border-warm-border pb-3">
@@ -1785,11 +1817,11 @@ export default function DashboardPage() {
                         : "bg-warm-bg text-slate-700 border border-warm-border hover:bg-slate-100"
                     }`}
                   >
-                    <span>{h.title}</span>
+                    <span className="flex-1 min-w-0">{h.title}</span>
                     {isMultiStep && !h.completedToday ? (
-                      <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] text-slate-700">{h.completedCount}/{h.quantity} +</span>
+                      <span className="shrink-0 rounded-full bg-slate-200 px-2 py-1 text-[10px] text-slate-700">{h.completedCount}/{h.quantity} +</span>
                     ) : (
-                      <div className={`h-5 w-5 rounded-full flex items-center justify-center ${h.completedToday ? "bg-emerald-600 text-white" : "border border-slate-300 bg-white"}`}>
+                      <div className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${h.completedToday ? "bg-emerald-600 text-white" : "border border-slate-300 bg-white"}`}>
                         {h.completedToday && <Check className="h-3 w-3 stroke-[3]" />}
                       </div>
                     )}
@@ -1980,7 +2012,7 @@ export default function DashboardPage() {
         <DialogContent className="max-w-lg p-6 space-y-4">
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-600" />
+              <Clock className="h-5 w-5 text-amber-600" />
               Analitik Khusus Sholat (Wajib & Sunnah)
             </DialogTitle>
           </DialogHeader>
@@ -1988,23 +2020,37 @@ export default function DashboardPage() {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
-                <span className="text-xl font-black text-amber-900 block">94%</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Tingkat Sholat Wajib</span>
+                <span className="text-xl font-black text-amber-900 block">
+                  {sholatAnalytics ? `${sholatAnalytics.wajibDays}/7` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Sholat Wajib Lengkap</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
-                <span className="text-xl font-black text-navy-900 block">5 Waktu</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Istiqamah Berjamaah</span>
+                <span className="text-xl font-black text-navy-900 block">
+                  {sholatAnalytics ? `${sholatAnalytics.sunnahCount}` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Sholat Sunnah (7 Hari)</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
-                <span className="text-xl font-black text-emerald-700 block">+3 Sunnah</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Rata-rata Harian</span>
+                <span className="text-xl font-black text-emerald-700 block">
+                  {sholatAnalytics ? `${sholatAnalytics.streak} hari` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Streak Beruntun</span>
               </div>
             </div>
 
             <div className="bg-warm-bg p-4 rounded-xl border border-warm-border space-y-2">
-              <span className="text-xs font-bold text-navy-900 block">Ringkasan Konsistensi 7 Hari Terakhir</span>
+              <span className="text-xs font-bold text-navy-900 block">Ringkasan 7 Hari Terakhir</span>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Sholat Subuh, Dzuhur, Ashar, Maghrib, dan Isya tercatat konsisten. Sholat Sunnah Rawatib dan Dhuha paling sering ditambahkan dalam tracker.
+                {sholatAnalytics
+                  ? sholatAnalytics.wajibDays === 7
+                    ? "MasyaAllah! Anda konsisten sholat 5 waktu penuh selama 7 hari berturut-turut."
+                    : sholatAnalytics.wajibDays >= 5
+                    ? "Alhamdulillah, sholat wajib Anda sudah sangat konsisten. Pertahankan!"
+                    : sholatAnalytics.wajibDays >= 3
+                    ? "Bagus, Anda sudah rutin sholat 5 waktu. Tingkatkan konsistensi harian Anda."
+                    : "Mulai biasakan sholat 5 waktu tepat waktu. Konsistensi adalah kunci."
+                  : "Memuat data..."}
               </p>
             </div>
           </div>
@@ -2033,23 +2079,35 @@ export default function DashboardPage() {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
-                <span className="text-xl font-black text-amber-900 block">12 Juz</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Total Tilawah</span>
+                <span className="text-xl font-black text-amber-900 block">
+                  {quranAnalytics ? `${quranAnalytics.totalPages} Hal` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Total Tilawah (7 Hari)</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
-                <span className="text-xl font-black text-navy-900 block">2 Halaman</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Target Harian PTP</span>
+                <span className="text-xl font-black text-navy-900 block">
+                  {quranAnalytics ? `${quranAnalytics.totalDays} Hari` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Aktif Tilawah</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
-                <span className="text-xl font-black text-emerald-700 block">100%</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Pencapaian Pekan Ini</span>
+                <span className="text-xl font-black text-emerald-700 block">
+                  {quranAnalytics ? `${quranAnalytics.streak} Hari` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Streak Berturut</span>
               </div>
             </div>
 
             <div className="bg-warm-bg p-4 rounded-xl border border-warm-border space-y-2">
-              <span className="text-xs font-bold text-navy-900 block">Progres Tilawah & Khatam</span>
+              <span className="text-xs font-bold text-navy-900 block">Ringkasan Tilawah 7 Hari</span>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Log tilawah harian terekam otomatis saat Anda melakukan checklist pada widget Tilawah Al-Qur'an.
+                {quranAnalytics
+                  ? quranAnalytics.streak >= 5
+                    ? "MasyaAllah! Tilawah Anda sangat konsisten. Pertahankan!"
+                    : quranAnalytics.totalDays >= 3
+                    ? "Bagus, Anda sudah rutin tilawah. Tingkatkan konsistensi harian."
+                    : "Mulai biasakan tilawah setiap hari. 15-30 menit setelah Subuh sangat dianjurkan."
+                  : "Memuat data..."}
               </p>
             </div>
           </div>
@@ -2078,23 +2136,35 @@ export default function DashboardPage() {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
-                <span className="text-xl font-black text-amber-900 block">14 Hadits</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Telah Dibaca</span>
+                <span className="text-xl font-black text-amber-900 block">
+                  {hadithAnalytics ? `${hadithAnalytics.totalRead} Hari` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Telah Dibaca (7 Hari)</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
-                <span className="text-xl font-black text-navy-900 block">1 Hadits/Hari</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Rata-rata Rutin</span>
+                <span className="text-xl font-black text-navy-900 block">
+                  {hadithAnalytics ? `${hadithAnalytics.streak} Hari` : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Streak Berturut</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
-                <span className="text-xl font-black text-emerald-700 block">89%</span>
-                <span className="text-[10px] text-slate-500 font-bold block">Tingkat Pemahaman</span>
+                <span className="text-xl font-black text-emerald-700 block">
+                  {hadithAnalytics && hadithAnalytics.totalRead >= 5 ? "Konsisten" : hadithAnalytics ? "Aktif" : "--"}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">Status Pekan Ini</span>
               </div>
             </div>
 
             <div className="bg-warm-bg p-4 rounded-xl border border-warm-border space-y-2">
-              <span className="text-xs font-bold text-navy-900 block">Tadabbur & Pilihan Tema</span>
+              <span className="text-xs font-bold text-navy-900 block">Ringkasan 7 Hari</span>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Hadits harian menyajikan kutipan riwayat sahih seputar niat, akhlak kepemimpinan, dan keistiqamahan amalan.
+                {hadithAnalytics
+                  ? hadithAnalytics.streak >= 5
+                    ? "MasyaAllah! Anda konsisten membaca hadits setiap hari. Pertahankan!"
+                    : hadithAnalytics.totalRead >= 3
+                    ? "Bagus, Anda sudah rutin membaca hadits. Tingkatkan konsistensi."
+                    : "Mulai biasakan membaca hadits harian. Ambil satu hadits, renungkan maknanya."
+                  : "Memuat data..."}
               </p>
             </div>
           </div>

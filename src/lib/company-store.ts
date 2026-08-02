@@ -1,5 +1,44 @@
 import { createClient } from "@/lib/supabase/client";
 
+export type AppErrorKind =
+  | "duplicate"
+  | "permission"
+  | "network"
+  | "not_found"
+  | "validation"
+  | "unknown";
+
+export class AppError extends Error {
+  kind: AppErrorKind;
+  code?: string;
+
+  constructor(message: string, kind: AppErrorKind = "unknown", code?: string) {
+    super(message);
+    this.name = "AppError";
+    this.kind = kind;
+    this.code = code;
+  }
+}
+
+export function parseSupabaseError(err: unknown): AppError {
+  if (err instanceof AppError) return err;
+  if (typeof err === "string") return new AppError(err, "unknown");
+  if (err instanceof Error && err.message) {
+    const msg = err.message;
+    if (msg.includes("duplicate key") || msg.includes("unique constraint") || msg.includes("23505")) {
+      return new AppError("Data sudah ada (duplikat). Gunakan nama atau kode yang berbeda.", "duplicate", "23505");
+    }
+    if (msg.includes("permission denied") || msg.includes("42501") || msg.includes("row-level security")) {
+      return new AppError("Anda tidak memiliki izin untuk melakukan aksi ini.", "permission");
+    }
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("ERR_NETWORK")) {
+      return new AppError("Gagal terhubung ke server. Periksa koneksi internet Anda.", "network");
+    }
+    return new AppError(msg, "unknown");
+  }
+  return new AppError("Terjadi kesalahan yang tidak diketahui.", "unknown");
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -30,6 +69,7 @@ export interface Batch {
   coachName: string;
   healthScore: number;
   createdAt: string;
+  autoLockAt?: string | null;
 }
 
 export interface AdminCoach {
@@ -66,11 +106,44 @@ export interface BroadcastNotification {
   title: string;
   message: string;
   targetScope: "all" | "company" | "batch" | "coach" | "participant";
-  targetId?: string;
+  targetId?: string | null;
   targetLabel: string;
   sentAt: string;
   sentBy: string;
   recipientCount: number;
+}
+
+export async function fetchAdminBroadcastHistory(): Promise<BroadcastNotification[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("admin_notifications")
+    .select("id, title, message, target_scope, target_id, target_label, sent_at, sent_by, recipient_count")
+    .order("sent_at", { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    message: r.message,
+    targetScope: r.target_scope,
+    targetId: r.target_id,
+    targetLabel: r.target_label,
+    sentAt: r.sent_at,
+    sentBy: r.sent_by,
+    recipientCount: r.recipient_count,
+  }));
+}
+
+export function formatSupabaseError(error: unknown, fallback: string): string {
+  if (!error) return fallback;
+  if (typeof error === "string") return error;
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object") {
+    const value = error as { message?: string; details?: string; hint?: string; code?: string };
+    const parts = [value.message, value.details, value.hint, value.code && `kode ${value.code}`].filter(Boolean);
+    if (parts.length) return parts.join(" — ");
+  }
+  return fallback;
 }
 
 // Zero Dummy Data - Defaults to Empty Arrays
@@ -85,87 +158,93 @@ export const INITIAL_NOTIFICATIONS: BroadcastNotification[] = [];
 // ==========================================
 
 export async function fetchCompaniesFromSupabase(): Promise<Company[]> {
+  const supabase = createClient();
+  const { data: companies, error } = await supabase
+    .from("companies")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw parseSupabaseError(error);
+  if (!companies) return [];
+
+  const { data: profiles } = await supabase.from("profiles").select("company_id");
+  const { data: batches } = await supabase.from("batches").select("company_id, coach_name");
+
+  // Fetch canonical monitoring data to compute real health scores
+  let monitoringRows: { company_id: string; habit_avg_percent: number; needs_support: boolean }[] = [];
   try {
-    const supabase = createClient();
-    const { data: companies, error } = await supabase
-      .from("companies")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error || !companies) {
-      console.warn("[company-store] Gagal fetch companies dari Supabase, menggunakan cache lokal.", error?.message);
-      return getStoredCompanies();
-    }
-
-    const { data: profiles } = await supabase.from("profiles").select("company_id");
-    const { data: batches } = await supabase.from("batches").select("company_id, coach_name");
-
-    const mapped = companies.map((c) => {
-      const pCount = (profiles || []).filter((p) => p.company_id === c.id).length;
-      const bCount = (batches || []).filter((b) => b.company_id === c.id).length;
-      const coaches = new Set(
-        (batches || []).filter((b) => b.company_id === c.id && b.coach_name).map((b) => b.coach_name)
-      );
-
-      return {
-        id: c.id,
-        name: c.name,
-        code: c.code,
-        status: (c.status || "Active") as "Active" | "Inactive",
-        participantCount: pCount,
-        batchCount: bCount,
-        coachCount: coaches.size,
-        healthScore: 95,
-        habitCompletionPercent: 88,
-        checkpointCompletionPercent: 90,
-        needSupportCount: 0,
-        createdAt: c.created_at ? c.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
-      };
-    });
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("slj_companies", JSON.stringify(mapped));
-    }
-
-    return mapped;
-  } catch (err) {
-    console.warn("[company-store] Error fetch companies, menggunakan cache lokal:", err);
-    return getStoredCompanies();
+    const { data } = await supabase.rpc("get_admin_monitoring", { p_company_id: null, p_batch_id: null });
+    monitoringRows = (data || []) as { company_id: string; habit_avg_percent: number; needs_support: boolean }[];
+  } catch {
+    // RPC not available yet — health scores stay 0
   }
-}
 
-export async function createCompanyInSupabase(company: Partial<Company>): Promise<Company | null> {
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("companies")
-      .insert({
-        name: company.name,
-        code: company.code?.toUpperCase(),
-        status: company.status || "Active",
-      })
-      .select()
-      .single();
+  return companies.map((c) => {
+    const pCount = (profiles || []).filter((p) => p.company_id === c.id).length;
+    const bCount = (batches || []).filter((b) => b.company_id === c.id).length;
+    const coachSet = new Set(
+      (batches || []).filter((b) => b.company_id === c.id && b.coach_name).map((b) => b.coach_name)
+    );
 
-    if (error || !data) return null;
+    // Compute health score from canonical monitoring (filter by company_id UUID, same as detail page)
+    const companyRows = monitoringRows.filter(
+      (r) => r.company_id === c.id
+    );
+    const total = companyRows.length;
+    const avgHabit = total > 0
+      ? Math.round(companyRows.reduce((sum, r) => sum + (r.habit_avg_percent || 0), 0) / total)
+      : 0;
+    const needSupport = companyRows.filter((r) => r.needs_support).length;
+    const supportRatio = total > 0 ? (needSupport / total) * 100 : 0;
+    const healthScore = total === 0
+      ? 0
+      : Math.min(100, Math.round(avgHabit * 0.6 + (100 - Math.min(supportRatio, 100)) * 0.4));
 
     return {
-      id: data.id,
-      name: data.name,
-      code: data.code,
-      status: data.status,
-      participantCount: 0,
-      batchCount: 0,
-      coachCount: 0,
-      healthScore: 100,
-      habitCompletionPercent: 100,
-      checkpointCompletionPercent: 100,
-      needSupportCount: 0,
-      createdAt: data.created_at ? data.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+      id: c.id,
+      name: c.name,
+      code: c.code,
+      status: (c.status || "Active") as "Active" | "Inactive",
+      participantCount: pCount,
+      batchCount: bCount,
+      coachCount: coachSet.size,
+      healthScore,
+      habitCompletionPercent: avgHabit,
+      checkpointCompletionPercent: avgHabit,
+      needSupportCount: needSupport,
+      createdAt: c.created_at ? c.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
     };
-  } catch {
-    return null;
-  }
+  });
+}
+
+export async function createCompanyInSupabase(company: Partial<Company>): Promise<Company> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("companies")
+    .insert({
+      name: company.name,
+      code: company.code?.toUpperCase(),
+      status: company.status || "Active",
+    })
+    .select()
+    .single();
+
+  if (error || !data) throw parseSupabaseError(error ?? new Error("Gagal membuat company."));
+
+  return {
+    id: data.id,
+    name: data.name,
+    code: data.code,
+    status: data.status,
+    participantCount: 0,
+    batchCount: 0,
+    coachCount: 0,
+    healthScore: 100,
+    habitCompletionPercent: 100,
+    checkpointCompletionPercent: 100,
+    needSupportCount: 0,
+    createdAt: data.created_at ? data.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+  };
 }
 
 export async function fetchBatchesFromSupabase(): Promise<Batch[]> {
@@ -176,10 +255,8 @@ export async function fetchBatchesFromSupabase(): Promise<Batch[]> {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error || !batches) {
-      console.warn("[company-store] Gagal fetch batches dari Supabase, menggunakan cache lokal.", error?.message);
-      return getStoredBatches();
-    }
+    if (error) throw error;
+    if (!batches) return [];
 
     const { data: profiles } = await supabase.from("profiles").select("batch_id, program_code");
 
@@ -199,20 +276,17 @@ export async function fetchBatchesFromSupabase(): Promise<Batch[]> {
         endDate: b.end_date || "",
         participantCount: pCount,
         coachId: b.coach_id || "",
-        coachName: b.coach_name || "Coach Pendamping",
+        coachName: b.coach_name || "Belum ditentukan",
         healthScore: 92,
         createdAt: b.created_at ? b.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+        autoLockAt: b.auto_lock_at || null,
       };
     });
 
-    if (typeof window !== "undefined") {
-      localStorage.setItem("slj_batches", JSON.stringify(mapped));
-    }
-
     return mapped;
   } catch (err) {
-    console.warn("[company-store] Error fetch batches, menggunakan cache lokal:", err);
-    return getStoredBatches();
+    console.error("[company-store] Error fetch batches:", err);
+    return [];
   }
 }
 
@@ -229,7 +303,9 @@ export async function createBatchInSupabase(batch: Partial<Batch>): Promise<Batc
         status: batch.status || "Active",
         start_date: batch.startDate,
         end_date: batch.endDate,
+        coach_id: batch.coachId || null,
         coach_name: batch.coachName,
+        auto_lock_at: batch.autoLockAt || null,
       })
       .select()
       .single();
@@ -247,9 +323,10 @@ export async function createBatchInSupabase(batch: Partial<Batch>): Promise<Batc
       endDate: data.end_date || "",
       participantCount: 0,
       coachId: data.coach_id || "",
-      coachName: data.coach_name || "Coach Pendamping",
+      coachName: data.coach_name || "Belum ditentukan",
       healthScore: 100,
       createdAt: data.created_at ? data.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+      autoLockAt: data.auto_lock_at || null,
     };
   } catch {
     return null;
@@ -267,10 +344,8 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
       .or("role.eq.participant,role.is.null")
       .order("created_at", { ascending: false });
 
-    if (error || !profiles || profiles.length === 0) {
-      console.warn("[company-store] Gagal fetch participants dari Supabase, menggunakan cache lokal.", error?.message);
-      return getStoredParticipants();
-    }
+    if (error) throw error;
+    if (!profiles) return [];
 
     const { data: journeys } = await supabase.from("journeys").select("user_id, status");
     const { data: batches } = await supabase.from("batches").select("*");
@@ -287,7 +362,7 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
 
       const totalLogs = userLogs.length;
       const completedLogs = userLogs.filter((l) => l.completed).length;
-      const habitAvgPercent = totalLogs > 0 ? Math.round((completedLogs / totalLogs) * 100) : 85;
+      const habitAvgPercent = totalLogs > 0 ? Math.round((completedLogs / totalLogs) * 100) : 0;
 
       const hasNeedSupportReview = userReviews.some((r) => r.status === "NEED_SUPPORT");
       const checkpointStatus = hasNeedSupportReview
@@ -308,7 +383,7 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
       return {
         id: p.user_id,
         name: p.full_name || "Peserta SLJ",
-        email: p.full_name ? `${p.full_name.toLowerCase().replace(/\s+/g, ".")}@example.com` : "peserta@slj.id",
+        email: p.email || "",
         companyId: p.company_id || b?.company_id || "",
         companyName: p.company_name || b?.company_name || "Perusahaan SLJ",
         batchId: p.batch_id || b?.id || "",
@@ -324,14 +399,10 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
       };
     });
 
-    if (typeof window !== "undefined") {
-      localStorage.setItem("slj_participants", JSON.stringify(mapped));
-    }
-
     return mapped;
   } catch (err) {
-    console.warn("[company-store] Error fetch participants, menggunakan cache lokal:", err);
-    return getStoredParticipants();
+    console.error("[company-store] Error fetch participants:", err);
+    return [];
   }
 }
 
@@ -365,7 +436,7 @@ export async function fetchCoachesFromSupabase(): Promise<AdminCoach[]> {
         return {
           id: c.user_id,
           name: c.full_name || "Coach SLJ",
-          email: c.full_name ? `${c.full_name.toLowerCase().replace(/\s+/g, ".")}@binahub.id` : "coach@binahub.id",
+        email: c.email || "",
           assignedCompanies: assignedCompanies.length > 0 ? assignedCompanies : ["Umum"],
           assignedBatchesCount: assignedBatches.length || 1,
           participantCount: pCount,
@@ -375,43 +446,10 @@ export async function fetchCoachesFromSupabase(): Promise<AdminCoach[]> {
       });
     }
 
-    // Also collect coaches from batch entries if not in profiles yet
-    if (batches && batches.length > 0) {
-      const distinctCoachNames = Array.from(new Set(batches.map((b) => b.coach_name).filter(Boolean)));
-      distinctCoachNames.forEach((cName, idx) => {
-        if (!mapped.some((m) => m.name.toLowerCase() === cName.toLowerCase())) {
-          const assignedBatches = batches.filter((b) => b.coach_name === cName);
-          const assignedCompanies = Array.from(new Set(assignedBatches.map((b) => b.company_name).filter(Boolean)));
-          
-          let pCount = 0;
-          assignedBatches.forEach((b) => {
-            pCount += (profiles || []).filter(
-              (p) => p.batch_id === b.id || (p.program_code && p.program_code.toUpperCase() === b.access_code.toUpperCase())
-            ).length;
-          });
-
-          mapped.push({
-            id: `coach-batch-${idx}`,
-            name: cName,
-            email: `${cName.toLowerCase().replace(/\s+/g, ".")}@binahub.id`,
-            assignedCompanies,
-            assignedBatchesCount: assignedBatches.length,
-            participantCount: pCount,
-            activeFlagsCount: 0,
-            status: "Active",
-          });
-        }
-      });
-    }
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("slj_coaches", JSON.stringify(mapped));
-    }
-
     return mapped;
   } catch (err) {
-    console.warn("[company-store] Error fetch coaches, menggunakan cache lokal:", err);
-    return getStoredCoaches();
+    console.error("[company-store] Error fetch coaches:", err);
+    return [];
   }
 }
 
@@ -419,65 +457,19 @@ export async function sendAdminBroadcastNotification(broadcast: {
   title: string;
   message: string;
   targetScope: "all" | "company" | "batch" | "coach" | "participant";
-  targetId?: string;
-  targetLabel: string;
+  targetId?: string | null;
+  targetLabel?: string;
   sentBy?: string;
 }): Promise<boolean> {
   try {
     const supabase = createClient();
-
-    // 1. Insert into admin_notifications broadcast log
-    const { data: adminNotif, error: adminErr } = await supabase
-      .from("admin_notifications")
-      .insert({
-        title: broadcast.title,
-        message: broadcast.message,
-        target_scope: broadcast.targetScope,
-        target_id: broadcast.targetId || null,
-        target_label: broadcast.targetLabel,
-        sent_by: broadcast.sentBy || "Super Admin",
-        recipient_count: 0,
-      })
-      .select()
-      .single();
-
-    if (adminErr) {
-      console.error("Error inserting admin_notifications:", adminErr);
-    }
-
-    // 2. Fetch targeted profiles to fan-out into user notifications table
-    let query = supabase.from("profiles").select("user_id, company_id, batch_id, program_code, role");
-
-    if (broadcast.targetScope === "company" && broadcast.targetId) {
-      query = query.eq("company_id", broadcast.targetId);
-    } else if (broadcast.targetScope === "batch" && broadcast.targetId) {
-      query = query.eq("batch_id", broadcast.targetId);
-    } else if (broadcast.targetScope === "participant" && broadcast.targetId) {
-      query = query.eq("user_id", broadcast.targetId);
-    }
-
-    const { data: targetProfiles } = await query;
-
-    if (targetProfiles && targetProfiles.length > 0) {
-      const userNotifs = targetProfiles.map((p) => ({
-        user_id: p.user_id,
-        title: broadcast.title,
-        message: broadcast.message,
-        category: "broadcast",
-        is_read: false,
-      }));
-
-      await supabase.from("notifications").insert(userNotifs);
-
-      // Update recipient count
-      if (adminNotif?.id) {
-        await supabase
-          .from("admin_notifications")
-          .update({ recipient_count: targetProfiles.length })
-          .eq("id", adminNotif.id);
-      }
-    }
-
+    const { error } = await supabase.rpc("send_admin_broadcast", {
+      p_title: broadcast.title.trim(),
+      p_message: broadcast.message.trim(),
+      p_target_scope: broadcast.targetScope,
+      p_target_id: broadcast.targetId || null,
+    });
+    if (error) throw error;
     return true;
   } catch (err) {
     console.error("Failed to broadcast notification:", err);
@@ -529,7 +521,7 @@ export async function verifyAccessCodeAsync(code: string): Promise<{ valid: bool
         endDate: batch.end_date || "",
         participantCount: 0,
         coachId: batch.coach_id || "",
-        coachName: batch.coach_name || "Coach Pendamping",
+        coachName: batch.coach_name || "Belum ditentukan",
         healthScore: 100,
         createdAt: batch.created_at ? batch.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
       };

@@ -34,6 +34,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_TIME_ZONE, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getJournalStreak, getJourneyDayForDate, parseJournalContent, composeJournalContent } from "@/lib/journal";
 
@@ -259,7 +260,12 @@ export default function RefactoredJournalPage() {
       }
 
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
+      const { data: profileTimeZone } = await supabase.from("profiles").select("timezone, timezone_mode").eq("user_id", user.id).maybeSingle();
+      const resolvedTimeZone = resolveParticipantTimeZone(
+        profileTimeZone?.timezone || DEFAULT_TIME_ZONE,
+        profileTimeZone?.timezone_mode || "AUTO"
+      );
+      const todayStr = getLocalDateString(now, resolvedTimeZone);
       const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
 
       const combinedContent = composeJournalContent(mainReflection, pelajaran, perbaikanBesok);

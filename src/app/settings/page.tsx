@@ -10,11 +10,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Bell, Lock, Check, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { getDeviceTimeZone, normalizeTimeZone } from "@/lib/local-date";
 
 export default function SettingsPage() {
   const supabase = createClient();
   const [city, setCity] = useState("Jakarta");
   const [timezone, setTimezone] = useState("Auto");
+  const [detectedTimeZone, setDetectedTimeZone] = useState("Asia/Jakarta");
   const [timeFormat, setTimeFormat] = useState<"24" | "12">("24");
   const [dateFormat, setDateFormat] = useState<"full" | "short">("full");
   const [prayerNotif, setPrayerNotif] = useState(true);
@@ -59,13 +61,26 @@ export default function SettingsPage() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("location")
+          .select("location, timezone, timezone_mode")
           .eq("user_id", user.id)
           .maybeSingle();
         if (profileError) throw profileError;
 
         if (profile?.location) {
           setCity(profile.location);
+        }
+        setDetectedTimeZone(getDeviceTimeZone());
+        if (profile?.timezone_mode === "AUTO") {
+          setTimezone("Auto");
+        } else if (profile?.timezone) {
+          const zoneLabel = profile.timezone === "Asia/Jakarta"
+            ? "WIB"
+            : profile.timezone === "Asia/Makassar"
+              ? "WITA"
+              : profile.timezone === "Asia/Jayapura"
+                ? "WIT"
+                : profile.timezone;
+          setTimezone(zoneLabel);
         }
 
         const { data: settings, error: settingsError } = await supabase
@@ -157,6 +172,8 @@ export default function SettingsPage() {
           .from("profiles")
           .update({
             location: city,
+            timezone_mode: timezone === "Auto" ? "AUTO" : "MANUAL",
+            timezone: timezone === "Auto" ? getDeviceTimeZone() : normalizeTimeZone(timezone),
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", user.id);
@@ -236,10 +253,14 @@ export default function SettingsPage() {
                       onChange={(e) => setTimezone(e.target.value)}
                       className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-navy-900 bg-white"
                     >
-                      <option value="Auto">Auto Detect (Otomatis)</option>
-                      <option value="WIB">WIB (Asia/Jakarta - UTC+7)</option>
-                      <option value="WITA">WITA (Asia/Makassar - UTC+8)</option>
-                      <option value="WIT">WIT (Asia/Jayapura - UTC+9)</option>
+                       <option value="Auto">Otomatis mengikuti perangkat ({detectedTimeZone})</option>
+                       <option value="WIB">WIB (Asia/Jakarta - UTC+7)</option>
+                       <option value="WITA">WITA (Asia/Makassar - UTC+8)</option>
+                       <option value="WIT">WIT (Asia/Jayapura - UTC+9)</option>
+                       <option value="Asia/Riyadh">Makkah / Madinah (Asia/Riyadh - UTC+3)</option>
+                       <option value="Australia/Perth">Australia Barat (Perth)</option>
+                       <option value="Australia/Adelaide">Australia Tengah (Adelaide)</option>
+                       <option value="Australia/Sydney">Australia Timur (Sydney)</option>
                     </select>
                     <p className="text-[11px] text-gray-500">
                       Penentuan tampilan nama zona waktu pada Live Clock.

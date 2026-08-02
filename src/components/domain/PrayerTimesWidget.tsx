@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Clock, MapPin, ChevronRight, Sun, Moon, Sunrise, Sunset } from "lucide-react";
+import { Clock, MapPin, Sun, Moon, Sunrise, Sunset } from "lucide-react";
 
 interface PrayerTimes {
   Fajr: string;
@@ -15,7 +15,6 @@ interface PrayerTimes {
 
 interface PrayerTimesWidgetProps {
   location?: string;
-  onViewAll?: () => void;
 }
 
 function parseTime(timeStr: string): number {
@@ -54,7 +53,7 @@ function getNextPrayerInfo(timings: PrayerTimes): { name: string; time: string; 
   return { name: "Subuh", time: timings.Fajr, remainingText: `${hrs}h ${m}m lagi` };
 }
 
-export function PrayerTimesWidget({ location = "Jakarta", onViewAll }: PrayerTimesWidgetProps) {
+export function PrayerTimesWidget({ location = "Jakarta" }: PrayerTimesWidgetProps) {
   const [timings, setTimings] = useState<PrayerTimes>({
     Fajr: "--:--",
     Sunrise: "--:--",
@@ -182,16 +181,6 @@ export function PrayerTimesWidget({ location = "Jakarta", onViewAll }: PrayerTim
         </div>
       </div>
 
-      {/* Footer link */}
-      <div className="pt-3 border-t border-warm-border/60">
-        <button
-          onClick={onViewAll}
-          className="text-xs font-bold text-navy-900 hover:text-amber-700 flex items-center gap-1 transition-colors w-full justify-between"
-        >
-          <span>Lihat Semua Jadwal</span>
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
     </Card>
   );
 }

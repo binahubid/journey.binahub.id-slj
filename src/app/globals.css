@@ -106,4 +106,7 @@
   scrollbar-color: rgba(199, 154, 60, 0.85) transparent;
 }
 
-
+/* Tighter product geometry: reserve full pills for badges and circular controls. */
+.rounded-3xl { border-radius: 0.875rem !important; }
+.rounded-2xl { border-radius: 0.75rem !important; }
+.rounded-xl { border-radius: 0.5rem !important; }

@@ -20,20 +20,20 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getStoredCompanies,
-  getStoredBatches,
-  saveBatches,
   fetchCompaniesFromSupabase,
   fetchBatchesFromSupabase,
   createBatchInSupabase,
-  INITIAL_COACHES,
+  fetchCoachesFromSupabase,
+  formatSupabaseError,
   Batch,
   Company,
+  AdminCoach,
 } from "@/lib/company-store";
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -53,54 +53,39 @@ export default function BatchesPage() {
   // Form states
   const [batchName, setBatchName] = useState("");
   const [companyId, setCompanyId] = useState("");
-  const [coachId, setCoachId] = useState(INITIAL_COACHES[0]?.id || "coach-1");
-  const [startDate, setStartDate] = useState("2027-02-01");
-  const [endDate, setEndDate] = useState("2027-05-01");
+  const [coachId, setCoachId] = useState("");
+  const [availableCoaches, setAvailableCoaches] = useState<AdminCoach[]>([]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().split("T")[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 4);
+    return d.toISOString().split("T")[0];
+  });
   const [generatedCode, setGeneratedCode] = useState("");
   const [formAutoLockAt, setFormAutoLockAt] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [savingBatch, setSavingBatch] = useState(false);
 
   const handleExecuteMassLock = async () => {
     if (!selectedLockBatch) return;
     setLockingBatch(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: affectedCount, error: lockError } = await supabase.rpc("lock_batch_ptps", {
+        p_batch_id: selectedLockBatch.id,
+      });
+      if (lockError) throw lockError;
 
-      // Find profiles in this batch
-      const { data: profilesInBatch } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .or(`program_code.eq.${selectedLockBatch.accessCode},batch_id.eq.${selectedLockBatch.id}`);
-
-      const userIds = (profilesInBatch || []).map((p) => p.user_id);
-
-      if (userIds.length > 0) {
-        // Bulk update journeys status
-        await supabase
-          .from("journeys")
-          .update({
-            ptp_status: "LOCKED",
-            locked_at: new Date().toISOString(),
-            locked_by: user?.id || null,
-          })
-          .in("user_id", userIds);
-      } else {
-        // Fallback: lock all editable journeys
-        await supabase
-          .from("journeys")
-          .update({
-            ptp_status: "LOCKED",
-            locked_at: new Date().toISOString(),
-            locked_by: user?.id || null,
-          })
-          .eq("ptp_status", "EDITABLE");
-      }
-
-      setLockSuccessMsg(`Seluruh Dokumen PTP pada Batch "${selectedLockBatch.name}" berhasil dikunci!`);
+      setLockSuccessMsg(`${affectedCount || 0} Dokumen PTP pada Batch "${selectedLockBatch.name}" berhasil dikunci.`);
       setTimeout(() => setLockSuccessMsg(null), 4000);
       setSelectedLockBatch(null);
     } catch (err) {
       console.error("Gagal melakukan Lock PTP:", err);
+      setErrorMsg("PTP batch belum dapat dikunci. Tidak ada perubahan yang dianggap berhasil.");
     } finally {
       setLockingBatch(false);
     }
@@ -111,10 +96,13 @@ export default function BatchesPage() {
     setSavingAutoLock(true);
     try {
       const supabase = createClient();
-      await supabase
+      const { data, error } = await supabase
         .from("batches")
         .update({ auto_lock_at: new Date(autoLockAt).toISOString() })
-        .eq("id", autoLockBatch.id);
+        .eq("id", autoLockBatch.id)
+        .select("id, auto_lock_at")
+        .single();
+      if (error || !data?.auto_lock_at) throw error || new Error("Batch tidak ditemukan atau tidak berubah.");
       setLockSuccessMsg(`Auto-Lock PTP batch "${autoLockBatch.name}" dijadwalkan pada ${new Date(autoLockAt).toLocaleString("id-ID")}`);
       setTimeout(() => setLockSuccessMsg(null), 5000);
       setShowAutoLockModal(false);
@@ -122,6 +110,7 @@ export default function BatchesPage() {
       setAutoLockAt("");
     } catch (err) {
       console.error("Gagal menyimpan auto-lock:", err);
+      setErrorMsg("Jadwal auto-lock belum tersimpan.");
     } finally {
       setSavingAutoLock(false);
     }
@@ -129,22 +118,38 @@ export default function BatchesPage() {
 
   useEffect(() => {
     async function loadData() {
-      const compList = await fetchCompaniesFromSupabase();
-      const batchList = await fetchBatchesFromSupabase();
-      setCompanies(compList);
-      setBatches(batchList);
+      setLoading(true);
+      try {
+        const [compList, batchList, coachList] = await Promise.all([
+          fetchCompaniesFromSupabase(),
+          fetchBatchesFromSupabase(),
+          fetchCoachesFromSupabase(),
+        ]);
+        setCompanies(compList);
+        setBatches(batchList);
+        setAvailableCoaches(coachList);
 
-      if (compList.length > 0) {
-        setCompanyId(compList[0].id);
-        generateCodeForCompany(compList[0]);
+        if (compList.length > 0) {
+          setCompanyId(compList[0].id);
+          generateCodeForCompany(compList[0]);
+        }
+        if (coachList.length > 0) {
+          setCoachId(coachList[0].id);
+        }
+      } catch (err) {
+        console.error("Error loading batch data:", err);
+        setErrorMsg("Gagal memuat data batch. Periksa koneksi lalu coba lagi.");
+      } finally {
+        setLoading(false);
       }
     }
     loadData();
   }, []);
 
   const generateCodeForCompany = (comp: Company) => {
+    const year = new Date().getFullYear();
     const randomNum = Math.floor(100 + Math.random() * 900);
-    setGeneratedCode(`${comp.code}-2027-${randomNum}`);
+    setGeneratedCode(`${comp.code}-${year}-${randomNum}`);
   };
 
   const handleCompanyChange = (cId: string) => {
@@ -156,44 +161,37 @@ export default function BatchesPage() {
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!batchName.trim() || !companyId) return;
+    setSavingBatch(true);
+    setErrorMsg(null);
 
     const comp = companies.find((c) => c.id === companyId);
-    const coach = INITIAL_COACHES.find((c) => c.id === coachId);
-    const codeToUse = generatedCode || `${comp?.code || "BATCH"}-2027-${Date.now().toString().slice(-3)}`;
+    const coach = availableCoaches.find((c) => c.id === coachId);
+    const codeToUse = generatedCode || `${comp?.code || "BATCH"}-${new Date().getFullYear()}-${Date.now().toString().slice(-3)}`;
 
     const created = await createBatchInSupabase({
       companyId,
-      companyName: comp?.name || "Corporate Mitra",
+      companyName: comp?.name || "Belum ditentukan",
       name: batchName,
       accessCode: codeToUse,
       status: "Active",
       startDate,
       endDate,
-      coachName: coach?.name || "Coach Pendamping",
+      coachId: coachId || "",
+      coachName: coach?.name || "Belum ditentukan",
+      autoLockAt: formAutoLockAt ? new Date(formAutoLockAt).toISOString() : null,
     });
 
-    const newBatch: Batch = created || {
-      id: `batch-${Date.now()}`,
-      companyId,
-      companyName: comp?.name || "Corporate Mitra",
-      name: batchName,
-      accessCode: codeToUse,
-      status: "Active",
-      startDate,
-      endDate,
-      participantCount: 0,
-      coachId: coach?.id || "coach-1",
-      coachName: coach?.name || "Coach Pendamping",
-      healthScore: 100,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-
-    const updated = [newBatch, ...batches];
+    if (!created) {
+      setErrorMsg("Batch belum tersimpan. Kemungkinan kode duplikat, izin admin, atau gangguan jaringan.");
+      setSavingBatch(false);
+      return;
+    }
+    const updated = [created, ...batches];
     setBatches(updated);
-    saveBatches(updated);
 
     setBatchName("");
     setShowAddModal(false);
+    setSavingBatch(false);
   };
 
   const handleCopyCode = (code: string) => {
@@ -233,6 +231,11 @@ export default function BatchesPage() {
       </div>
 
       {/* Filters Bar */}
+      {errorMsg && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+          {errorMsg}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Search */}
         <div className="relative max-w-md w-full">
@@ -278,7 +281,19 @@ export default function BatchesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EAE5D9]">
-              {filtered.map((b) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                    Memuat data batch...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                    Tidak ada batch ditemukan.
+                  </td>
+                </tr>
+              ) : filtered.map((b) => (
                 <tr key={b.id} className="hover:bg-[#FAF8F4]/80 transition-colors">
                   <td className="p-4 font-bold text-[#071A33]">
                     <div className="flex items-center gap-2">
@@ -432,7 +447,7 @@ export default function BatchesPage() {
                   onChange={(e) => setCoachId(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
                 >
-                  {INITIAL_COACHES.map((c) => (
+                  {availableCoaches.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} ({c.participantCount} peserta bimbingan)
                     </option>
@@ -463,9 +478,10 @@ export default function BatchesPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-[#0B2C6B] hover:bg-[#071A33] text-white text-xs font-bold shadow-md inline-flex items-center gap-1.5"
+                  disabled={savingBatch}
+                  className="px-5 py-2 rounded-lg bg-[#0B2C6B] hover:bg-[#071A33] text-white text-xs font-bold shadow-md inline-flex items-center gap-1.5 disabled:opacity-60"
                 >
-                  <Share2 className="h-4 w-4 text-[#C79A3C]" /> Buat Batch & Bagikan Kode
+                   <Share2 className="h-4 w-4 text-[#C79A3C]" /> {savingBatch ? "Menyimpan..." : "Buat Batch & Bagikan Kode"}
                 </button>
               </div>
             </form>

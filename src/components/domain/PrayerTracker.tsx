@@ -7,12 +7,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Sparkles, X, ExternalLink } from "lucide-react";
+import { DEFAULT_TIME_ZONE, getLocalDateRange, getLocalDateString } from "@/lib/local-date";
 
 interface PrayerTrackerProps {
   userId: string;
   onPrayerToggle?: (dateStr: string, prayerName: string, isCompleted: boolean) => void;
   externalLogs?: Record<string, boolean>;
   accountCreatedDate?: string; // YYYY-MM-DD format
+  timeZone?: string;
 }
 
 const MANDATORY_PRAYERS = [
@@ -49,7 +51,7 @@ const DAY_INITIALS: Record<number, string> = {
   0: "M", 1: "S", 2: "S", 3: "R", 4: "K", 5: "J", 6: "S",
 };
 
-export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, externalLogs }: PrayerTrackerProps) {
+export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, externalLogs, timeZone = DEFAULT_TIME_ZONE }: PrayerTrackerProps) {
   const supabase = createClient();
   const [logs, setLogs] = useState<Record<string, boolean>>({});
   const [activeSunnahKeys, setActiveSunnahKeys] = useState<string[]>([]);
@@ -106,48 +108,52 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
 
     try {
       if (nextVal) {
-        await supabase.from("prayer_logs").upsert({
+        const { error } = await supabase.from("prayer_logs").upsert({
           user_id: userId,
           date: dateStr,
           prayer_name: prayerName,
           is_completed: true,
-        });
+        }, { onConflict: "user_id,date,prayer_name" });
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from("prayer_logs")
           .delete()
           .eq("user_id", userId)
           .eq("date", dateStr)
           .eq("prayer_name", prayerName);
+        if (error) throw error;
       }
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = getLocalDateString(new Date(), timeZone);
       if (dateStr === todayStr) {
         const targetHabitTitle = PRAYER_TO_HABIT_TITLE[prayerName];
         if (targetHabitTitle) {
-          const { data: habit } = await supabase
+          const { data: habits, error: habitError } = await supabase
             .from("habits")
             .select("id")
             .eq("user_id", userId)
-            .eq("title", targetHabitTitle)
-            .maybeSingle();
+            .eq("title", targetHabitTitle);
+          if (habitError) throw habitError;
 
-          if (habit) {
+          for (const habit of habits || []) {
             if (nextVal) {
-              await supabase.from("habit_logs").upsert({
+              const { error } = await supabase.from("habit_logs").upsert({
                 user_id: userId,
                 habit_id: habit.id,
                 date: todayStr,
                 completed: true,
                 completed_count: 1,
-              });
+              }, { onConflict: "habit_id,date" });
+              if (error) throw error;
             } else {
-              await supabase
+              const { error } = await supabase
                 .from("habit_logs")
                 .delete()
                 .eq("user_id", userId)
                 .eq("habit_id", habit.id)
                 .eq("date", todayStr);
+              if (error) throw error;
             }
           }
         }
@@ -159,22 +165,10 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
     }
   };
 
-  const get7Days = () => {
-    const arr = [];
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split("T")[0];
-      const dayNum = d.getDate();
-      const dayNameIndex = d.getDay();
-      const initial = DAY_INITIALS[dayNameIndex];
-      arr.push({ dateStr, dayNum, initial, isToday: i === 0 });
-    }
-    return arr;
-  };
-
-  const days = get7Days();
+  const days = getLocalDateRange(7, timeZone).map((day) => ({
+    ...day,
+    initial: DAY_INITIALS[day.dayIndex],
+  }));
   const toggleSunnahActive = (key: string) => {
     if (activeSunnahKeys.includes(key)) {
       setActiveSunnahKeys(activeSunnahKeys.filter((k) => k !== key));
@@ -247,40 +241,30 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
                   </tr>
                 ))}
 
-                {activeSunnahList.length > 0 && (
-                  <>
-                    <tr className="bg-amber-50/40 border-t-2 border-amber-100">
-                      <td colSpan={8} className="py-1.5 px-2 text-[10px] font-black text-amber-800 uppercase tracking-wider">
-                        Sholat Sunnah
-                      </td>
-                    </tr>
-                    {activeSunnahList.map((p) => (
-                      <tr key={p.key} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-2 pr-2 font-semibold text-slate-800 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                          <span className="truncate text-xs">{p.label}</span>
+                {activeSunnahList.map((p) => (
+                  <tr key={p.key} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-2.5 pr-2 font-bold text-navy-900">
+                      <span className="truncate text-xs">{p.label}</span>
+                    </td>
+                    {days.map((d) => {
+                      const isChecked = !!logs[`${d.dateStr}_${p.key}`];
+                      const isLocked = !!(accountCreatedDate && d.dateStr < accountCreatedDate);
+                      return (
+                        <td key={d.dateStr} className="text-center py-2.5 px-1 w-9">
+                          <Checkbox
+                            checked={isChecked}
+                            disabled={isLocked}
+                            onCheckedChange={() => !isLocked && togglePrayer(d.dateStr, p.key)}
+                            className={`h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto ${
+                              isLocked ? "opacity-30 cursor-not-allowed bg-slate-100" : ""
+                            }`}
+                            title={isLocked ? "Hari sebelum akun dibuat (terkunci)" : ""}
+                          />
                         </td>
-                        {days.map((d) => {
-                          const isChecked = !!logs[`${d.dateStr}_${p.key}`];
-                          const isLocked = !!(accountCreatedDate && d.dateStr < accountCreatedDate);
-                          return (
-                            <td key={d.dateStr} className="text-center py-2 px-1 w-9">
-                              <Checkbox
-                                checked={isChecked}
-                                disabled={isLocked}
-                                onCheckedChange={() => !isLocked && togglePrayer(d.dateStr, p.key)}
-                                className={`h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto ${
-                                  isLocked ? "opacity-30 cursor-not-allowed bg-slate-100" : ""
-                                }`}
-                                title={isLocked ? "Hari sebelum akun dibuat (terkunci)" : ""}
-                              />
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </>
-                )}
+                      );
+                    })}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -320,14 +304,13 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
                 return (
                   <div
                     key={s.key}
-                    onClick={() => toggleSunnahActive(s.key)}
                     className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
                       isSelected
                         ? "bg-amber-50 border-amber-300 text-amber-900 font-bold"
                         : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <span className="text-xs">{s.label}</span>
+                    <button type="button" onClick={() => toggleSunnahActive(s.key)} className="flex-1 text-left text-xs">{s.label}</button>
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleSunnahActive(s.key)}

@@ -631,9 +631,9 @@ interface BatchMate {
               {guideOpen && (
                 <div className="px-4 pb-4 pt-1 border-t border-slate-700/60 bg-[#071A33]">
                   <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Kondisi hati dan aspek mana dalam hidup Anda saat ini yang paling membutuhkan petunjuk dan perbaikan dari Allah SWT?</li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Kebiasaan, kekhilafan, atau kendala apa yang selama ini paling menghambat tumbuh kembang Anda sebagai hamba dan pemimpin?</li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Jika perjalanan hidup Anda berakhir hari ini, hal penting apa yang paling Anda harapkan telah diperbaiki?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Apa bagian dari hati dan kehidupan saya yang paling membutuhkan pertolongan Allah?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Apa yang paling ingin saya perbaiki melalui program ini?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Kenapa area perbaikan itu penting?</li>
                   </ul>
                 </div>
               )}
@@ -657,7 +657,7 @@ interface BatchMate {
         return (
           <div className="space-y-4">
             {/* Collapsible Reflection Guide */}
-            <div className="bg-[#071A33] border border-amber-400/40 rounded-2xl overflow-hidden shadow-xs">
+            <div className="bg-[#071A33] border-l-4 border-amber-400 rounded-xl overflow-hidden shadow-xs">
               <button
                 type="button"
                 onClick={() => setHadithOpen(v => !v)}
@@ -672,9 +672,9 @@ interface BatchMate {
               {hadithOpen && (
                 <div className="px-4 pb-4 pt-1 border-t border-slate-700/60 bg-[#071A33]">
                   <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Apakah niat utama Anda menunaikan Umrah murni karena Allah SWT dan kerinduan untuk bertransformasi?</li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Perubahan bermakna apa yang ingin Anda bawa pulang agar memberi dampak positif bagi diri dan lingkungan?</li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Komitmen konkret apa yang siap Anda jalankan secara istiqamah selama 90 hari ke depan?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Mengapa saya ingin berangkat Umrah, dan apakah niat saya benar-benar karena Allah? Bagaimana saya meluruskan niat ini?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Pribadi seperti apa yang ingin saya bentuk setelah kembali dari Tanah Suci?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Apa komitmen yang saya ikrarkan kepada Allah untuk mewujudkan perubahan itu?</li>
                   </ul>
                 </div>
               )}

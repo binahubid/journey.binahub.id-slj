@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BookMarked, Quote, CheckCircle2 } from "lucide-react";
+import { DEFAULT_TIME_ZONE, getLocalDateString } from "@/lib/local-date";
 
 interface DailyHadithWidgetProps {
   userId: string;
+  timeZone?: string;
 }
 
 const HADITHS = [
@@ -43,9 +45,9 @@ const HADITHS = [
   },
 ];
 
-export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
+export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: DailyHadithWidgetProps) {
   const supabase = createClient();
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getLocalDateString(new Date(), timeZone);
 
   const dayOfYear = Math.floor(
     (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
@@ -54,23 +56,27 @@ export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
 
   const [isRead, setIsRead] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadHadithLog() {
       if (!userId) return;
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("hadith_logs")
           .select("is_read")
           .eq("user_id", userId)
           .eq("date", todayStr)
           .maybeSingle();
+        if (error) throw error;
 
         if (data) {
           setIsRead(data.is_read || false);
         }
       } catch (err) {
         console.error("Gagal memuat log hadits:", err);
+        setErrorMsg("Status baca hadits belum dapat dimuat.");
       } finally {
         setLoading(false);
       }
@@ -80,27 +86,26 @@ export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
 
   const syncHabitLog = async (habitTitle: string, completed: boolean) => {
     try {
-      const { data: habit } = await supabase
+      const { data: habits, error: habitError } = await supabase
         .from("habits")
         .select("id")
         .eq("user_id", userId)
-        .ilike("title", habitTitle)
-        .maybeSingle();
+        .ilike("title", habitTitle);
+      if (habitError) throw habitError;
 
-      if (!habit) return;
+      if (!habits?.length) return;
 
-      if (completed) {
-        await supabase.from("habit_logs").upsert(
-          { habit_id: habit.id, user_id: userId, date: todayStr, completed: true },
-          { onConflict: "habit_id,date" }
-        );
-      } else {
-        await supabase
-          .from("habit_logs")
-          .delete()
-          .eq("habit_id", habit.id)
-          .eq("user_id", userId)
-          .eq("date", todayStr);
+      for (const habit of habits) {
+        if (completed) {
+          const { error } = await supabase.from("habit_logs").upsert(
+            { habit_id: habit.id, user_id: userId, date: todayStr, completed: true, completed_count: 1 },
+            { onConflict: "habit_id,date" }
+          );
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("habit_logs").delete().eq("habit_id", habit.id).eq("user_id", userId).eq("date", todayStr);
+          if (error) throw error;
+        }
       }
     } catch (err) {
       console.error("syncHabitLog (DailyHadithWidget):", err);
@@ -108,10 +113,13 @@ export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
   };
 
   const toggleHadithRead = async (checked: boolean) => {
+    if (saving || loading) return;
+    setSaving(true);
+    setErrorMsg(null);
     setIsRead(checked);
     try {
       if (checked) {
-        await supabase.from("hadith_logs").upsert(
+        const { error } = await supabase.from("hadith_logs").upsert(
           {
             user_id: userId,
             date: todayStr,
@@ -119,12 +127,14 @@ export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
           },
           { onConflict: "user_id,date" }
         );
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from("hadith_logs")
           .delete()
           .eq("user_id", userId)
           .eq("date", todayStr);
+        if (error) throw error;
       }
 
       // Sync matching PTP habits
@@ -132,6 +142,9 @@ export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
     } catch (err) {
       console.error("Gagal update status baca hadits:", err);
       setIsRead(!checked);
+      setErrorMsg("Status baca belum tersimpan. Silakan coba lagi.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -151,6 +164,7 @@ export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
         <div className="flex items-center space-x-2 bg-amber-50/70 px-3 py-1.5 rounded-full border border-amber-200">
           <Checkbox
             checked={isRead}
+            disabled={loading || saving}
             onCheckedChange={(c) => toggleHadithRead(!!c)}
             className="h-4 w-4 rounded-md border-amber-400 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white"
           />
@@ -159,6 +173,7 @@ export function DailyHadithWidget({ userId }: DailyHadithWidgetProps) {
           </span>
         </div>
       </div>
+      {errorMsg && <p role="alert" className="text-xs font-semibold text-rose-700">{errorMsg}</p>}
 
       <div className="space-y-3 z-10 relative flex-1 flex flex-col justify-between">
         <p className="text-right font-serif text-lg text-navy-900 leading-loose tracking-wide dir-rtl font-bold bg-amber-50/30 p-3 rounded-xl border border-amber-100/50">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { BookOpen, Plus, CheckCircle2 } from "lucide-react";
+import { DEFAULT_TIME_ZONE, getLocalDateString } from "@/lib/local-date";
 
 interface QuranLogEntry {
   id: string;
@@ -20,9 +21,10 @@ interface QuranLogEntry {
 interface QuranTrackerProps {
   userId: string;
   onQuranLogged?: () => void;
+  timeZone?: string;
 }
 
-export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
+export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZONE }: QuranTrackerProps) {
   const supabase = createClient();
   const [logs, setLogs] = useState<QuranLogEntry[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -33,25 +35,28 @@ export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
   const [fromAyat, setFromAyat] = useState<number | "">("");
   const [toAyat, setToAyat] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getLocalDateString(new Date(), timeZone);
 
   useEffect(() => {
     async function loadQuranLogs() {
       if (!userId) return;
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("quran_logs")
           .select("*")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(10);
+        if (error) throw error;
 
         if (data) {
           setLogs(data);
         }
       } catch (err) {
         console.error("Gagal memuat log Al-Qur'an:", err);
+        setErrorMsg("Riwayat tilawah belum dapat dimuat.");
       } finally {
         setLoading(false);
       }
@@ -63,27 +68,26 @@ export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
 
   const syncHabitLog = async (habitTitle: string, completed: boolean) => {
     try {
-      const { data: habit } = await supabase
+      const { data: habits, error: habitError } = await supabase
         .from("habits")
         .select("id")
         .eq("user_id", userId)
-        .ilike("title", habitTitle)
-        .maybeSingle();
+        .ilike("title", habitTitle);
+      if (habitError) throw habitError;
 
-      if (!habit) return;
+      if (!habits?.length) return;
 
-      if (completed) {
-        await supabase.from("habit_logs").upsert(
-          { habit_id: habit.id, user_id: userId, date: todayStr, completed: true },
-          { onConflict: "habit_id,date" }
-        );
-      } else {
-        await supabase
-          .from("habit_logs")
-          .delete()
-          .eq("habit_id", habit.id)
-          .eq("user_id", userId)
-          .eq("date", todayStr);
+      for (const habit of habits) {
+        if (completed) {
+          const { error } = await supabase.from("habit_logs").upsert(
+            { habit_id: habit.id, user_id: userId, date: todayStr, completed: true, completed_count: 1 },
+            { onConflict: "habit_id,date" }
+          );
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("habit_logs").delete().eq("habit_id", habit.id).eq("user_id", userId).eq("date", todayStr);
+          if (error) throw error;
+        }
       }
     } catch (err) {
       console.error("syncHabitLog (QuranTracker):", err);
@@ -96,9 +100,14 @@ export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
 
     const fromNum = Number(fromAyat);
     const toNum = Number(toAyat);
+    if (toNum < fromNum) {
+      setErrorMsg("Ayat akhir tidak boleh lebih kecil dari ayat awal.");
+      return;
+    }
     const totalAyat = Math.max(1, toNum - fromNum + 1);
 
     setSaving(true);
+    setErrorMsg(null);
     try {
       const newEntry = {
         user_id: userId,
@@ -115,16 +124,16 @@ export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
         .select()
         .single();
 
-      if (data && !error) {
+      if (error) throw error;
+      if (data) {
         setLogs([data, ...logs]);
         setSurahName("");
         setFromAyat("");
         setToAyat("");
         setShowModal(false);
 
-        // Sync habit: "Tilawah Al-Qur'an" and "Khatam 1 Juz Al-Qur'an"
+        // Satu catatan tilawah tidak otomatis berarti khatam satu juz.
         await syncHabitLog("Tilawah Al-Qur'an", true);
-        await syncHabitLog("Khatam 1 Juz Al-Qur'an", true);
 
         if (onQuranLogged) {
           onQuranLogged();
@@ -132,6 +141,7 @@ export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
       }
     } catch (err) {
       console.error("Gagal menyimpan tilawah Qur'an:", err);
+      setErrorMsg("Catatan tilawah belum tersimpan. Periksa koneksi lalu coba lagi.");
     } finally {
       setSaving(false);
     }
@@ -215,6 +225,7 @@ export function QuranTracker({ userId, onQuranLogged }: QuranTrackerProps) {
           </table>
         </div>
       )}
+      {errorMsg && <p role="alert" className="text-xs font-semibold text-rose-700">{errorMsg}</p>}
 
       {/* Modal Input Bacaan Al-Qur'an */}
       <Dialog open={showModal} onOpenChange={setShowModal}>

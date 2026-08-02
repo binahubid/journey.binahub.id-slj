@@ -14,25 +14,67 @@ import {
   Activity,
   Layers,
 } from "lucide-react";
-import { getStoredCompanies, getStoredBatches, Company, Batch } from "@/lib/company-store";
+import { createClient } from "@/lib/supabase/client";
+import {
+  fetchCompaniesFromSupabase,
+  fetchBatchesFromSupabase,
+  formatSupabaseError,
+  Company,
+  Batch,
+} from "@/lib/company-store";
 
 export default function CompanyDashboardPage() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadedCompanies = getStoredCompanies();
-    setCompanies(loadedCompanies);
-    if (loadedCompanies.length > 0) {
-      setSelectedCompany(loadedCompanies[0]); // Default to PT Pertamina
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [compList, batchList] = await Promise.all([
+          fetchCompaniesFromSupabase(),
+          fetchBatchesFromSupabase(),
+        ]);
+        setCompanies(compList);
+        setBatches(batchList);
+        if (compList.length > 0) {
+          setSelectedCompany(compList[0]);
+        }
+      } catch (err: any) {
+        setErrorMsg(formatSupabaseError(err, "Gagal memuat data perusahaan."));
+      } finally {
+        setLoading(false);
+      }
     }
-    setBatches(getStoredBatches());
+    loadData();
   }, []);
 
-  if (!selectedCompany) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
+        <p className="text-sm text-slate-500 font-medium">Memuat data...</p>
+      </div>
+    );
+  }
 
-  const currentCompanyBatches = batches.filter((b) => b.companyId === selectedCompany.id || selectedCompany.name.includes(b.companyName));
+  if (!selectedCompany) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Building2 className="h-12 w-12 text-slate-300 mx-auto" />
+          <p className="text-sm text-slate-500 font-medium">Belum ada data perusahaan.</p>
+          <Link href="/admin/companies" className="inline-block text-xs font-bold text-[#0B2C6B] underline">
+            Tambah Perusahaan
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const currentCompanyBatches = batches.filter((b) => b.companyId === selectedCompany.id);
 
   return (
     <div className="min-h-screen bg-[#FAF8F4] font-sans pb-16">
@@ -51,7 +93,7 @@ export default function CompanyDashboardPage() {
             </div>
           </div>
 
-          {/* Company Switcher for Demo */}
+          {/* Company Switcher */}
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-slate-500 hidden sm:inline">Pilih Entitas HR:</span>
             <select
@@ -79,7 +121,13 @@ export default function CompanyDashboardPage() {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-6 pt-8 space-y-8">
-        {/* Privacy Lock Banner (Strict Privacy Notice as requested by User) */}
+        {errorMsg && (
+          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* Privacy Lock Banner */}
         <div className="p-4 rounded-2xl bg-[#0B2C6B] text-white border border-[#C79A3C]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center text-[#C79A3C] shrink-0">
@@ -99,12 +147,11 @@ export default function CompanyDashboardPage() {
           </span>
         </div>
 
-        {/* 3 Core HR Stat Cards (Requested explicitly by User) */}
+        {/* 3 Core HR Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: 85% Habit Completion */}
           <div className="p-6 rounded-2xl border border-[#EAE5D9] bg-white space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Rata-rata Penyelesaian Habit (Habit Completion)</span>
+              <span className="text-xs font-bold text-slate-500">Rata-rata Penyelesaian Habit</span>
               <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                 <CheckCircle2 className="h-4 w-4" />
               </div>
@@ -115,7 +162,6 @@ export default function CompanyDashboardPage() {
             </p>
           </div>
 
-          {/* Card 2: 91% Checkpoint Complete */}
           <div className="p-6 rounded-2xl border border-[#EAE5D9] bg-white space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500">Checkpoint Complete</span>
@@ -129,7 +175,6 @@ export default function CompanyDashboardPage() {
             </p>
           </div>
 
-          {/* Card 3: 12 Need Support */}
           <div className="p-6 rounded-2xl border border-[#EAE5D9] bg-white space-y-2 shadow-2xs border-l-4 border-l-amber-500">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500">Need Support (Membutuhkan Perhatian)</span>
@@ -159,25 +204,27 @@ export default function CompanyDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentCompanyBatches.map((b) => (
-              <div key={b.id} className="p-5 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4]/60 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-[#071A33] text-sm">{b.name}</h3>
-                  <span className="px-2.5 py-0.5 rounded bg-[#0B2C6B] text-white text-[10px] font-bold">
-                    {b.status}
-                  </span>
+            {currentCompanyBatches.length === 0 ? (
+              <p className="text-xs text-slate-500 font-medium py-8 text-center col-span-2">Belum ada batch untuk perusahaan ini.</p>
+            ) : (
+              currentCompanyBatches.map((b) => (
+                <div key={b.id} className="p-5 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4]/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-extrabold text-[#071A33] text-sm">{b.name}</h3>
+                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                      b.status === "Active" ? "bg-[#0B2C6B] text-white" : b.status === "Upcoming" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {b.status}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 space-y-1">
+                    <p>Coach Pendamping: <strong className="text-[#071A33]">{b.coachName}</strong></p>
+                    <p>Jumlah Karyawan: <strong className="text-[#071A33]">{b.participantCount} Peserta</strong></p>
+                    <p>Kode Akses Batch: <strong className="font-mono text-[#0B2C6B]">{b.accessCode}</strong></p>
+                  </div>
                 </div>
-                <div className="text-xs text-slate-600 space-y-1">
-                  <p>Coach Pendamping: <strong className="text-[#071A33]">{b.coachName}</strong></p>
-                  <p>Jumlah Karyawan: <strong className="text-[#071A33]">{b.participantCount} Peserta</strong></p>
-                  <p>Kode Akses Batch: <strong className="font-mono text-[#0B2C6B]">{b.accessCode}</strong></p>
-                </div>
-                <div className="pt-2 border-t border-[#EAE5D9] flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Program Health Score:</span>
-                  <span className="font-extrabold text-emerald-600">{b.healthScore} / 100</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </main>

@@ -403,17 +403,17 @@ export default function JourneySetupPage() {
 
               {/* Prompt guide box */}
               <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/60 space-y-2 text-xs text-amber-900">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-amber-600 shrink-0" />
-                  <span>Apa yang paling mengganggu hidup Anda?</span>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-amber-700 shrink-0">1.</span>
+                  <span>Apa bagian dari hati dan kehidupan saya yang paling membutuhkan pertolongan Allah?</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-amber-600 shrink-0" />
-                  <span>Apa kebiasaan yang paling ingin diubah?</span>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-amber-700 shrink-0">2.</span>
+                  <span>Apa yang paling ingin saya perbaiki melalui program ini?</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-amber-600 shrink-0" />
-                  <span>Jika Allah memberi kesempatan berubah, apa yang ingin Anda ubah?</span>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-amber-700 shrink-0">3.</span>
+                  <span>Kenapa area perbaikan itu penting?</span>
                 </div>
               </div>
 
@@ -450,11 +450,19 @@ export default function JourneySetupPage() {
                 </p>
               </div>
 
-              <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/60 space-y-1 text-xs text-navy-900">
-                <span className="font-bold uppercase text-[10px] text-amber-800 tracking-wider block">RUMUS NIAT:</span>
-                <p className="font-serif italic text-sm text-navy-900">
-                  &ldquo;Karena Allah, saya berkomitmen untuk tujuan perubahan Anda...&rdquo;
-                </p>
+              <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/60 space-y-2 text-xs text-navy-900">
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-amber-700 shrink-0">1.</span>
+                  <span>Mengapa saya ingin berangkat Umrah, dan apakah niat saya benar-benar karena Allah? Bagaimana saya meluruskan niat ini?</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-amber-700 shrink-0">2.</span>
+                  <span>Pribadi seperti apa yang ingin saya bentuk setelah kembali dari Tanah Suci?</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-amber-700 shrink-0">3.</span>
+                  <span>Apa komitmen yang saya ikrarkan kepada Allah untuk mewujudkan perubahan itu?</span>
+                </div>
               </div>
 
               <Textarea

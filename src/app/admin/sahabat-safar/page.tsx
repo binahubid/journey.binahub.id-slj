@@ -36,6 +36,9 @@ import {
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SafarProfileData = Record<string, any>;
+
 interface ParticipantProfile {
   id: string;
   user_id: string;
@@ -45,7 +48,7 @@ interface ParticipantProfile {
   avatar_url: string | null;
   sahabat_safar_user_id: string | null;
   sahabat_safar_name: string | null;
-  safarData?: any;
+  safarData?: SafarProfileData;
   journey_id?: string;
 }
 
@@ -185,6 +188,7 @@ export default function AdminSahabatSafarPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [participants, setParticipants] = useState<ParticipantProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [genderFilter, setGenderFilter] = useState<"ALL" | "Pria" | "Wanita">("ALL");
@@ -195,6 +199,7 @@ export default function AdminSahabatSafarPage() {
   const [matchCandidates, setMatchCandidates] = useState<MatchCandidate[]>([]);
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingSuccess, setPairingSuccess] = useState<string | null>(null);
+  const [pairingError, setPairingError] = useState<string | null>(null);
 
   // Unpair Action Modal
   const [unpairTarget, setUnpairTarget] = useState<ParticipantProfile | null>(null);
@@ -247,6 +252,7 @@ export default function AdminSahabatSafarPage() {
       setParticipants(combined);
     } catch (err) {
       console.error("Gagal memuat data peserta admin Sahabat Safar:", err);
+      setErrorMsg("Gagal memuat data. Periksa koneksi lalu coba lagi.");
     } finally {
       setLoading(false);
     }
@@ -283,58 +289,16 @@ export default function AdminSahabatSafarPage() {
     if (!selectedTarget) return;
     setPairingLoading(true);
     setPairingSuccess(null);
+    setPairingError(null);
 
     try {
       const userA = selectedTarget;
       const userB = candidate;
-
-      // 1. Update profiles for User A
-      const { error: errA } = await supabase
-        .from("profiles")
-        .update({
-          sahabat_safar_user_id: userB.user_id,
-          sahabat_safar_name: userB.full_name,
-        })
-        .eq("user_id", userA.user_id);
-      if (errA) throw errA;
-
-      // 2. Update profiles for User B
-      const { error: errB } = await supabase
-        .from("profiles")
-        .update({
-          sahabat_safar_user_id: userA.user_id,
-          sahabat_safar_name: userA.full_name,
-        })
-        .eq("user_id", userB.user_id);
-      if (errB) throw errB;
-
-      // 3. Upsert support_team for User A
-      if (userA.journey_id) {
-        await supabase.from("support_team").upsert(
-          {
-            user_id: userA.user_id,
-            journey_id: userA.journey_id,
-            sahabat_safar_name: userB.full_name,
-            sahabat_safar_user_id: userB.user_id,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
-      }
-
-      // 4. Upsert support_team for User B
-      if (userB.journey_id) {
-        await supabase.from("support_team").upsert(
-          {
-            user_id: userB.user_id,
-            journey_id: userB.journey_id,
-            sahabat_safar_name: userA.full_name,
-            sahabat_safar_user_id: userA.user_id,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
-      }
+      const { error } = await supabase.rpc("pair_sahabat_safar", {
+        p_user_a: userA.user_id,
+        p_user_b: userB.user_id,
+      });
+      if (error) throw error;
 
       setPairingSuccess(
         `Berhasil memasangkan ${userA.full_name} ↔ ${userB.full_name} (Skor Kecocokan ${matchScore}%)!`
@@ -346,7 +310,7 @@ export default function AdminSahabatSafarPage() {
       }, 1800);
     } catch (err: any) {
       console.error("Gagal memasangkan Sahabat Safar:", err);
-      alert("Terjadi kesalahan saat memasangkan peserta: " + (err?.message || "Koneksi terputus"));
+      setPairingError(err?.message || "Pasangan belum tersimpan. Silakan coba lagi.");
     } finally {
       setPairingLoading(false);
     }
@@ -357,39 +321,18 @@ export default function AdminSahabatSafarPage() {
   const handleExecuteUnpair = async () => {
     if (!unpairTarget) return;
     setPairingLoading(true);
+    setPairingError(null);
     try {
-      const partnerId = unpairTarget.sahabat_safar_user_id;
-
-      // Clear profile target
-      await supabase
-        .from("profiles")
-        .update({ sahabat_safar_user_id: null, sahabat_safar_name: null })
-        .eq("user_id", unpairTarget.user_id);
-
-      // Clear support team target
-      await supabase
-        .from("support_team")
-        .update({ sahabat_safar_user_id: null, sahabat_safar_name: null })
-        .eq("user_id", unpairTarget.user_id);
-
-      // Clear partner if exists
-      if (partnerId) {
-        await supabase
-          .from("profiles")
-          .update({ sahabat_safar_user_id: null, sahabat_safar_name: null })
-          .eq("user_id", partnerId);
-
-        await supabase
-          .from("support_team")
-          .update({ sahabat_safar_user_id: null, sahabat_safar_name: null })
-          .eq("user_id", partnerId);
-      }
+      const { error } = await supabase.rpc("unpair_sahabat_safar", {
+        p_user_id: unpairTarget.user_id,
+      });
+      if (error) throw error;
 
       setUnpairTarget(null);
       await loadData();
     } catch (err: any) {
       console.error("Gagal melepas pasangan:", err);
-      alert("Gagal melepas pasangan: " + err.message);
+      setPairingError(err?.message || "Pasangan belum dapat dilepas. Silakan coba lagi.");
     } finally {
       setPairingLoading(false);
     }
@@ -441,6 +384,12 @@ export default function AdminSahabatSafarPage() {
           Refresh Data
         </Button>
       </div>
+
+      {errorMsg && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+          {errorMsg}
+        </div>
+      )}
 
       {/* ─── STAT KPI CARDS ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -692,6 +641,12 @@ export default function AdminSahabatSafarPage() {
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 font-bold flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
                 <span>{pairingSuccess}</span>
+              </div>
+            )}
+            {pairingError && (
+              <div role="alert" className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-semibold flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+                <span>{pairingError}</span>
               </div>
             )}
 

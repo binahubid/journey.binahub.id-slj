@@ -1,27 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Search, Building2, Layers, ShieldAlert, Sparkles, RefreshCw } from "lucide-react";
+import { Users, Search, Building2, Layers, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   fetchCompaniesFromSupabase,
   fetchBatchesFromSupabase,
   Company,
   Batch,
+  formatSupabaseError,
 } from "@/lib/company-store";
+import { MonitoringRow, RawMonitoringRow, mapMonitoringRow } from "@/lib/admin-types";
 
 export interface ParticipantReal {
-  id: string;
+  userId: string;
   name: string;
-  email: string;
+  companyId: string;
   companyName: string;
+  batchId: string;
   batchName: string;
   coachName: string;
-  accessCode: string;
+  journeyStatus: string;
+  ptpStatus: string;
   habitAvgPercent: number;
-  status: "ACTIVE" | "NEED_SUPPORT" | "NOT_STARTED";
-  created_at: string;
+  daysInactive: number;
+  monthsReviewed: number;
+  needsSupport: boolean;
+  status: "NOT_ENROLLED" | "ONBOARDING" | "ACTIVE" | "COMPLETED" | "NEED_SUPPORT";
 }
+
+const DAY_INACTIVE_THRESHOLD = 5;
 
 export default function ParticipantsPage() {
   const supabase = createClient();
@@ -32,73 +40,52 @@ export default function ParticipantsPage() {
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState("all");
   const [selectedBatchFilter, setSelectedBatchFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function loadDataFromSupabase() {
     setLoading(true);
+    setErrorMsg(null);
     try {
-      // 1. Fetch profiles
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      // 2. Fetch journeys for habit progress
-      const { data: journeysData } = await supabase
-        .from("journeys")
-        .select("user_id, status");
-
-      // 3. Fetch monthly indicator reports for scores
-      const { data: reportsData } = await supabase
-        .from("monthly_indicator_reports")
-        .select("user_id, score_percentage");
-
-      const [compList, batchList] = await Promise.all([
+      const [rows, compList, batchList] = await Promise.all([
+        supabase.rpc("get_admin_monitoring", { p_limit: 1000, p_offset: 0 }),
         fetchCompaniesFromSupabase(),
         fetchBatchesFromSupabase(),
       ]);
+      if (rows.error) throw rows.error;
       setCompanies(compList);
       setBatches(batchList);
 
-      if (profilesData && profilesData.length > 0) {
-        const mapped: ParticipantReal[] = profilesData.map((p: any) => {
-          const userReports = (reportsData || []).filter((r: any) => r.user_id === p.user_id);
-          const userJourney = (journeysData || []).find((j: any) => j.user_id === p.user_id);
-          
-          let avgPct = 0;
-          if (userReports.length > 0) {
-            avgPct = Math.round(
-              userReports.reduce((acc: number, curr: any) => acc + (curr.score_percentage || 0), 0) / userReports.length
-            );
-          } else {
-            avgPct = userJourney ? 75 : 0;
-          }
+      const mapped: ParticipantReal[] = (rows.data || []).map((r: RawMonitoringRow) => {
+        const row = mapMonitoringRow(r);
+        const needsSupport = row.needsSupport || row.daysInactive > DAY_INACTIVE_THRESHOLD;
+        let status: ParticipantReal["status"] = "ACTIVE";
+        if (row.journeyStatus === "ONBOARDING" || row.journeyStatus === "NOT_ENROLLED") status = "ONBOARDING";
+        else if (row.journeyStatus === "COMPLETED") status = "COMPLETED";
+        else if (needsSupport) status = "NEED_SUPPORT";
+        return {
+          userId: row.userId,
+          name: row.fullName,
+          companyId: row.companyId,
+          companyName: row.companyName,
+          batchId: row.batchId,
+          batchName: row.batchName,
+          coachName: row.coachName,
+          journeyStatus: row.journeyStatus,
+          ptpStatus: row.ptpStatus,
+          habitAvgPercent: row.habitAvgPercent,
+          daysInactive: row.daysInactive,
+          monthsReviewed: row.monthsReviewed,
+          needsSupport,
+          status,
+        };
+      });
 
-          let statusVal: "ACTIVE" | "NEED_SUPPORT" | "NOT_STARTED" = "ACTIVE";
-          if (!userJourney) statusVal = "NOT_STARTED";
-          else if (avgPct < 50) statusVal = "NEED_SUPPORT";
-
-          return {
-            id: p.id || p.user_id,
-            name: p.full_name || p.email?.split("@")[0] || "Peserta SLJ",
-            email: p.email || p.user_id?.substring(0, 8) + "@user.com",
-            companyName: p.company || p.company_name || "PT Mitra Sejahtera",
-            batchName: p.batch || p.batch_name || "Batch Umrah 2027",
-            coachName: p.coach_name || "Associate Binahub",
-            accessCode: p.access_code || "SLJ-2027",
-            habitAvgPercent: avgPct,
-            status: statusVal,
-            created_at: p.created_at || new Date().toISOString(),
-          };
-        });
-
-        setParticipants(mapped);
-      } else {
-        // Fallback mockup if database profiles empty
-        setParticipants(generateMockParticipants(25));
-      }
-    } catch (err) {
-      console.error("Gagal load peserta:", err);
-      setParticipants(generateMockParticipants(25));
+      setParticipants(mapped);
+    } catch (err: any) {
+      const errorText = formatSupabaseError(err, "Data peserta belum dapat dimuat. Pastikan migration 018 berhasil dan akun memiliki role admin.");
+      console.error("Gagal load peserta:", errorText, err);
+      setErrorMsg(errorText);
+      setParticipants([]);
     } finally {
       setLoading(false);
     }
@@ -109,14 +96,27 @@ export default function ParticipantsPage() {
   }, []);
 
   const filtered = participants.filter((p) => {
+    const q = searchTerm.toLowerCase();
     const matchesSearch =
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.companyName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCompany = selectedCompanyFilter === "all" || p.companyName === selectedCompanyFilter;
-    const matchesBatch = selectedBatchFilter === "all" || p.batchName === selectedBatchFilter;
+      p.name.toLowerCase().includes(q) ||
+      p.companyName.toLowerCase().includes(q) ||
+      p.batchName.toLowerCase().includes(q);
+    const matchesCompany = selectedCompanyFilter === "all" || p.companyId === selectedCompanyFilter;
+    const matchesBatch = selectedBatchFilter === "all" || p.batchId === selectedBatchFilter;
     return matchesSearch && matchesCompany && matchesBatch;
   });
+
+  const filteredBatches = batches.filter(
+    (b) => selectedCompanyFilter === "all" || b.companyId === selectedCompanyFilter
+  );
+
+  const statusLabel: Record<ParticipantReal["status"], string> = {
+    ACTIVE: "Aktif",
+    NEED_SUPPORT: "Perlu Bimbingan",
+    NOT_ENROLLED: "Belum Terdaftar Batch",
+    ONBOARDING: "Onboarding",
+    COMPLETED: "Selesai",
+  };
 
   return (
     <div className="space-y-8">
@@ -124,35 +124,40 @@ export default function ParticipantsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EAE5D9] pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight flex items-center gap-2">
-            <Users className="h-7 w-7 text-[#C79A3C]" /> Participants (Daftar Peserta Real)
+            <Users className="h-7 w-7 text-[#C79A3C]" /> Participants (Daftar Peserta)
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1">
-            Monitoring peserta terdaftar di database Supabase (`profiles` & `journeys`).
+            Data canonical dari view admin monitoring — journey aktif, habit, checkpoint, dan inactivity.
           </p>
         </div>
         <button
           onClick={loadDataFromSupabase}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#EAE5D9] text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-2xs self-start"
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#EAE5D9] text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-2xs self-start disabled:opacity-60"
         >
-          <RefreshCw className="h-3.5 w-3.5 text-[#C79A3C]" /> Refresh Data
+          <RefreshCw className={`h-3.5 w-3.5 text-[#C79A3C] ${loading ? "animate-spin" : ""}`} /> Refresh Data
         </button>
       </div>
 
+      {errorMsg && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+          {errorMsg}
+        </div>
+      )}
+
       {/* Filters Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Search */}
         <div className="relative max-w-md w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari nama peserta, email, atau perusahaan..."
+            placeholder="Cari nama, perusahaan, atau batch..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#EAE5D9] bg-white text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
           />
         </div>
 
-        {/* Company & Batch Filters */}
         <div className="flex items-center gap-3">
           <select
             value={selectedCompanyFilter}
@@ -163,9 +168,9 @@ export default function ParticipantsPage() {
             className="px-3.5 py-2.5 rounded-xl border border-[#EAE5D9] bg-white text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
           >
             <option value="all">Semua Perusahaan</option>
-            {Array.from(new Set(participants.map((p) => p.companyName))).map((c) => (
-              <option key={c} value={c}>
-                {c}
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
@@ -176,9 +181,9 @@ export default function ParticipantsPage() {
             className="px-3.5 py-2.5 rounded-xl border border-[#EAE5D9] bg-white text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
           >
             <option value="all">Semua Batch</option>
-            {Array.from(new Set(participants.map((p) => p.batchName))).map((b) => (
-              <option key={b} value={b}>
-                {b}
+            {filteredBatches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
               </option>
             ))}
           </select>
@@ -191,8 +196,8 @@ export default function ParticipantsPage() {
           <span className="text-xs font-extrabold text-[#071A33]">
             Menampilkan {filtered.length} dari {participants.length} Peserta Terdaftar
           </span>
-          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-            ✓ Database Synced
+          <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+            {loading ? "Memuat…" : errorMsg ? "Gagal memuat" : "Sumber: Canonical View"}
           </span>
         </div>
 
@@ -201,48 +206,56 @@ export default function ParticipantsPage() {
             <thead>
               <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
                 <th className="p-4 font-semibold">Nama Peserta</th>
-                <th className="p-4 font-semibold">Company (Perusahaan)</th>
+                <th className="p-4 font-semibold">Company</th>
                 <th className="p-4 font-semibold">Batch</th>
-                <th className="p-4 font-semibold">Pendamping Associate</th>
+                <th className="p-4 font-semibold">Coach</th>
                 <th className="p-4 font-semibold">Progres Habit</th>
-                <th className="p-4 font-semibold">Status Program</th>
+                <th className="p-4 font-semibold">Checkpoint</th>
+                <th className="p-4 font-semibold">Inaktivitas</th>
+                <th className="p-4 font-semibold">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EAE5D9]">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
                     <div className="animate-spin h-6 w-6 border-2 border-amber-600 border-t-transparent rounded-full mx-auto mb-2" />
-                    Memuat data peserta dari Supabase...
+                    Memuat data peserta dari canonical view...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-slate-500">
-                    Tidak ada peserta yang cocok dengan kata kunci pencarian.
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                    {errorMsg ? errorMsg : "Tidak ada peserta yang cocok dengan filter saat ini."}
                   </td>
                 </tr>
               ) : (
                 filtered.map((p) => (
-                  <tr key={p.id} className="hover:bg-[#FAF8F4]/80 transition-colors">
+                  <tr key={p.userId} className="hover:bg-[#FAF8F4]/80 transition-colors">
                     <td className="p-4">
                       <div className="font-extrabold text-[#071A33]">{p.name}</div>
-                      <div className="text-slate-400 text-[11px] font-normal">{p.email}</div>
+                      <div className="text-slate-400 text-[11px] font-normal">
+                        PTP: {p.ptpStatus === "LOCKED" ? "Terlocked" : "Editable"}
+                      </div>
                     </td>
                     <td className="p-4 font-bold text-slate-700">
                       <div className="flex items-center gap-1.5">
                         <Building2 className="h-3.5 w-3.5 text-[#C79A3C]" />
-                        <span>{p.companyName}</span>
+                        <span>{p.companyName || "—"}</span>
                       </div>
                     </td>
-                    <td className="p-4 font-medium text-slate-600">{p.batchName}</td>
-                    <td className="p-4 font-medium text-slate-600">{p.coachName}</td>
+                    <td className="p-4 font-medium text-slate-600">{p.batchName || "—"}</td>
+                    <td className="p-4 font-medium text-slate-600">{p.coachName || "—"}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
-                              p.habitAvgPercent >= 80 ? "bg-emerald-500" : p.habitAvgPercent >= 50 ? "bg-amber-500" : "bg-red-400"
+                              p.habitAvgPercent >= 80
+                                ? "bg-emerald-500"
+                                : p.habitAvgPercent >= 50
+                                ? "bg-amber-500"
+                                : "bg-red-400"
                             }`}
                             style={{ width: `${p.habitAvgPercent}%` }}
                           />
@@ -250,6 +263,11 @@ export default function ParticipantsPage() {
                         <span className="font-bold text-slate-700">{p.habitAvgPercent}%</span>
                       </div>
                     </td>
+                    <td className="p-4 font-medium text-slate-600">
+                      {p.monthsReviewed} bulan
+                      {p.needsSupport && <span className="block text-[10px] font-bold text-amber-700">Perlu dukungan</span>}
+                    </td>
+                    <td className="p-4 font-medium text-slate-600">{p.daysInactive} hari</td>
                     <td className="p-4">
                       <span
                         className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
@@ -257,10 +275,12 @@ export default function ParticipantsPage() {
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : p.status === "NEED_SUPPORT"
                             ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : p.status === "COMPLETED"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
                             : "bg-slate-100 text-slate-600 border-slate-200"
                         }`}
                       >
-                        {p.status === "ACTIVE" ? "✓ Aktif (On Track)" : p.status === "NEED_SUPPORT" ? "⚠ Perlu Bimbingan" : "Belum Mulai"}
+                        {statusLabel[p.status]}
                       </span>
                     </td>
                   </tr>
@@ -272,38 +292,4 @@ export default function ParticipantsPage() {
       </div>
     </div>
   );
-}
-
-// Generate 25 Realistic Participants Mockup
-function generateMockParticipants(count: number): ParticipantReal[] {
-  const names = [
-    "Ahmad Fauzi", "Siti Rahayu", "Budi Santoso", "Dewi Lestari", "Rizky Pratama",
-    "Hendra Wijaya", "Maya Putri", "Dimas Arjuna", "Rina Susanti", "Fajar Nugroho",
-    "Tri Kurniawan", "Eka Saputra", "Nurul Hidayah", "Agus Setiawan", "Indah Permata",
-    "Bayu Skak", "Dian Sastrowardoyo", "Gilang Ramadhan", "Hana Pertiwi", "Irfan Hakim",
-    "Joko Widodo", "Kartika Putri", "Lukman Sardi", "Mega Utami", "Naufal Samudra"
-  ];
-
-  const companies = ["PT Mitra Sejahtera", "PT Bangun Nusantara", "PT Teknologi Inovasi"];
-  const batches = ["Batch Umrah Mei 2027", "Batch Umrah Juli 2027", "Batch Umrah Sept 2027"];
-
-  return Array.from({ length: count }, (_, i) => {
-    const name = names[i % names.length];
-    const companyName = companies[i % companies.length];
-    const batchName = batches[i % batches.length];
-    const pct = Math.floor(Math.random() * 35) + 80; // 80% - 115%
-
-    return {
-      id: `mock-${i + 1}`,
-      name,
-      email: `${name.toLowerCase().replace(/\s+/g, ".")}@${companyName.toLowerCase().replace(/[^a-z]/g, "")}.com`,
-      companyName,
-      batchName,
-      coachName: "Associate Binahub",
-      accessCode: `SLJ-${2027 + (i % 2)}`,
-      habitAvgPercent: pct,
-      status: pct >= 85 ? "ACTIVE" : "NEED_SUPPORT",
-      created_at: new Date().toISOString(),
-    };
-  });
 }

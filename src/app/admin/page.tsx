@@ -13,31 +13,87 @@ import {
   ShieldCheck,
   Key,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import {
-  getStoredCompanies,
-  getStoredBatches,
   fetchCompaniesFromSupabase,
   fetchBatchesFromSupabase,
+  formatSupabaseError,
   Company,
   Batch,
 } from "@/lib/company-store";
+import { RawMonitoringRow } from "@/lib/admin-types";
+
+interface MonitoringSummary {
+  totalParticipants: number;
+  avgHabitPercent: number;
+  needSupportCount: number;
+  coachCount: number;
+}
 
 export default function AdminDashboardPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [monitoring, setMonitoring] = useState<MonitoringSummary>({
+    totalParticipants: 0,
+    avgHabitPercent: 0,
+    needSupportCount: 0,
+    coachCount: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
-      const compList = await fetchCompaniesFromSupabase();
-      const batchList = await fetchBatchesFromSupabase();
-      setCompanies(compList);
-      setBatches(batchList);
+      setLoading(true);
+      setErrorMsg(null);
+      try {
+        const supabase = createClient();
+        const [compList, batchList, monitoringRes] = await Promise.all([
+          fetchCompaniesFromSupabase(),
+          fetchBatchesFromSupabase(),
+          supabase.rpc("get_admin_monitoring", { p_limit: 1000, p_offset: 0 }),
+        ]);
+
+        setCompanies(compList);
+        setBatches(batchList);
+
+        if (monitoringRes.error) throw monitoringRes.error;
+
+        const rows: RawMonitoringRow[] = monitoringRes.data || [];
+        const totalParticipants = rows.length;
+        const avgHabitPercent = totalParticipants > 0
+          ? Math.round(rows.reduce((acc, r) => acc + (r.habit_avg_percent ?? 0), 0) / totalParticipants)
+          : 0;
+        const needSupportCount = rows.filter(
+          (r) => r.needs_support === true || (r.days_inactive ?? 0) > 5
+        ).length;
+
+        const coachIds = new Set(rows.map((r) => r.coach_id).filter(Boolean));
+
+        setMonitoring({
+          totalParticipants,
+          avgHabitPercent,
+          needSupportCount,
+          coachCount: coachIds.size,
+        });
+      } catch (err: any) {
+        console.error("Error loading admin dashboard:", err);
+        setErrorMsg(formatSupabaseError(err, "Gagal memuat data dashboard."));
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
 
-  const totalParticipants = companies.reduce((acc, c) => acc + c.participantCount, 0);
-  const activeBatchesCount = batches.filter((b) => b.status === "Active").length || batches.length;
+  const activeBatchesCount = batches.filter((b) => b.status === "Active").length;
+
+  const healthScore = monitoring.totalParticipants === 0
+    ? 100
+    : Math.min(100, Math.round(
+        monitoring.avgHabitPercent * 0.6 +
+        (100 - Math.min(monitoring.needSupportCount / monitoring.totalParticipants * 100, 100)) * 0.4
+      ));
 
   return (
     <div className="space-y-8">
@@ -66,6 +122,12 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      {errorMsg && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+          {errorMsg}
+        </div>
+      )}
+
       {/* Dynamic Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Card 1: Companies */}
@@ -93,7 +155,7 @@ export default function AdminDashboardPage() {
                 <Layers className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-[#071A33]">{batches.length}</div>
+            <div className="text-3xl font-extrabold text-[#071A33]">{activeBatchesCount}</div>
             <p className="text-[11px] font-semibold text-emerald-600">Tersebar di {companies.length} Perusahaan</p>
           </div>
         </Link>
@@ -107,7 +169,7 @@ export default function AdminDashboardPage() {
                 <Users className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-[#071A33]">{totalParticipants}</div>
+            <div className="text-3xl font-extrabold text-[#071A33]">{monitoring.totalParticipants}</div>
             <p className="text-[11px] font-semibold text-slate-500">Peserta Terdaftar</p>
           </div>
         </Link>
@@ -121,9 +183,7 @@ export default function AdminDashboardPage() {
                 <UserCheck className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-[#071A33]">
-              {Array.from(new Set(batches.map((b) => b.coachName).filter(Boolean))).length}
-            </div>
+            <div className="text-3xl font-extrabold text-[#071A33]">{monitoring.coachCount}</div>
             <p className="text-[11px] font-semibold text-slate-500">Coach Bimbingan</p>
           </div>
         </Link>
@@ -137,10 +197,12 @@ export default function AdminDashboardPage() {
                 <Activity className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-emerald-600">
-              {companies.length > 0 ? Math.round(companies.reduce((a, c) => a + c.healthScore, 0) / companies.length) : 100}
+            <div className={`text-3xl font-extrabold ${healthScore >= 80 ? "text-emerald-600" : healthScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
+              {healthScore}
             </div>
-            <p className="text-[11px] font-semibold text-emerald-600">Health Score Ekosistem</p>
+            <p className={`text-[11px] font-semibold ${healthScore >= 80 ? "text-emerald-600" : healthScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
+              Health Score Ekosistem
+            </p>
           </div>
         </Link>
       </div>
@@ -162,7 +224,9 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="overflow-x-auto">
-            {companies.length === 0 ? (
+            {loading ? (
+              <div className="py-8 text-center text-xs text-slate-500 font-medium">Memuat data...</div>
+            ) : companies.length === 0 ? (
               <div className="py-8 text-center text-xs text-slate-500 font-medium space-y-2">
                 <p>Belum ada perusahaan mitra terdaftar di Supabase.</p>
                 <Link href="/admin/companies" className="inline-block font-bold text-[#0B2C6B] underline">
@@ -177,7 +241,6 @@ export default function AdminDashboardPage() {
                     <th className="pb-3 font-semibold">Peserta</th>
                     <th className="pb-3 font-semibold">Batch</th>
                     <th className="pb-3 font-semibold">Coach</th>
-                    <th className="pb-3 font-semibold">Health Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EAE5D9]">
@@ -191,11 +254,6 @@ export default function AdminDashboardPage() {
                       <td className="py-3.5 font-semibold text-slate-600">{c.participantCount} Peserta</td>
                       <td className="py-3.5 font-semibold text-slate-600">{c.batchCount} Batch</td>
                       <td className="py-3.5 font-semibold text-slate-600">{c.coachCount} Coach</td>
-                      <td className="py-3.5">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]">
-                          {c.healthScore} / 100
-                        </span>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -219,7 +277,9 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="space-y-3">
-            {batches.length === 0 ? (
+            {loading ? (
+              <div className="py-8 text-center text-xs text-slate-500 font-medium">Memuat data...</div>
+            ) : batches.length === 0 ? (
               <div className="py-8 text-center text-xs text-slate-500 font-medium space-y-2">
                 <p>Belum ada batch rombongan yang dibuat.</p>
                 <Link href="/admin/batches" className="inline-block font-bold text-[#0B2C6B] underline">
@@ -231,7 +291,9 @@ export default function AdminDashboardPage() {
                 <div key={b.id} className="p-4 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4]/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-[#071A33] text-sm">{b.name}</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#0B2C6B] text-white">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      b.status === "Active" ? "bg-[#0B2C6B] text-white" : b.status === "Upcoming" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"
+                    }`}>
                       {b.status}
                     </span>
                   </div>

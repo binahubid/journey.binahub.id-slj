@@ -65,70 +65,11 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Update user profile in Supabase with Identity, Company & Access Code
-      const { data: existingProfile, error: existingProfileError } = await supabase.from("profiles").select("start_date, end_date").eq("user_id", user.id).maybeSingle();
-      if (existingProfileError) throw existingProfileError;
-      const startDate = existingProfile?.start_date ? new Date(existingProfile.start_date) : new Date();
-      const endDate = existingProfile?.end_date ? new Date(existingProfile.end_date) : new Date(startDate);
-      if (!existingProfile?.end_date) endDate.setDate(startDate.getDate() + 89);
-
-      const { error: profileErr } = await supabase
-        .from("profiles")
-        .update({
-          full_name: data.fullName,
-          company_name: data.companyName,
-          program_code: data.programCode,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (profileErr) {
-        console.error("Error update profile:", profileErr);
-        setErrorMsg(`Gagal memperbarui profil: ${profileErr.message}`);
-        return;
-      }
-
-      // Update journey status to ACTIVE — use order + limit to safely handle duplicates
-      const { data: journey, error: journeyFetchErr } = await supabase
-        .from("journeys")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (journeyFetchErr) {
-        console.error("Error fetching journey:", journeyFetchErr);
-        throw journeyFetchErr;
-      }
-
-      if (journey) {
-        const { error: updateErr } = await supabase
-          .from("journeys")
-          .update({
-            status: "ACTIVE",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", journey.id);
-
-        if (updateErr) {
-          console.error("Error update journey:", updateErr);
-          setErrorMsg(`Gagal memperbarui journey: ${updateErr.message}`);
-          return;
-        }
-      } else {
-        const { error: insertErr } = await supabase.from("journeys").insert({
-          user_id: user.id,
-          status: "ACTIVE",
-        });
-
-        if (insertErr) {
-          console.error("Error insert journey:", insertErr);
-          setErrorMsg(`Gagal membuat journey baru: ${insertErr.message}`);
-          return;
-        }
-      }
+      const { error: enrollmentError } = await supabase.rpc("enroll_participant_by_access_code", {
+        p_full_name: data.fullName.trim(),
+        p_program_code: data.programCode.trim().toUpperCase(),
+      });
+      if (enrollmentError) throw enrollmentError;
 
       router.push("/dashboard");
       router.refresh();

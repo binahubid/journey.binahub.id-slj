@@ -4,9 +4,8 @@ import { UserRole } from "@/types/slj";
 /**
  * Resolves user role following the binahub-platform architecture:
  * 1. Primary: user.app_metadata.role (raw_app_meta_data)
- * 2. Secondary: user.user_metadata.role (raw_user_meta_data)
- * 3. Tertiary: Database profiles.role column
- * 4. Fallback: "participant"
+ * 2. Secondary: Database profiles.role column
+ * 3. Fallback: "participant"
  */
 export function getUserRole(user?: User | null, dbProfileRole?: string | null): UserRole {
   if (!user) return "participant";
@@ -17,13 +16,7 @@ export function getUserRole(user?: User | null, dbProfileRole?: string | null): 
     return appRole as UserRole;
   }
 
-  // 2. Check user_metadata.role (raw_user_meta_data in Supabase)
-  const userMetaRole = user.user_metadata?.role;
-  if (userMetaRole === "admin" || userMetaRole === "coach" || userMetaRole === "participant") {
-    return userMetaRole as UserRole;
-  }
-
-  // 3. Check database profiles.role
+  // Database profile role is used only after trusted app metadata.
   if (dbProfileRole === "admin" || dbProfileRole === "coach" || dbProfileRole === "participant") {
     return dbProfileRole as UserRole;
   }
