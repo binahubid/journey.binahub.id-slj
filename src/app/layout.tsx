@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
   icons: {
     icon: "/icons/journey-icon.webp",
-    apple: "/icons/journey-icon.webp",
+    apple: "/icons/app-icon.webp",
   },
 };
 
