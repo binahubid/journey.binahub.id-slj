@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Bell, CheckCheck, Inbox, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { usePwaInstall } from "@/components/pwa/PwaProvider";
 
 interface NotificationItemData {
   id: string;
@@ -19,9 +20,16 @@ interface NotificationItemData {
 
 export default function NotificationsPage() {
   const supabase = createClient();
+  const { updateBadge } = usePwaInstall();
   const [notifications, setNotifications] = useState<NotificationItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync badge with unread count
+  const syncBadge = (items: NotificationItemData[]) => {
+    const unread = items.filter((n) => !n.isRead).length;
+    updateBadge(unread);
+  };
 
   useEffect(() => {
     async function loadNotifications() {
@@ -37,8 +45,7 @@ export default function NotificationsPage() {
         if (queryError) throw queryError;
 
         if (data && data.length > 0) {
-          setNotifications(
-            data.map((n) => ({
+          const items = data.map((n) => ({
               id: n.id,
               title: n.title,
               message: n.message,
@@ -50,10 +57,12 @@ export default function NotificationsPage() {
                 hour: "2-digit",
                 minute: "2-digit",
               }),
-            }))
-          );
+            }));
+          setNotifications(items);
+          syncBadge(items);
         } else {
           setNotifications([]);
+          syncBadge([]);
         }
       } catch (err) {
         console.error("Gagal memuat notifikasi:", err);
@@ -78,7 +87,11 @@ export default function NotificationsPage() {
         return;
       }
     }
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, isRead: true }));
+      syncBadge(updated);
+      return updated;
+    });
   };
 
   const markRead = async (id: string) => {
@@ -87,9 +100,11 @@ export default function NotificationsPage() {
       setError("Notifikasi belum berhasil diperbarui.");
       return;
     }
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+      syncBadge(updated);
+      return updated;
+    });
   };
 
   if (loading) {

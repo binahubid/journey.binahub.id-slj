@@ -33,6 +33,7 @@ self.addEventListener("push", (event) => {
     title: "Spiritual Leadership Journey",
     body: "Anda memiliki pengingat baru.",
     url: "/notifications",
+    badgeCount: 1,
   };
 
   let payload = fallback;
@@ -42,19 +43,31 @@ self.addEventListener("push", (event) => {
     payload.body = event.data?.text() || fallback.body;
   }
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: "/icons/stage_04_istiqamah.png",
-      badge: "/icons/stage_04_istiqamah.png",
-      data: { url: payload.url || "/notifications" },
-      tag: payload.tag || "slj-reminder",
-    })
-  );
+  const notificationPromise = self.registration.showNotification(payload.title, {
+    body: payload.body,
+    icon: "/icons/app-icon.webp",
+    badge: "/icons/app-icon.webp",
+    data: { url: payload.url || "/notifications" },
+    tag: payload.tag || "slj-reminder",
+  });
+
+  // Set badge count (Chrome Android + iOS PWA 16.4+)
+  if (self.registration.setAppBadge) {
+    const count = typeof payload.badgeCount === "number" ? payload.badgeCount : 1;
+    notificationPromise.then(() => self.registration.setAppBadge(count)).catch(() => {});
+  }
+
+  event.waitUntil(notificationPromise);
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  // Clear badge on click
+  if (self.registration.clearAppBadge) {
+    self.registration.clearAppBadge().catch(() => {});
+  }
+
   const targetUrl = new URL(event.notification.data?.url || "/notifications", self.location.origin).href;
 
   event.waitUntil(
@@ -63,4 +76,18 @@ self.addEventListener("notificationclick", (event) => {
       return existing ? existing.focus() : self.clients.openWindow(targetUrl);
     })
   );
+});
+
+// Handle badge update messages from the main app
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "UPDATE_BADGE") {
+    const count = event.data.count || 0;
+    if (self.registration.setAppBadge) {
+      if (count > 0) {
+        self.registration.setAppBadge(count).catch(() => {});
+      } else {
+        self.registration.clearAppBadge().catch(() => {});
+      }
+    }
+  }
 });

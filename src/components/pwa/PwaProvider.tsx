@@ -12,6 +12,7 @@ interface PwaContextValue {
   isInstalled: boolean;
   isIos: boolean;
   install: () => Promise<"accepted" | "dismissed" | "unavailable">;
+  updateBadge: (count: number) => void;
 }
 
 const PwaContext = createContext<PwaContextValue>({
@@ -19,6 +20,7 @@ const PwaContext = createContext<PwaContextValue>({
   isInstalled: false,
   isIos: false,
   install: async () => "unavailable",
+  updateBadge: () => {},
 });
 
 export function PwaProvider({ children }: { children: React.ReactNode }) {
@@ -65,6 +67,11 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
       const choice = await installPrompt.userChoice;
       if (choice.outcome === "accepted") setInstallPrompt(null);
       return choice.outcome;
+    },
+    updateBadge: (count: number) => {
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: "UPDATE_BADGE", count });
+      }
     },
   }), [installPrompt, isInstalled, isIos]);
 
