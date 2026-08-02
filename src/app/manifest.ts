@@ -13,15 +13,21 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "portrait-primary",
     icons: [
       {
-        src: "/icons/stage_04_istiqamah.png",
-        sizes: "512x512",
-        type: "image/png",
+        src: "/icons/journey-icon.webp",
+        sizes: "192x192",
+        type: "image/webp",
         purpose: "any",
       },
       {
-        src: "/icons/stage_04_istiqamah.png",
+        src: "/icons/journey-icon.webp",
         sizes: "512x512",
-        type: "image/png",
+        type: "image/webp",
+        purpose: "any",
+      },
+      {
+        src: "/icons/journey-icon.webp",
+        sizes: "512x512",
+        type: "image/webp",
         purpose: "maskable",
       },
     ],
@@ -30,13 +36,13 @@ export default function manifest(): MetadataRoute.Manifest {
         name: "Dashboard SLJ",
         short_name: "Dashboard",
         url: "/dashboard",
-        icons: [{ src: "/icons/stage_04_istiqamah.png", sizes: "512x512" }],
+        icons: [{ src: "/icons/journey-icon.webp", sizes: "192x192" }],
       },
       {
         name: "Monitoring Journey",
         short_name: "Monitoring",
         url: "/monitoring",
-        icons: [{ src: "/icons/stage_04_istiqamah.png", sizes: "512x512" }],
+        icons: [{ src: "/icons/journey-icon.webp", sizes: "192x192" }],
       },
     ],
   };

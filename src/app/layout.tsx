@@ -29,8 +29,8 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false },
   icons: {
-    icon: "/icons/stage_04_istiqamah.png",
-    apple: "/icons/stage_04_istiqamah.png",
+    icon: "/icons/journey-icon.webp",
+    apple: "/icons/journey-icon.webp",
   },
 };
 
