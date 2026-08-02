@@ -118,7 +118,7 @@ export default function NotificationsPage() {
   return (
     <ParticipantLayout activePath="/notifications" pageTitle="Notifikasi • Pengingat & Info Program">
 
-      <main className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-5 md:px-6 md:pt-7">
+      <main className="mx-auto w-full max-w-3xl space-y-4 pt-5 md:pt-7">
         <div className="flex items-end justify-between gap-3 border-b border-slate-200 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100"><Bell className="h-4 w-4" /></div>

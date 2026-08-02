@@ -686,7 +686,7 @@ export default function MonitoringPage() {
   if (!journeyId) {
     return (
       <ParticipantLayout activePath="/monitoring" pageTitle="Monitoring Perjalanan SLJ">
-        <main className="max-w-3xl mx-auto px-4 py-16 text-center space-y-4">
+        <main className="max-w-3xl mx-auto py-16 text-center space-y-4">
           <Target className="h-10 w-10 text-amber-600 mx-auto" />
           <h1 className="text-xl font-black text-navy-900">PTP belum siap dimonitor</h1>
           <p className="text-sm text-slate-600">Pilih tiga area transformasi, isi target, dan buat Action Plan terlebih dahulu.</p>
@@ -699,7 +699,7 @@ export default function MonitoringPage() {
   return (
     <ParticipantLayout activePath="/monitoring" pageTitle="Monitoring Perjalanan SLJ">
       {/* Full-width container with clean whitespace */}
-      <main className="w-full px-4 sm:px-6 lg:px-8 pt-6 pb-16 font-sans text-slate-800">
+      <main className="w-full pt-6 pb-16 font-sans text-slate-800">
         {saveError && (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
             <AlertTriangle className="h-4 w-4 shrink-0" />

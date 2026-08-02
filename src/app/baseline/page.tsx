@@ -463,7 +463,7 @@ export default function BaselinePage() {
 
   return (
     <ParticipantLayout activePath="/baseline" pageTitle="Baseline Self-Discovery">
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-8 pt-6 pb-20 font-sans text-slate-800 space-y-6">
+      <main className="max-w-7xl w-full mx-auto pt-6 pb-20 font-sans text-slate-800 space-y-6">
         {errorMessage && (
           <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
             <span className="flex-1">{errorMessage}</span>

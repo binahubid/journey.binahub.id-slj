@@ -1,6 +1,6 @@
 {
   "name": "slj-binahub",
-  "version": "0.5.2",
+  "version": "0.5.5",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -17,6 +17,7 @@
     "drizzle-orm": "^0.38.3",
     "lucide-react": "^0.469.0",
     "next": "^15.1.3",
+    "ogl": "^1.0.11",
     "postgres": "^3.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

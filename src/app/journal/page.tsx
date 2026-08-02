@@ -358,7 +358,7 @@ export default function RefactoredJournalPage() {
       <main className="w-full min-h-screen bg-[#FAF9F5] text-navy-950 font-sans pb-20">
 
         {/* ─── MAIN CONTENT WRAPPER (2-COLUMN: 75% LEFT / 25% RIGHT) ───────────── */}
-        <div className="w-full px-3 sm:px-8 pt-4 sm:pt-6 pb-28 sm:pb-20">
+        <div className="w-full pt-4 sm:pt-6 pb-28 sm:pb-20">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-7 items-start">
 
             {/* ─── LEFT COLUMN (75% / col-span-8 or col-span-9) ───────────────── */}

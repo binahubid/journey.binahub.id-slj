@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, MapPin, Bell, Lock, Check, Clock, Download, Smartphone } from "lucide-react";
+import { MapPin, Bell, Lock, Check, Clock, Download, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { usePwaInstall } from "@/components/pwa/PwaProvider";
@@ -273,11 +272,10 @@ export default function SettingsPage() {
   return (
     <ParticipantLayout activePath="/settings" pageTitle="Pengaturan • Lokasi & Notifikasi">
 
-      <main className="max-w-wizard mx-auto px-4 md:px-6 pt-6 space-y-6">
+      <main className="max-w-wizard mx-auto pt-6 pb-24 space-y-6">
         {errorMsg && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{errorMsg}</div>}
-        <Card className="bg-white border-warm-border p-6 space-y-6">
-          <form onSubmit={handleSave} className="space-y-6">
-            <Tabs defaultValue="notifikasi">
+        <form onSubmit={handleSave} className="space-y-6">
+          <Tabs defaultValue="notifikasi">
               <TabsList className="mb-4 w-full justify-start">
                 <TabsTrigger value="notifikasi" className="gap-1.5 text-xs">
                   <Bell className="h-3.5 w-3.5" /> Notifikasi & Lokasi
@@ -627,7 +625,7 @@ export default function SettingsPage() {
               </TabsContent>
             </Tabs>
 
-            <CardFooter className="p-0 border-t border-warm-border pt-4 flex justify-end">
+            <div className="border-t border-slate-200/60 pt-4 flex justify-end">
               <Button type="submit" variant="primary" disabled={saving} className="font-semibold gap-1">
                 {saving ? (
                   "Menyimpan..."
@@ -639,26 +637,33 @@ export default function SettingsPage() {
                   "Simpan Pengaturan"
                 )}
               </Button>
-            </CardFooter>
+            </div>
           </form>
-        </Card>
 
-        <div className="rounded-xl border border-warm-border bg-white p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-navy-900">Syarat &amp; Ketentuan dan Kebijakan Privasi</p>
-            <p className="text-[11px] text-gray-500">Dokumen legal Platform BinaJourney — versi 1.1.</p>
+          <div className="py-4">
+            <div className="flex items-center gap-2 pb-3">
+              <Lock className="h-3.5 w-3.5 text-accent" />
+              <h3 className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-500">
+                Legal & Kebijakan
+              </h3>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <p className="text-[13px] font-semibold text-navy-900">Syarat &amp; Ketentuan</p>
+                <p className="text-[11px] text-slate-500">Dokumen legal Platform BinaJourney — versi 1.1</p>
+              </div>
+              <Link
+                href="/terms"
+                target="_blank"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-navy-900 transition-colors"
+              >
+                Baca
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </Link>
+            </div>
           </div>
-          <Link
-            href="/terms"
-            target="_blank"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-navy-900 transition-colors"
-          >
-            Baca dokumen
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </Link>
-        </div>
       </main>
     </ParticipantLayout>
   );

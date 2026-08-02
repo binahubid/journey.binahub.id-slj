@@ -352,7 +352,7 @@ export default function InitialProcessPage() {
 
   return (
     <ParticipantLayout activePath="/initial-process" pageTitle="Initial Process — Sahabat Safar Profile">
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-20 space-y-6 font-sans">
+      <main className="max-w-4xl mx-auto pt-4 pb-20 space-y-6 font-sans">
 
         {/* ── HEADER BANNER ───────────────────────────────────────────────── */}
         <div className="bg-gradient-to-r from-[#071A33] via-navy-900 to-slate-800 text-white rounded-3xl p-6 shadow-md border border-slate-700/50 space-y-3 relative overflow-hidden">
