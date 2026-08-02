@@ -18,6 +18,7 @@ import {
   Flame,
   ArrowLeft,
   ChevronRight,
+  ChevronDown,
   Check,
   Lock,
   Lightbulb,
@@ -156,6 +157,10 @@ export default function RefactoredJournalPage() {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Collapsible guide states
+  const [showMujahadah, setShowMujahadah] = useState(false);
+  const [showIstiqamah, setShowIstiqamah] = useState(false);
 
   // Instagram-style Posts for Right Column
   const [posts, setPosts] = useState<JournalPost[]>([]);
@@ -420,6 +425,39 @@ export default function RefactoredJournalPage() {
               {/* 2. FORM REFLEKSI CARD */}
               <Card className="w-full bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xs space-y-5 sm:space-y-6 border border-slate-200/80">
                 
+                {/* ─── PANDUAN MUJAAHAH (COLLAPSIBLE) ─── */}
+                <div className="bg-amber-50/70 rounded-2xl border border-amber-200/60 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowMujahadah(!showMujahadah)}
+                    className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider">
+                        Panduan Mujahadah
+                      </span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-amber-600 transition-transform duration-200 ${showMujahadah ? "rotate-180" : ""}`} />
+                  </button>
+                  {showMujahadah && (
+                    <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 space-y-2 text-xs text-amber-900 border-t border-amber-200/40 pt-3">
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold text-amber-700 shrink-0">1.</span>
+                        <span>Apa pelajaran terbesar yang Allah tunjukkan kepada saya selama perjalanan ini?</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold text-amber-700 shrink-0">2.</span>
+                        <span>Apa hal-hal yang bisa saya lakukan lebih baik bila ada kesempatan kembali?</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold text-amber-700 shrink-0">3.</span>
+                        <span>Apa amal atau kebiasaan yang akan saya perjuangkan sepulang dari Tanah Suci?</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
                 {/* SECTION: CERITAKAN PERJALANANMU HARI INI */}
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center gap-2">
@@ -486,6 +524,41 @@ export default function RefactoredJournalPage() {
                     })}
                   </div>
                 </div>
+
+                {/* ─── PANDUAN ISTIQAMAH (HARI KE-90 SAJA) ─── */}
+                {dayCount >= 90 && (
+                  <div className="bg-amber-50/70 rounded-2xl border border-amber-200/60 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowIstiqamah(!showIstiqamah)}
+                      className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Target className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider">
+                          Panduan Istiqamah — Refleksi 90 Hari
+                        </span>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-amber-600 transition-transform duration-200 ${showIstiqamah ? "rotate-180" : ""}`} />
+                    </button>
+                    {showIstiqamah && (
+                      <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 space-y-2 text-xs text-amber-900 border-t border-amber-200/40 pt-3">
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-amber-700 shrink-0">1.</span>
+                          <span>Perubahan apa yang sudah mulai saya rasakan setelah Umrah? Apa saja dampak perubahan ini terhadap diri, pekerjaan, lingkungan saya?</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-amber-700 shrink-0">2.</span>
+                          <span>Apa tantangan terbesar yang dapat melemahkan komitmen saya?</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-amber-700 shrink-0">3.</span>
+                          <span>Apa kebiasaan yang akan saya jaga agar perubahan ini tetap hidup sepanjang perjalanan saya?</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* SECTION 4 & 5: PELAJARAN & PERBAIKAN BESOK */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 border-t border-slate-100 pt-4 sm:pt-5">

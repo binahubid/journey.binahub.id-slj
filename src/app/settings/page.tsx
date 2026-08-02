@@ -7,25 +7,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, MapPin, Bell, Lock, Check, Clock } from "lucide-react";
+import { ArrowLeft, MapPin, Bell, Lock, Check, Clock, Download, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { usePwaInstall } from "@/components/pwa/PwaProvider";
 import { getDeviceTimeZone, normalizeTimeZone } from "@/lib/local-date";
+import { disableWebPush, enableWebPush, getPushPermission, isPushSupported } from "@/lib/web-push";
 
 export default function SettingsPage() {
   const supabase = createClient();
+  const { canInstall, isInstalled, isIos, install } = usePwaInstall();
   const [city, setCity] = useState("Jakarta");
   const [timezone, setTimezone] = useState("Auto");
   const [detectedTimeZone, setDetectedTimeZone] = useState("Asia/Jakarta");
   const [timeFormat, setTimeFormat] = useState<"24" | "12">("24");
   const [dateFormat, setDateFormat] = useState<"full" | "short">("full");
-  const [prayerNotif, setPrayerNotif] = useState(true);
+  const [prayerNotif, setPrayerNotif] = useState(false);
   const [habitNotif, setHabitNotif] = useState(true);
+  const [journalNotif, setJournalNotif] = useState(true);
+  const [quranNotif, setQuranNotif] = useState(false);
+  const [hadithNotif, setHadithNotif] = useState(false);
+  const [checkpointNotif, setCheckpointNotif] = useState(true);
+  const [socialNotif, setSocialNotif] = useState(true);
+  const [inactivityNotif, setInactivityNotif] = useState(true);
+  const [pushNotif, setPushNotif] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [updatingPush, setUpdatingPush] = useState(false);
   const [journalPrivacy, setJournalPrivacy] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [installMsg, setInstallMsg] = useState<string | null>(null);
 
   // Auth provider & Security States
   const [userEmail, setUserEmail] = useState("");
@@ -85,15 +98,24 @@ export default function SettingsPage() {
 
         const { data: settings, error: settingsError } = await supabase
           .from("settings")
-          .select("prayer_notifications_enabled, habit_notifications_enabled, journal_privacy_default")
+          .select("prayer_notifications_enabled, habit_notifications_enabled, journal_notifications_enabled, quran_notifications_enabled, hadith_notifications_enabled, checkpoint_notifications_enabled, social_notifications_enabled, inactivity_notifications_enabled, push_notifications_enabled, journal_privacy_default")
           .eq("user_id", user.id)
           .maybeSingle();
         if (settingsError) throw settingsError;
         if (settings) {
-          setPrayerNotif(settings.prayer_notifications_enabled ?? true);
+          setPrayerNotif(settings.prayer_notifications_enabled ?? false);
           setHabitNotif(settings.habit_notifications_enabled ?? true);
+          setJournalNotif(settings.journal_notifications_enabled ?? true);
+          setQuranNotif(settings.quran_notifications_enabled ?? false);
+          setHadithNotif(settings.hadith_notifications_enabled ?? false);
+          setCheckpointNotif(settings.checkpoint_notifications_enabled ?? true);
+          setSocialNotif(settings.social_notifications_enabled ?? true);
+          setInactivityNotif(settings.inactivity_notifications_enabled ?? true);
+          setPushNotif(settings.push_notifications_enabled ?? false);
           setJournalPrivacy(settings.journal_privacy_default ?? true);
         }
+
+        setPushPermission(await getPushPermission());
 
         // Load local preferences if available
         const savedTz = localStorage.getItem("slj_timezone");
@@ -180,10 +202,18 @@ export default function SettingsPage() {
         if (error) throw error;
         const { error: settingsError } = await supabase.from("settings").upsert({
           user_id: user.id,
-          prayer_notifications_enabled: prayerNotif,
-          habit_notifications_enabled: habitNotif,
-          journal_privacy_default: journalPrivacy,
-          preferred_prayer_city: city,
+           prayer_notifications_enabled: prayerNotif,
+           habit_notifications_enabled: habitNotif,
+           journal_notifications_enabled: journalNotif,
+           quran_notifications_enabled: quranNotif,
+           hadith_notifications_enabled: hadithNotif,
+           checkpoint_notifications_enabled: checkpointNotif,
+           social_notifications_enabled: socialNotif,
+           inactivity_notifications_enabled: inactivityNotif,
+           push_notifications_enabled: pushNotif,
+           journal_privacy_default: journalPrivacy,
+           preferred_prayer_city: city,
+           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
         if (settingsError) throw settingsError;
       }
@@ -198,6 +228,37 @@ export default function SettingsPage() {
       setErrorMsg("Pengaturan belum tersimpan. Periksa koneksi lalu coba lagi.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleInstall = async () => {
+    setInstallMsg(null);
+    const result = await install();
+    if (result === "accepted") {
+      setInstallMsg("SLJ berhasil ditambahkan ke Home Screen.");
+    } else if (result === "dismissed") {
+      setInstallMsg("Instalasi dibatalkan. Anda dapat mencobanya lagi kapan saja.");
+    }
+  };
+
+  const handlePushToggle = async (enabled: boolean) => {
+    setUpdatingPush(true);
+    setErrorMsg(null);
+    try {
+      if (enabled) {
+        await enableWebPush(supabase);
+        setPushNotif(true);
+      } else {
+        await disableWebPush(supabase);
+        setPushNotif(false);
+      }
+      setPushPermission(await getPushPermission());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Notifikasi HP belum dapat diperbarui.";
+      setErrorMsg(message);
+      setPushNotif(false);
+    } finally {
+      setUpdatingPush(false);
     }
   };
 
@@ -328,24 +389,115 @@ export default function SettingsPage() {
 
                 <div className="space-y-3 pt-4 border-t border-warm-border">
                   <label className="block text-sm font-semibold text-navy-900 flex items-center gap-1.5">
-                    <Bell className="h-4 w-4 text-accent" /> Preferensi Notifikasi In-App & Email
+                    <Bell className="h-4 w-4 text-accent" /> Preferensi Pengingat
                   </label>
 
                   <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
-                      <span className="text-xs font-semibold text-navy-900 block">Pengingat Waktu Sholat</span>
-                      <span className="text-[11px] text-gray-500">Notifikasi sebelum masuk waktu sholat 5 waktu.</span>
+                      <span className="text-xs font-semibold text-navy-900 block">Pengingat Habit Harian</span>
+                      <span className="text-[11px] text-gray-500">Pengingat utama pukul 20.00 jika habit hari ini belum selesai.</span>
                     </div>
-                    <Switch checked={prayerNotif} onCheckedChange={setPrayerNotif} />
+                    <Switch checked={habitNotif} onCheckedChange={setHabitNotif} />
                   </div>
 
                   <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
-                      <span className="text-xs font-semibold text-navy-900 block">Pengingat Habit & Jurnal Harian</span>
-                      <span className="text-[11px] text-gray-500">Pengingat sesuai jam yang Anda tetapkan di Action Plan.</span>
+                      <span className="text-xs font-semibold text-navy-900 block">Pengingat Jurnal Harian</span>
+                      <span className="text-[11px] text-gray-500">Pengingat utama pukul 21.00 jika jurnal hari ini belum ditulis.</span>
                     </div>
-                    <Switch checked={habitNotif} onCheckedChange={setHabitNotif} />
+                    <Switch checked={journalNotif} onCheckedChange={setJournalNotif} />
                   </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                      <div><span className="text-xs font-semibold text-navy-900 block">Waktu Sholat</span><span className="text-[11px] text-gray-500">Opsional, pengingat waktu sholat.</span></div>
+                      <Switch checked={prayerNotif} onCheckedChange={setPrayerNotif} />
+                    </div>
+                    <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                      <div><span className="text-xs font-semibold text-navy-900 block">Tilawah Al-Qur'an</span><span className="text-[11px] text-gray-500">Opsional, pukul 06.30 waktu lokal.</span></div>
+                      <Switch checked={quranNotif} onCheckedChange={setQuranNotif} />
+                    </div>
+                    <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                      <div><span className="text-xs font-semibold text-navy-900 block">Hadits Hari Ini</span><span className="text-[11px] text-gray-500">Opsional, pukul 07.00 waktu lokal.</span></div>
+                      <Switch checked={hadithNotif} onCheckedChange={setHadithNotif} />
+                    </div>
+                    <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                      <div><span className="text-xs font-semibold text-navy-900 block">Checkpoint Program</span><span className="text-[11px] text-gray-500">H-3, H-1, dan hari checkpoint.</span></div>
+                      <Switch checked={checkpointNotif} onCheckedChange={setCheckpointNotif} />
+                    </div>
+                    <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                      <div><span className="text-xs font-semibold text-navy-900 block">Coach & Sahabat Safar</span><span className="text-[11px] text-gray-500">Respons coach dan pengingat pasangan.</span></div>
+                      <Switch checked={socialNotif} onCheckedChange={setSocialNotif} />
+                    </div>
+                    <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                      <div><span className="text-xs font-semibold text-navy-900 block">Pengingat Tidak Aktif</span><span className="text-[11px] text-gray-500">Dikirim setelah 3 hari tanpa aktivitas.</span></div>
+                      <Switch checked={inactivityNotif} onCheckedChange={setInactivityNotif} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-warm-border">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-navy-900">
+                    <Bell className="h-4 w-4 text-accent" /> Notifikasi HP
+                  </label>
+                  <div className="flex items-center justify-between gap-4 rounded-md border border-warm-border bg-warm-bg/30 p-4">
+                    <div>
+                      <span className="block text-xs font-semibold text-navy-900">Tampilkan pengingat di layar HP</span>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+                        Pengingat tetap masuk ke akun. Opsi ini menambahkan Web Push ke notification tray perangkat.
+                        {pushPermission === "denied" ? " Izin saat ini diblokir oleh browser." : ""}
+                      </span>
+                    </div>
+                    <Switch
+                      checked={pushNotif}
+                      onCheckedChange={handlePushToggle}
+                      disabled={updatingPush || !isPushSupported() || pushPermission === "denied"}
+                    />
+                  </div>
+                  {pushPermission === "unsupported" && (
+                    <p className="text-[11px] font-medium text-amber-800">Browser/perangkat ini belum mendukung Web Push. Notifikasi akun tetap tersedia.</p>
+                  )}
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-warm-border">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-navy-900">
+                    <Smartphone className="h-4 w-4 text-accent" /> Akses Cepat dari Home Screen
+                  </label>
+
+                  <div className="flex flex-col gap-3 rounded-md border border-warm-border bg-warm-bg/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <span className="block text-xs font-semibold text-navy-900">
+                        {isInstalled ? "SLJ sudah terpasang" : "Pasang SLJ di HP"}
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+                        Buka SLJ langsung dari ikon di Home Screen tanpa masuk ke browser terlebih dahulu.
+                      </span>
+                    </div>
+
+                    {isInstalled ? (
+                      <span className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-emerald-100 px-3 text-xs font-bold text-emerald-800">
+                        <Check className="h-3.5 w-3.5" /> Terpasang
+                      </span>
+                    ) : canInstall ? (
+                      <Button type="button" onClick={handleInstall} className="h-9 shrink-0 bg-navy-900 text-xs font-bold text-white">
+                        <Download className="mr-1.5 h-3.5 w-3.5" /> Pasang di HP
+                      </Button>
+                    ) : isIos ? (
+                      <p className="max-w-xs text-[11px] font-medium leading-relaxed text-slate-600">
+                        Di iPhone/iPad: buka menu <strong>Bagikan</strong> di Safari, lalu pilih <strong>Tambahkan ke Layar Utama</strong>.
+                      </p>
+                    ) : (
+                      <p className="max-w-xs text-[11px] font-medium leading-relaxed text-slate-600">
+                        Buka menu browser, lalu pilih <strong>Install app</strong> atau <strong>Tambahkan ke layar utama</strong>.
+                      </p>
+                    )}
+                  </div>
+
+                  {installMsg && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+                      {installMsg}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
