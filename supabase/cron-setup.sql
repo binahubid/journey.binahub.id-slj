@@ -8,16 +8,15 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- Jadwalkan send-user-reminders setiap 5 menit
--- Ganti <YOUR_REMINDER_CRON_SECRET> dengan secret yang sama seperti di Edge Function
 SELECT cron.schedule(
   'slj-send-user-reminders',
   '*/5 * * * *',
   $$
   SELECT net.http_post(
-    url := 'https://fwmmcxjvdwjcecgxggwk.supabase.co/functions/v1/send-user-reminders',
+    url := 'https://<YOUR_SUPABASE_URL>/functions/v1/send-user-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-cron-secret', 'l4YmZo1ePhRO4jxBFT59DhSEpb5u3lxkMfbmTBMX7fgB1oWy'
+      'x-cron-secret', '<YOUR_REMINDER_CRON_SECRET>'
     ),
     body := '{}'::jsonb
   );
