@@ -475,7 +475,7 @@ export default function BaselinePage() {
         {isIntro ? (
           <div className="space-y-5">
             {/* 2-Column Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
 
               {/* ─── LEFT COLUMN (75% / col-span-8) ───────────────────────── */}
               <div className="lg:col-span-8 space-y-6">
@@ -523,7 +523,7 @@ export default function BaselinePage() {
                     <img
                       src="/ilustration-baseline.webp"
                       alt="Baseline Illustration"
-                      className="w-48 sm:w-64 md:w-72 h-auto object-contain shrink-0 self-center sm:self-auto drop-shadow-md"
+                      className="w-48 sm:w-64 lg:w-72 h-auto object-contain shrink-0 self-center sm:self-auto drop-shadow-md"
                     />
 
                   </div>

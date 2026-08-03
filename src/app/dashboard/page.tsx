@@ -1394,7 +1394,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── BARIS 1: 3 CARDS BENTO (JADWAL SHOLAT, HABITS HARI INI, HADITS HARI INI) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
           {/* Card 1: Jadwal Sholat Hari Ini */}
           <PrayerTimesWidget
             location={userLocation}
@@ -1552,7 +1552,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── BARIS 2: 2 CARDS BENTO (TRACKING SHOLAT & TILAWAH AL-QUR'AN) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
           {/* Card 1: Tracking Sholat */}
           <div className="relative group">
             <button
@@ -1582,7 +1582,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── BARIS 3: 2 CARDS BENTO (PROGRESS JOURNEY & JOURNAL REFLEKSI) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
           {/* Card 1: Progress Journey (Total Progress 90 Hari - Countdown) */}
            <Card className="bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5">
             <div className="space-y-4">

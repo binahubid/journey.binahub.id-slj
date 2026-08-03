@@ -720,7 +720,7 @@ export default function MonitoringPage() {
 
             {/* ─── 1. HERO BANNER (Solid Dark Navy - No Gradient) ───────────── */}
             <div className="bg-[#071A33] text-white p-4 sm:p-8 rounded-3xl shadow-xs">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                 <div className="space-y-3 max-w-xl min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-amber-300 font-bold flex items-center gap-1.5">
@@ -761,7 +761,7 @@ export default function MonitoringPage() {
                 </div>
 
                 {/* Right Card: Next Checkpoint Widget (Solid Fill) */}
-                <div className="bg-white/10 p-4 rounded-2xl shrink-0 w-full md:w-64 space-y-3">
+                <div className="bg-white/10 p-4 rounded-2xl shrink-0 w-full lg:w-64 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">Target Evaluasi</span>
                     <Clock className="h-4 w-4 text-amber-300" />
@@ -859,10 +859,10 @@ export default function MonitoringPage() {
             </div>
 
             {/* ─── 3. PROGRESS ANALYTICS & 90-DAY GRID ─────────────────────────── */}
-            <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
 
               {/* Dynamic Multi-Timeframe Chart (2 cols) */}
-              <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm md:col-span-2">
+              <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2">
                 <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
@@ -1080,7 +1080,7 @@ export default function MonitoringPage() {
                   </Link>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   {selectedAreas.map(area => {
                     const rep = areaReports[selectedMonth]?.[area];
                     const score = rep ? calcAreaScore(rep) : 0;
@@ -1189,7 +1189,7 @@ export default function MonitoringPage() {
             </div>
 
             {/* ─── 5. CHECKPOINT TIMELINE & COACH THREAD (Border-free) ───────── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
               {/* Checkpoint Timeline (1 col) */}
               <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-4">
@@ -1232,7 +1232,7 @@ export default function MonitoringPage() {
               </div>
 
               {/* Coach Conversation Thread (2 cols) */}
-              <div className="md:col-span-2 bg-white p-5 rounded-2xl shadow-2xs space-y-4">
+              <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-2xs space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 min-w-0 gap-2">
                   <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2 min-w-0 truncate">
                     <MessageSquare className="h-4 w-4 text-navy-900 shrink-0" />

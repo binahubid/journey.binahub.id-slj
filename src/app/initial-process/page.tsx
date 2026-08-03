@@ -367,7 +367,7 @@ export default function InitialProcessPage() {
           </div>
 
           {/* Stepper Progress */}
-          <div className="pt-2 grid grid-cols-4 gap-2 text-center text-xs font-semibold">
+          <div className="pt-2 grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 text-center text-xs font-semibold">
             {[
               { num: 1, label: "Filter Eligibility" },
               { num: 2, label: "Prioritas (100 Poin)" },
