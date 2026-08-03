@@ -6,6 +6,9 @@ USING public.support_team retained
 WHERE duplicate.user_id = retained.user_id
   AND duplicate.id > retained.id;
 
+-- Pastikan kolom updated_at ada (dibuat sebelum migration 013 tanpa kolom ini).
+ALTER TABLE public.support_team ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 CREATE UNIQUE INDEX IF NOT EXISTS support_team_user_id_key
   ON public.support_team (user_id);
 
