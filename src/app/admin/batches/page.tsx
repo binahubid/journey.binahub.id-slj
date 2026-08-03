@@ -455,6 +455,35 @@ export default function BatchesPage() {
                 </select>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#071A33] mb-1">
+                    <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 text-emerald-600" /> Tanggal Mulai</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Kode akses baru bisa dipakai mulai tanggal ini.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#071A33] mb-1">
+                    <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 text-rose-500" /> Tanggal Berakhir</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Setelah tanggal ini, kode tidak bisa dipakai.</p>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-[#071A33] mb-1">
                   <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 text-purple-600" /> Auto-Lock PTP (opsional)</span>
