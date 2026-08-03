@@ -50,6 +50,7 @@ interface ParticipantProfile {
   avatar_url: string | null;
   sahabat_safar_user_id: string | null;
   sahabat_safar_name: string | null;
+  trio_id: string | null;
   safarData?: SafarProfileData;
   journey_id?: string;
 }
@@ -208,6 +209,23 @@ export default function AdminSahabatSafarPage() {
   // Unpair Action Modal
   const [unpairTarget, setUnpairTarget] = useState<ParticipantProfile | null>(null);
 
+  // Trio Modal
+  const [trioModalOpen, setTrioModalOpen] = useState(false);
+  const [trioStep, setTrioStep] = useState<1 | 2 | 3>(1);
+  const [trioTarget, setTrioTarget] = useState<ParticipantProfile | null>(null);
+  const [trioRecommendations, setTrioRecommendations] = useState<Array<{ a: ParticipantProfile; b: ParticipantProfile; score: number; reasons: string[] }>>([]);
+  const [trioSelectedPair, setTrioSelectedPair] = useState<{ a: ParticipantProfile; b: ParticipantProfile } | null>(null);
+  const [trioLoading, setTrioLoading] = useState(false);
+  const [trioError, setTrioError] = useState<string | null>(null);
+  const [trioSuccess, setTrioSuccess] = useState<string | null>(null);
+
+  // Unpair Trio Modal
+  const [unpairTrioTarget, setUnpairTrioTarget] = useState<{ trio_id: string; members: ParticipantProfile[] } | null>(null);
+  const [unpairTrioUserId, setUnpairTrioUserId] = useState<string | null>(null);
+
+  // Dissolve Trio Modal
+  const [dissolveTrioTarget, setDissolveTrioTarget] = useState<{ trio_id: string; members: ParticipantProfile[] } | null>(null);
+
   // ── LOAD DATA ─────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
@@ -216,7 +234,7 @@ export default function AdminSahabatSafarPage() {
       // 1. Fetch Profiles (with batch_id)
       const { data: profs, error: profErr } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name, company_name, batch_id, location, avatar_url, sahabat_safar_user_id, sahabat_safar_name")
+        .select("id, user_id, full_name, company_name, batch_id, location, avatar_url, sahabat_safar_user_id, sahabat_safar_name, trio_id")
         .eq("role", "participant")
         .order("full_name", { ascending: true });
 
@@ -355,7 +373,134 @@ export default function AdminSahabatSafarPage() {
     }
   };
 
-  // ── FILTERED DATA ─────────────────────────────────────────────────────────
+  // ── TRIO: OPEN MODAL & CALCULATE RECOMMENDATIONS ────────────────────────
+
+  const handleOpenTrioModal = () => {
+    setTrioModalOpen(true);
+    setTrioStep(1);
+    setTrioTarget(null);
+    setTrioRecommendations([]);
+    setTrioSelectedPair(null);
+    setTrioError(null);
+    setTrioSuccess(null);
+  };
+
+  const handleTrioSelectUnpaired = (target: ParticipantProfile) => {
+    setTrioTarget(target);
+    setTrioStep(2);
+
+    // Find existing pairs in same batch, same gender as target
+    const targetGender = (target.safarData?.layer1?.gender || "").trim().toLowerCase();
+    const processed = new Set<string>();
+    const pairs: Array<{ a: ParticipantProfile; b: ParticipantProfile }> = [];
+
+    participants.forEach((p) => {
+      if (!p.sahabat_safar_user_id || processed.has(p.id)) return;
+      if (p.trio_id) return; // skip already in trio
+      if (p.batch_id !== target.batch_id) return;
+      const partner = participants.find((pp) => pp.id === p.sahabat_safar_user_id);
+      if (!partner || partner.trio_id) return;
+      // Both must be same gender as target
+      const pGender = (p.safarData?.layer1?.gender || "").trim().toLowerCase();
+      const partnerGender = (partner.safarData?.layer1?.gender || "").trim().toLowerCase();
+      if (pGender !== targetGender || partnerGender !== targetGender) return;
+      processed.add(p.id);
+      processed.add(partner.id);
+      pairs.push({ a: p, b: partner });
+    });
+
+    // Calculate trio compatibility: avg of (target↔A, target↔B, A↔B)
+    const recs = pairs.map(({ a, b }) => {
+      const compatTA = calculateCompatibility(target, a);
+      const compatTB = calculateCompatibility(target, b);
+      const compatAB = calculateCompatibility(a, b);
+      const score = Math.round((compatTA.score + compatTB.score + compatAB.score) / 3);
+      const reasons: string[] = [];
+      if (compatTA.score >= 60) reasons.push(`${target.full_name}↔${a.full_name}: ${compatTA.score}%`);
+      if (compatTB.score >= 60) reasons.push(`${target.full_name}↔${b.full_name}: ${compatTB.score}%`);
+      if (compatAB.score >= 60) reasons.push(`${a.full_name}↔${b.full_name}: ${compatAB.score}%`);
+      return { a, b, score, reasons };
+    }).sort((x, y) => y.score - x.score);
+
+    setTrioRecommendations(recs);
+  };
+
+  const handleTrioSelectPair = (pair: { a: ParticipantProfile; b: ParticipantProfile }) => {
+    setTrioSelectedPair(pair);
+    setTrioStep(3);
+  };
+
+  const handleExecuteTrio = async () => {
+    if (!trioTarget || !trioSelectedPair) return;
+    setTrioLoading(true);
+    setTrioError(null);
+    try {
+      const { error } = await supabase.rpc("pair_trio", {
+        p_user_a: trioSelectedPair.a.user_id,
+        p_user_b: trioSelectedPair.b.user_id,
+        p_unpaired: trioTarget.user_id,
+      });
+      if (error) throw error;
+
+      setTrioSuccess(
+        `Trio berhasil dibentuk: ${trioSelectedPair.a.full_name} + ${trioSelectedPair.b.full_name} + ${trioTarget.full_name}!`
+      );
+      await loadData();
+      setTimeout(() => {
+        setTrioSuccess(null);
+        setTrioModalOpen(false);
+      }, 2000);
+    } catch (err: any) {
+      console.error("Gagal membuat trio:", err);
+      setTrioError(err?.message || "Trio belum tersimpan. Silakan coba lagi.");
+    } finally {
+      setTrioLoading(false);
+    }
+  };
+
+  // ── UNPAIR TRIO MEMBER ─────────────────────────────────────────────────
+
+  const handleExecuteUnpairTrioMember = async () => {
+    if (!unpairTrioTarget || !unpairTrioUserId) return;
+    setPairingLoading(true);
+    setPairingError(null);
+    try {
+      const { error } = await supabase.rpc("unpair_trio_member", {
+        p_trio_id: unpairTrioTarget.trio_id,
+        p_user_to_remove: unpairTrioUserId,
+      });
+      if (error) throw error;
+      setUnpairTrioTarget(null);
+      setUnpairTrioUserId(null);
+      await loadData();
+    } catch (err: any) {
+      console.error("Gagal melepas anggota trio:", err);
+      setPairingError(err?.message || "Gagal melepas anggota trio.");
+    } finally {
+      setPairingLoading(false);
+    }
+  };
+
+  // ── DISSOLVE TRIO ──────────────────────────────────────────────────────
+
+  const handleExecuteDissolveTrio = async () => {
+    if (!dissolveTrioTarget) return;
+    setPairingLoading(true);
+    setPairingError(null);
+    try {
+      const { error } = await supabase.rpc("dissolve_trio", {
+        p_trio_id: dissolveTrioTarget.trio_id,
+      });
+      if (error) throw error;
+      setDissolveTrioTarget(null);
+      await loadData();
+    } catch (err: any) {
+      console.error("Gagal membubarkan trio:", err);
+      setPairingError(err?.message || "Gagal membubarkan trio.");
+    } finally {
+      setPairingLoading(false);
+    }
+  };
 
   const filledCount = participants.filter((p) => p.safarData?.is_completed).length;
   const pairedCount = participants.filter((p) => p.sahabat_safar_user_id).length;
@@ -374,7 +519,7 @@ export default function AdminSahabatSafarPage() {
     const matchesBatch =
       batchFilter === "ALL" || p.batch_id === batchFilter;
 
-    const isPaired = Boolean(p.sahabat_safar_user_id);
+    const isPaired = Boolean(p.sahabat_safar_user_id) || Boolean(p.trio_id);
     const matchesTab = tabView === "PAIRED" ? isPaired : !isPaired;
 
     return matchesSearch && matchesGender && matchesBatch && matchesTab;
@@ -555,7 +700,231 @@ export default function AdminSahabatSafarPage() {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <>
+          {tabView === "PAIRED" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {(() => {
+                const processed = new Set<string>();
+                const trios: Array<{ trio_id: string; members: ParticipantProfile[] }> = [];
+                const pairs: Array<{ a: ParticipantProfile; b: ParticipantProfile }> = [];
+
+                // First: group trios
+                filteredParticipants.forEach((p) => {
+                  if (!p.trio_id || processed.has(p.id)) return;
+                  const members = filteredParticipants.filter(
+                    (pp) => pp.trio_id === p.trio_id && !processed.has(pp.id)
+                  );
+                  members.forEach((m) => processed.add(m.id));
+                  trios.push({ trio_id: p.trio_id, members });
+                });
+
+                // Then: find regular pairs (skip trio members)
+                filteredParticipants.forEach((p) => {
+                  if (!p.sahabat_safar_user_id || processed.has(p.id)) return;
+                  if (p.trio_id) return;
+                  const partner = participants.find((pp) => pp.id === p.sahabat_safar_user_id);
+                  if (!partner || partner.trio_id) return;
+                  processed.add(p.id);
+                  processed.add(partner.id);
+                  pairs.push({ a: p, b: partner });
+                });
+
+                return { trios, pairs };
+              })().trios.map(({ trio_id, members }) => {
+                const m = members;
+                return (
+                  <Card
+                    key={`trio-${trio_id}`}
+                    className="bg-white border-[#C79A3C]/40 p-5 rounded-2xl shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-3">
+                      {/* 3 avatars with handshake icons */}
+                      <div className="flex items-center justify-center gap-1">
+                        {m.map((person, idx) => (
+                          <div key={person.id} className="flex items-center gap-1">
+                            <div className="h-9 w-9 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-xs shadow-sm shrink-0">
+                              {person.full_name.charAt(0).toUpperCase()}
+                            </div>
+                            {idx < m.length - 1 && (
+                              <HeartHandshake className="h-4 w-4 text-blue-500 shrink-0" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Names */}
+                      <div className="text-center">
+                        <h3 className="font-extrabold text-sm text-[#071A33] leading-snug">
+                          {m.map((p) => p.full_name).join(" + ")}
+                        </h3>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          Trio Sahabat Safar
+                        </p>
+                      </div>
+
+                      {/* Cities */}
+                      <div className="flex flex-wrap justify-center gap-1.5 text-[11px] text-slate-600">
+                        {m.map((person) => {
+                          const city = person.safarData?.layer1?.city || person.location || "—";
+                          return (
+                            <span key={person.id} className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-0.5 rounded-lg border border-[#EAE5D9]">
+                              <MapPin className="h-3 w-3 text-slate-400" />
+                              {city}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      {/* Batch */}
+                      {m[0]?.batch_name && (
+                        <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold">
+                          <Building className="h-3 w-3 text-blue-400" />
+                          {m[0].batch_name}
+                        </div>
+                      )}
+
+                      {/* IP Status for all 3 */}
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {m.map((person) => {
+                          const filled = Boolean(person.safarData?.is_completed);
+                          return (
+                            <div key={person.id} className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-1 rounded-lg border ${filled ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
+                              {filled ? <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" />}
+                              <span className="truncate">{person.full_name.split(" ")[0]}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex gap-2">
+                      <Button
+                        onClick={() => setUnpairTrioTarget({ trio_id, members: m })}
+                        variant="outline"
+                        className="flex-1 text-[11px] font-bold border-amber-200 text-amber-700 hover:bg-amber-50 h-9 rounded-xl gap-1.5"
+                      >
+                        <UserX className="h-3.5 w-3.5" /> Lepas 1 Orang
+                      </Button>
+                      <Button
+                        onClick={() => setDissolveTrioTarget({ trio_id, members: m })}
+                        variant="outline"
+                        className="flex-1 text-[11px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5"
+                      >
+                        <UserX className="h-3.5 w-3.5" /> Bubarkan
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+
+              {/* Regular pairs (not in trio) */}
+              {(() => {
+                const processed = new Set<string>();
+                const pairs: Array<{ a: ParticipantProfile; b: ParticipantProfile }> = [];
+                filteredParticipants.forEach((p) => {
+                  if (!p.sahabat_safar_user_id || processed.has(p.id) || p.trio_id) return;
+                  const partner = participants.find((pp) => pp.id === p.sahabat_safar_user_id);
+                  if (!partner || partner.trio_id) return;
+                  processed.add(p.id);
+                  processed.add(partner.id);
+                  pairs.push({ a: p, b: partner });
+                });
+                return pairs;
+              })().map(({ a, b }) => {
+                const gA = a.safarData?.layer1?.gender || "—";
+                const gB = b.safarData?.layer1?.gender || "—";
+                const cityA = a.safarData?.layer1?.city || a.location || "—";
+                const cityB = b.safarData?.layer1?.city || b.location || "—";
+                const filledA = Boolean(a.safarData?.is_completed);
+                const filledB = Boolean(b.safarData?.is_completed);
+
+                return (
+                  <Card
+                    key={`pair-${a.id}`}
+                    className="bg-white border-[#EAE5D9] p-5 rounded-2xl shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">
+                            {a.full_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{a.full_name}</h3>
+                            <p className="text-[11px] text-slate-500 font-medium truncate">{cityA}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-center shrink-0">
+                          <HeartHandshake className="h-5 w-5 text-blue-500" />
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                          <div className="min-w-0 text-right">
+                            <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{b.full_name}</h3>
+                            <p className="text-[11px] text-slate-500 font-medium truncate">{cityB}</p>
+                          </div>
+                          <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">
+                            {b.full_name.charAt(0).toUpperCase()}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gA.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gA.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>
+                          {gA === "Pria" ? "👨" : gA === "Wanita" ? "👩" : "—"} {gA}
+                        </Badge>
+                        <span className="text-slate-300 text-xs">·</span>
+                        <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gB.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gB.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>
+                          {gB === "Pria" ? "👨" : gB === "Wanita" ? "👩" : "—"} {gB}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]">
+                          <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{cityA}</span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]">
+                          <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{cityB}</span>
+                        </div>
+                      </div>
+
+                      {a.batch_name && (
+                        <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold">
+                          <Building className="h-3 w-3 text-blue-400" />
+                          {a.batch_name}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledA ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
+                          {filledA ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}
+                          <span className="truncate">{filledA ? "Lengkap" : "Belum Isi"}</span>
+                        </div>
+                        <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledB ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
+                          {filledB ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}
+                          <span className="truncate">{filledB ? "Lengkap" : "Belum Isi"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100">
+                      <Button
+                        onClick={() => setUnpairTarget(a)}
+                        variant="outline"
+                        className="w-full text-xs font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5"
+                      >
+                        <UserX className="h-3.5 w-3.5" /> Lepas Pasangan
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredParticipants.map((p) => {
             const hasFilled = Boolean(p.safarData?.is_completed);
             const gender = p.safarData?.layer1?.gender || "Belum diisi";
@@ -627,44 +996,32 @@ export default function AdminSahabatSafarPage() {
                       </div>
                     )}
                   </div>
-
-                  {p.sahabat_safar_user_id && (
-                    <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200 space-y-1 text-xs">
-                      <span className="text-[10px] font-extrabold text-blue-900 uppercase tracking-wider block">
-                        Terpasangkan Dengan:
-                      </span>
-                      <p className="font-extrabold text-navy-900 flex items-center gap-1.5">
-                        <HeartHandshake className="h-4 w-4 text-blue-600" />
-                        {p.sahabat_safar_name || "Sahabat Safar"}
-                      </p>
-                    </div>
-                  )}
                 </div>
 
-                <div className="pt-3 border-t border-slate-100">
-                  {p.sahabat_safar_user_id ? (
-                    <Button
-                      onClick={() => setUnpairTarget(p)}
-                      variant="outline"
-                      className="w-full text-xs font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5"
-                    >
-                      <UserX className="h-3.5 w-3.5" /> Lepas Pasangan (Unpair)
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => handleOpenMatchModal(p)}
-                      disabled={!hasFilled}
-                      className="w-full text-xs font-bold bg-[#071A33] hover:bg-black text-amber-300 h-9 rounded-xl gap-1.5 shadow-sm"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Cari Rekomendasi Pasangan
-                    </Button>
-                  )}
+                <div className="pt-3 border-t border-slate-100 flex gap-2">
+                  <Button
+                    onClick={() => handleOpenMatchModal(p)}
+                    disabled={!hasFilled}
+                    className="flex-1 text-xs font-bold bg-[#071A33] hover:bg-black text-amber-300 h-9 rounded-xl gap-1.5 shadow-sm"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Pasangan
+                  </Button>
+                  <Button
+                    onClick={handleOpenTrioModal}
+                    disabled={!hasFilled}
+                    variant="outline"
+                    className="flex-1 text-xs font-bold border-[#C79A3C] text-[#C79A3C] hover:bg-amber-50 h-9 rounded-xl gap-1.5"
+                  >
+                    <Users className="h-3.5 w-3.5" /> Trio
+                  </Button>
                 </div>
               </Card>
             );
           })}
         </div>
-      )}
+           )}
+          </>
+       )}
 
       {/* ─── MODAL REKOMENDASI PAIRING MATCHING ENGINE ──────────────────────── */}
       {selectedTarget && (
@@ -834,6 +1191,314 @@ export default function AdminSahabatSafarPage() {
                 className="bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-xl h-9 px-5 flex-1"
               >
                 {pairingLoading ? "Memproses..." : "Ya, Lepas Pasangan"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ─── MODAL BUAT TRIO ────────────────────────────────────────────────── */}
+      {trioModalOpen && (
+        <Dialog open={trioModalOpen} onOpenChange={() => setTrioModalOpen(false)}>
+          <DialogContent className="sm:max-w-3xl bg-white border border-[#EAE5D9] rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="border-b border-[#EAE5D9] pb-4">
+              <DialogTitle className="text-lg font-black text-[#071A33] flex items-center gap-2">
+                <Users className="h-5 w-5 text-[#C79A3C]" />
+                {trioStep === 1 && "Buat Trio — Pilih Peserta"}
+                {trioStep === 2 && "Buat Trio — Pilih Pasangan"}
+                {trioStep === 3 && "Buat Trio — Konfirmasi"}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                {trioStep === 1 && "Pilih 1 peserta yang belum memiliki pasangan untuk bergabung dengan pasangan yang sudah ada."}
+                {trioStep === 2 && `Sistem merekomendasikan pasangan paling cocok untuk ${trioTarget?.full_name}.`}
+                {trioStep === 3 && "Konfirmasi pembentukan trio."}
+              </DialogDescription>
+            </DialogHeader>
+
+            {trioSuccess && (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 font-bold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                <span>{trioSuccess}</span>
+              </div>
+            )}
+            {trioError && (
+              <div role="alert" className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-semibold flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+                <span>{trioError}</span>
+              </div>
+            )}
+
+            {/* Step 1: Select unpaired person */}
+            {trioStep === 1 && (
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-black text-[#071A33] uppercase tracking-wider">
+                  Peserta Belum Berpasangan ({participants.filter(p => !p.sahabat_safar_user_id && !p.trio_id && p.safarData?.is_completed).length} Orang)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {participants
+                    .filter((p) => !p.sahabat_safar_user_id && !p.trio_id && p.safarData?.is_completed)
+                    .map((p) => {
+                      const gender = p.safarData?.layer1?.gender || "—";
+                      const city = p.safarData?.layer1?.city || p.location || "—";
+                      return (
+                        <Card
+                          key={p.id}
+                          onClick={() => handleTrioSelectUnpaired(p)}
+                          className="p-4 rounded-2xl border border-[#EAE5D9] hover:border-[#C79A3C] hover:bg-amber-50/30 cursor-pointer transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shrink-0">
+                              {p.full_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-extrabold text-sm text-[#071A33] truncate">{p.full_name}</h4>
+                              <p className="text-[11px] text-slate-500 font-medium">{gender} • {city}</p>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Show recommended pairs */}
+            {trioStep === 2 && trioTarget && (
+              <div className="space-y-4 pt-2">
+                <div className="bg-[#FAF8F4] p-4 rounded-xl border border-[#EAE5D9] flex items-center justify-between gap-3 text-xs">
+                  <div>
+                    <span className="font-extrabold text-[#071A33] block">
+                      {trioTarget.full_name} ({trioTarget.safarData?.layer1?.gender})
+                    </span>
+                    <span className="text-slate-500 font-medium">
+                      {trioTarget.company_name} • {trioTarget.safarData?.layer1?.city || trioTarget.location}
+                    </span>
+                  </div>
+                  <Badge className="bg-[#C79A3C] text-white font-bold text-xs">
+                    Bergabung dengan Pasangan
+                  </Badge>
+                </div>
+
+                {trioRecommendations.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <AlertCircle className="h-8 w-8 text-amber-600 mx-auto" />
+                    <p className="text-xs font-bold text-slate-700">
+                      Belum Ada Pasangan Sesama {trioTarget.safarData?.layer1?.gender} yang Cocok
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Pastikan ada pasangan yang sudah terbentuk dengan jenis kelamin yang sama.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {trioRecommendations.slice(0, 5).map((rec, idx) => (
+                      <Card
+                        key={`trio-rec-${rec.a.id}-${rec.b.id}`}
+                        className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 ${
+                          idx === 0
+                            ? "bg-amber-50/40 border-amber-300 shadow-xs"
+                            : "bg-white border-[#EAE5D9] hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="space-y-2 flex-1 min-w-0">
+                          <div className="flex items-center gap-3">
+                            <div className="h-14 w-14 rounded-2xl bg-[#071A33] text-amber-300 flex flex-col items-center justify-center shrink-0 shadow-sm border border-amber-400/40">
+                              <span className="text-base font-black leading-none">{rec.score}%</span>
+                              <span className="text-[8px] font-extrabold uppercase text-amber-200/80 mt-0.5">Trio</span>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-extrabold text-sm text-[#071A33]">
+                                  {rec.a.full_name} + {rec.b.full_name}
+                                </h4>
+                                {idx === 0 && (
+                                  <Badge className="bg-emerald-600 text-white font-extrabold text-[9px] px-2">
+                                    💡 Rekomendasi Teratas
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 font-medium">
+                                {rec.a.safarData?.layer1?.city || rec.a.location} • {rec.b.safarData?.layer1?.city || rec.b.location}
+                              </p>
+                            </div>
+                          </div>
+                          {rec.reasons.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {rec.reasons.map((r, rIdx) => (
+                                <span key={rIdx} className="text-[10px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
+                                  {r}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="shrink-0 flex items-center justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200">
+                          <Button
+                            onClick={() => handleTrioSelectPair(rec)}
+                            className="bg-[#C79A3C] hover:bg-[#B08928] text-white font-extrabold text-xs h-10 px-5 rounded-xl gap-1.5 shadow-sm w-full sm:w-auto"
+                          >
+                            <Users className="h-4 w-4" /> Pilih Pasangan Ini
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: Confirm trio */}
+            {trioStep === 3 && trioTarget && trioSelectedPair && (
+              <div className="space-y-4 pt-2">
+                <div className="bg-[#FAF8F4] p-5 rounded-xl border border-[#EAE5D9] space-y-3">
+                  <p className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">Ringkasan Trio</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="text-center">
+                      <div className="h-12 w-12 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-base mx-auto shadow-sm">
+                        {trioSelectedPair.a.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      <p className="text-xs font-extrabold text-[#071A33] mt-1">{trioSelectedPair.a.full_name}</p>
+                    </div>
+                    <HeartHandshake className="h-5 w-5 text-blue-500" />
+                    <div className="text-center">
+                      <div className="h-12 w-12 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-base mx-auto shadow-sm">
+                        {trioSelectedPair.b.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      <p className="text-xs font-extrabold text-[#071A33] mt-1">{trioSelectedPair.b.full_name}</p>
+                    </div>
+                    <HeartHandshake className="h-5 w-5 text-blue-500" />
+                    <div className="text-center">
+                      <div className="h-12 w-12 rounded-full bg-[#C79A3C] text-white font-black flex items-center justify-center text-base mx-auto shadow-sm border-2 border-[#071A33]">
+                        {trioTarget.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      <p className="text-xs font-extrabold text-[#C79A3C] mt-1">{trioTarget.full_name}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="border-t border-[#EAE5D9] pt-3 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (trioStep === 2) { setTrioStep(1); setTrioTarget(null); }
+                  else if (trioStep === 3) { setTrioStep(2); setTrioSelectedPair(null); }
+                  else { setTrioModalOpen(false); }
+                }}
+                className="text-xs font-bold rounded-xl h-9"
+              >
+                {trioStep === 1 ? "Batal" : "Kembali"}
+              </Button>
+              {trioStep === 3 && (
+                <Button
+                  onClick={handleExecuteTrio}
+                  disabled={trioLoading}
+                  className="bg-[#C79A3C] hover:bg-[#B08928] text-white text-xs font-bold rounded-xl h-9 px-5"
+                >
+                  {trioLoading ? "Memproses..." : "Buat Trio Sekarang"}
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ─── MODAL UNPAIR TRIO MEMBER ────────────────────────────────────────── */}
+      {unpairTrioTarget && (
+        <Dialog open={!!unpairTrioTarget} onOpenChange={() => { setUnpairTrioTarget(null); setUnpairTrioUserId(null); }}>
+          <DialogContent className="sm:max-w-md bg-white border border-[#EAE5D9] rounded-2xl shadow-2xl p-6">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-base font-black text-amber-700 flex items-center gap-2">
+                <UserX className="h-5 w-5 text-amber-600" />
+                Lepas 1 Anggota Trio
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-600 leading-relaxed">
+                Pilih siapa yang akan dilepas dari trio. Sisa 2 orang akan tetap menjadi pasangan Sahabat Safar.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2 py-2">
+              {unpairTrioTarget.members.map((m) => (
+                <label
+                  key={m.user_id}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                    unpairTrioUserId === m.user_id
+                      ? "border-amber-400 bg-amber-50"
+                      : "border-[#EAE5D9] hover:border-slate-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="trio-remove"
+                    value={m.user_id}
+                    checked={unpairTrioUserId === m.user_id}
+                    onChange={() => setUnpairTrioUserId(m.user_id)}
+                    className="accent-amber-600"
+                  />
+                  <div className="h-8 w-8 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-xs shrink-0">
+                    {m.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-xs font-extrabold text-[#071A33]">{m.full_name}</p>
+                    <p className="text-[10px] text-slate-500">{m.safarData?.layer1?.city || m.location || "—"}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <DialogFooter className="border-t border-slate-100 pt-3 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { setUnpairTrioTarget(null); setUnpairTrioUserId(null); }}
+                className="text-xs font-bold rounded-xl h-9 flex-1"
+              >
+                Batal
+              </Button>
+              <Button
+                onClick={handleExecuteUnpairTrioMember}
+                disabled={!unpairTrioUserId || pairingLoading}
+                className="bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl h-9 px-5 flex-1"
+              >
+                {pairingLoading ? "Memproses..." : "Ya, Lepas Orang Ini"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ─── MODAL DISSOLVE TRIO ────────────────────────────────────────────── */}
+      {dissolveTrioTarget && (
+        <Dialog open={!!dissolveTrioTarget} onOpenChange={() => setDissolveTrioTarget(null)}>
+          <DialogContent className="sm:max-w-md bg-white border border-[#EAE5D9] rounded-2xl shadow-2xl p-6">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-base font-black text-rose-700 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-rose-600" />
+                Bubarkan Trio?
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-600 leading-relaxed">
+                Seluruh anggota trio akan dilepas. Ketiga peserta akan kembali menjadi <strong>belum berpasangan</strong>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+              Anggota: {dissolveTrioTarget.members.map((m) => m.full_name).join(", ")}
+            </div>
+
+            <DialogFooter className="border-t border-slate-100 pt-3 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDissolveTrioTarget(null)}
+                className="text-xs font-bold rounded-xl h-9 flex-1"
+              >
+                Batal
+              </Button>
+              <Button
+                onClick={handleExecuteDissolveTrio}
+                disabled={pairingLoading}
+                className="bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-xl h-9 px-5 flex-1"
+              >
+                {pairingLoading ? "Memproses..." : "Ya, Bubarkan Trio"}
               </Button>
             </DialogFooter>
           </DialogContent>
