@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { onboardingSchema, type OnboardingInput } from "@/lib/validations/onboarding";
 import { createClient } from "@/lib/supabase/client";
+import { formatSupabaseError } from "@/lib/company-store";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -75,7 +76,7 @@ export default function OnboardingPage() {
       router.refresh();
     } catch (err) {
       console.error("Gagal menyimpan identitas onboarding:", err);
-      setErrorMsg("Terjadi gangguan jaringan saat memverifikasi data. Silakan coba lagi.");
+      setErrorMsg(formatSupabaseError(err, "Terjadi kesalahan saat memverifikasi data. Silakan coba lagi."));
     } finally {
       setLoading(false);
     }
