@@ -168,7 +168,7 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
           )}
 
           <Button
-            onClick={() => setShowModal(true)}
+            onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
             className="text-xs h-8.5 gap-1.5 font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl px-3.5 shadow-2xs"
           >
             <Plus className="h-4 w-4" />
@@ -184,7 +184,7 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
           <p className="text-xs text-slate-500 font-medium">Belum ada catatan bacaan Al-Qur&apos;an hari ini.</p>
           <Button
             size="sm"
-            onClick={() => setShowModal(true)}
+            onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
             className="text-xs font-bold bg-navy-900 text-white rounded-lg px-4"
           >
             + Tambah Catatan Tilawah Pertama
