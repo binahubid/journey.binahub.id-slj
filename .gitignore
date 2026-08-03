@@ -27,4 +27,5 @@ yarn-error.log*
 
 # Markdown documentation files
 *.md
+!CHANGELOG.md
 
