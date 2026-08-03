@@ -398,7 +398,7 @@ export default function AdminSahabatSafarPage() {
       if (!p.sahabat_safar_user_id || processed.has(p.id)) return;
       if (p.trio_id) return; // skip already in trio
       if (p.batch_id !== target.batch_id) return;
-      const partner = participants.find((pp) => pp.id === p.sahabat_safar_user_id);
+      const partner = participants.find((pp) => pp.user_id === p.sahabat_safar_user_id);
       if (!partner || partner.trio_id) return;
       // Both must be same gender as target
       const pGender = (p.safarData?.layer1?.gender || "").trim().toLowerCase();
@@ -641,6 +641,15 @@ export default function AdminSahabatSafarPage() {
             })}
           </select>
 
+          <Button
+            type="button"
+            onClick={handleOpenTrioModal}
+            variant="outline"
+            className="h-9 border-[#C79A3C] text-[#9A7225] hover:bg-amber-50 text-xs font-extrabold gap-1.5"
+          >
+            <Users className="h-3.5 w-3.5" /> Buat Trio
+          </Button>
+
           <div className="flex items-center gap-1 bg-[#FAF8F4] p-1 rounded-xl border border-[#EAE5D9] text-xs">
             <button
               type="button"
@@ -769,7 +778,7 @@ export default function AdminSahabatSafarPage() {
                 filteredParticipants.forEach((p) => {
                   if (!p.sahabat_safar_user_id || processed.has(p.id)) return;
                   if (p.trio_id) return;
-                  const partner = participants.find((pp) => pp.id === p.sahabat_safar_user_id);
+                  const partner = participants.find((pp) => pp.user_id === p.sahabat_safar_user_id);
                   if (!partner) return;
                   processed.add(p.id);
                   processed.add(partner.id);
@@ -904,21 +913,13 @@ export default function AdminSahabatSafarPage() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex gap-2">
+                <div className="pt-3 border-t border-slate-100">
                   <Button
                     onClick={() => handleOpenMatchModal(p)}
                     disabled={!hasFilled}
-                    className="flex-1 text-xs font-bold bg-[#071A33] hover:bg-black text-amber-300 h-9 rounded-xl gap-1.5 shadow-sm"
+                    className="w-full text-xs font-bold bg-[#071A33] hover:bg-black text-amber-300 h-9 rounded-xl gap-1.5 shadow-sm"
                   >
-                    <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Pasangan
-                  </Button>
-                  <Button
-                    onClick={handleOpenTrioModal}
-                    disabled={!hasFilled}
-                    variant="outline"
-                    className="flex-1 text-xs font-bold border-[#C79A3C] text-[#C79A3C] hover:bg-amber-50 h-9 rounded-xl gap-1.5"
-                  >
-                    <Users className="h-3.5 w-3.5" /> Trio
+                    <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Cari Rekomendasi Pasangan
                   </Button>
                 </div>
               </Card>
