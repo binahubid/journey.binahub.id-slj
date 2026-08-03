@@ -329,7 +329,7 @@ export default function ProfilePage() {
         </section>
 
         {/* ─── INFO SECTIONS (BORDERLESS) ──────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6 items-start">
 
           {/* Akun & Program */}
           <InfoSection title="Akun & Program" icon={<Layers className="h-3.5 w-3.5" />}>

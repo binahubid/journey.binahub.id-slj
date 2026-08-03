@@ -501,7 +501,7 @@ export default function RefactoredJournalPage() {
                   </div>
 
                   {/* 5 Mood Cards */}
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-2.5">
+                  <div className="grid grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5">
                     {MOOD_ITEMS.map((m) => {
                       const isSelected = selectedMood === m.label;
                       return (
@@ -561,7 +561,7 @@ export default function RefactoredJournalPage() {
                 )}
 
                 {/* SECTION 4 & 5: PELAJARAN & PERBAIKAN BESOK */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 border-t border-slate-100 pt-4 sm:pt-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 border-t border-slate-100 pt-4 sm:pt-5">
                   
                   <div className="space-y-2">
                     <div>

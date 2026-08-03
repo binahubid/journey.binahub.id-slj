@@ -482,7 +482,7 @@ export default function BaselinePage() {
 
                 {/* HERO CARD WITH WEBP ILLUSTRATION */}
                 <Card className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xs border border-slate-200/70 relative overflow-hidden">
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
+                  <div className="flex flex-col lg:flex-row items-center lg:items-start justify-between gap-6">
                     
                     {/* Left Text Info */}
                     <div className="space-y-4 max-w-md">
@@ -546,7 +546,7 @@ export default function BaselinePage() {
                   </div>
 
                   {/* 6 Stepper Pills */}
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 pt-1 text-center">
+                  <div className="grid grid-cols-2 lg:grid-cols-6 gap-2.5 pt-1 text-center">
                     {/* Item 1 */}
                     <div className="flex flex-col items-center space-y-2 p-2 rounded-2xl bg-rose-50/40 border border-rose-100">
                       <div className="h-9 w-9 rounded-full bg-rose-50 border-2 border-rose-400 text-rose-600 font-extrabold text-xs flex items-center justify-center shadow-xs">
@@ -610,7 +610,7 @@ export default function BaselinePage() {
                 </Card>
 
                 {/* METADATA INFO BAR & START BUTTON */}
-                <Card className="bg-white p-5 rounded-3xl shadow-2xs border border-slate-200/70 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <Card className="bg-white p-5 rounded-3xl shadow-2xs border border-slate-200/70 flex flex-col lg:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-6 flex-wrap">
                     {/* Item 1: Estimasi Waktu */}
                     <div className="flex items-center gap-3">

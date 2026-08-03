@@ -287,7 +287,7 @@ export default function SettingsPage() {
 
               {/* Tab 1: Notifikasi & Lokasi */}
               <TabsContent value="notifikasi" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-navy-900 flex items-center gap-1.5">
                       <MapPin className="h-4 w-4 text-accent" /> Lokasi Kota (Waktu Sholat)
@@ -327,7 +327,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-warm-border">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-warm-border">
                   <div className="space-y-2">
                     <label className="block text-xs font-bold text-navy-900">Format Jam</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -406,7 +406,7 @@ export default function SettingsPage() {
                     <Switch checked={journalNotif} onCheckedChange={setJournalNotif} />
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-3 lg:grid-cols-2">
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Waktu Sholat</span><span className="text-[11px] text-gray-500">Opsional, pengingat waktu sholat.</span></div>
                       <Switch checked={prayerNotif} onCheckedChange={setPrayerNotif} />
