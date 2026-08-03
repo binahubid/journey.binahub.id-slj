@@ -52,8 +52,9 @@ self.addEventListener("push", (event) => {
   });
 
   // Set badge count (Chrome Android + iOS PWA 16.4+)
+  // badgeCount dikirim Edge Function = jumlah unread sebenarnya.
   if (self.registration.setAppBadge) {
-    const count = typeof payload.badgeCount === "number" ? payload.badgeCount : 1;
+    const count = typeof payload.badgeCount === "number" && payload.badgeCount > 0 ? payload.badgeCount : 1;
     notificationPromise.then(() => self.registration.setAppBadge(count)).catch(() => {});
   }
 
@@ -63,17 +64,21 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  // Clear badge on click
-  if (self.registration.clearAppBadge) {
-    self.registration.clearAppBadge().catch(() => {});
-  }
-
+  // Jangan clear badge buta — biarkan halaman yang menghitung unread sebenarnya
+  // (badge mungkin masih berisi notif lain yang belum dibaca).
   const targetUrl = new URL(event.notification.data?.url || "/notifications", self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       const existing = clients.find((client) => client.url === targetUrl);
-      return existing ? existing.focus() : self.clients.openWindow(targetUrl);
+      if (existing) {
+        existing.focus();
+        existing.postMessage({ type: "SYNC_BADGE" });
+        return;
+      }
+      return self.clients.openWindow(targetUrl).then((client) => {
+        if (client) client.postMessage({ type: "SYNC_BADGE" });
+      });
     })
   );
 });

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { usePwaInstall } from "@/components/pwa/PwaProvider";
 import {
   LayoutDashboard,
   Compass,
@@ -42,6 +43,7 @@ export function ParticipantLayout({
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const { updateBadge } = usePwaInstall();
   const currentPath = activePath || pathname;
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -58,6 +60,21 @@ export function ParticipantLayout({
       document.body.style.overflow = "unset";
     };
   }, [mobileMenuOpen]);
+
+  // Sync badge app icon setiap jumlah unread berubah.
+  useEffect(() => {
+    updateBadge(unreadNotifications);
+  }, [unreadNotifications, updateBadge]);
+
+  // SW minta re-sync badge setelah notifikasi diklik/dibuka.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === "SYNC_BADGE") updateBadge(unreadNotifications);
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [updateBadge, unreadNotifications]);
 
   useEffect(() => {
     async function loadUser() {

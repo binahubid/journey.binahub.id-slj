@@ -69,8 +69,15 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
       return choice.outcome;
     },
     updateBadge: (count: number) => {
-      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      if (!("serviceWorker" in navigator)) return;
+      const post = (reg: ServiceWorkerRegistration) => {
+        const active = reg.active || reg.installing || reg.waiting;
+        active?.postMessage({ type: "UPDATE_BADGE", count });
+      };
+      if (navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: "UPDATE_BADGE", count });
+      } else {
+        navigator.serviceWorker.ready.then(post).catch(() => {});
       }
     },
   }), [installPrompt, isInstalled, isIos]);

@@ -102,32 +102,61 @@ serve(async (req) => {
     const { data: rows, error: claimError } = await supabase.rpc("claim_pending_push_notifications", { p_limit: 500 });
     if (claimError) throw claimError;
 
+    // Hitung unread count per user agar badge di app icon akurat (bukan selalu 1).
+    const userIds = [...new Set((rows || []).map((r) => r.user_id))];
+    const unreadByUser = new Map<string, number>();
+    if (userIds.length > 0) {
+      const { data: unreadRows } = await supabase
+        .from("notifications")
+        .select("user_id")
+        .in("user_id", userIds)
+        .eq("is_read", false);
+      for (const u of unreadRows || []) {
+        unreadByUser.set(u.user_id, (unreadByUser.get(u.user_id) || 0) + 1);
+      }
+    }
+
     const successfulNotificationIds = new Set<string>();
     let sent = 0;
     let failed = 0;
+    const failedEndpoints: { endpoint: string; statusCode: number }[] = [];
 
-    for (const row of rows || []) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
-          JSON.stringify({
-            title: row.title,
-            body: row.message,
-            url: row.action_url || "/notifications",
-            tag: `notification-${row.notification_id}`,
-          })
-        );
-        successfulNotificationIds.add(row.notification_id);
-        sent++;
-      } catch (error) {
-        failed++;
-        const statusCode = error?.statusCode;
-        await supabase.from("push_subscriptions").update({
-          is_active: statusCode === 404 || statusCode === 410 ? false : true,
-          last_error: String(error?.message || error),
-          updated_at: new Date().toISOString(),
-        }).eq("endpoint", row.endpoint);
+    // Kirim paralel dengan concurrency terbatas agar tidak menumpuk antrian.
+    const CONCURRENCY = 20;
+    const rowsCopy = [...(rows || [])];
+    let cursor = 0;
+
+    const worker = async () => {
+      while (cursor < rowsCopy.length) {
+        const row = rowsCopy[cursor++];
+        try {
+          await webpush.sendNotification(
+            { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
+            JSON.stringify({
+              title: row.title,
+              body: row.message,
+              url: row.action_url || "/notifications",
+              tag: `notification-${row.notification_id}`,
+              badgeCount: unreadByUser.get(row.user_id) || 0,
+            })
+          );
+          successfulNotificationIds.add(row.notification_id);
+          sent++;
+        } catch (error) {
+          failed++;
+          failedEndpoints.push({ endpoint: row.endpoint, statusCode: error?.statusCode });
+        }
       }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, Math.max(1, rowsCopy.length)) }, () => worker()));
+
+    for (const f of failedEndpoints) {
+      await supabase.from("push_subscriptions").update({
+        is_active: f.statusCode === 404 || f.statusCode === 410 ? false : true,
+        last_error: `Push failed with status ${f.statusCode}`,
+        updated_at: new Date().toISOString(),
+      }).eq("endpoint", f.endpoint);
     }
 
     if (successfulNotificationIds.size > 0) {
