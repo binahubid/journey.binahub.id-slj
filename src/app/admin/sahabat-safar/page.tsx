@@ -44,6 +44,8 @@ interface ParticipantProfile {
   user_id: string;
   full_name: string;
   company_name: string | null;
+  batch_id: string | null;
+  batch_name?: string | null;
   location: string | null;
   avatar_url: string | null;
   sahabat_safar_user_id: string | null;
@@ -193,6 +195,8 @@ export default function AdminSahabatSafarPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [genderFilter, setGenderFilter] = useState<"ALL" | "Pria" | "Wanita">("ALL");
   const [tabView, setTabView] = useState<"UNPAIRED" | "PAIRED">("UNPAIRED");
+  const [batchFilter, setBatchFilter] = useState<string>("ALL");
+  const [batches, setBatches] = useState<{ id: string; name: string }[]>([]);
 
   // Selection & Matching Modal
   const [selectedTarget, setSelectedTarget] = useState<ParticipantProfile | null>(null);
@@ -209,10 +213,10 @@ export default function AdminSahabatSafarPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch Profiles
+      // 1. Fetch Profiles (with batch_id)
       const { data: profs, error: profErr } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name, company_name, location, avatar_url, sahabat_safar_user_id, sahabat_safar_name")
+        .select("id, user_id, full_name, company_name, batch_id, location, avatar_url, sahabat_safar_user_id, sahabat_safar_name")
         .eq("role", "participant")
         .order("full_name", { ascending: true });
 
@@ -238,12 +242,24 @@ export default function AdminSahabatSafarPage() {
         journeyMap.set(j.user_id, j.id);
       });
 
+      // 4. Fetch Batches (for names)
+      const { data: batchData } = await supabase
+        .from("batches")
+        .select("id, name");
+
+      const batchMap = new Map<string, string>();
+      (batchData || []).forEach((b: any) => {
+        batchMap.set(b.id, b.name);
+      });
+      setBatches(batchData || []);
+
       // Combine Data
       const combined: ParticipantProfile[] = (profs || []).map((p: any) => {
         const sData = safarMap.get(p.user_id);
         return {
           ...p,
           full_name: p.full_name || "Tanpa Nama",
+          batch_name: batchMap.get(p.batch_id) || null,
           safarData: sData,
           journey_id: journeyMap.get(p.user_id),
         };
@@ -267,11 +283,12 @@ export default function AdminSahabatSafarPage() {
   const handleOpenMatchModal = (target: ParticipantProfile) => {
     setSelectedTarget(target);
 
-    // Filter candidates of SAME GENDER who filled initial process
+    // Filter candidates: SAME GENDER + SAME BATCH + unpaired + filled initial process
     const candidates = participants.filter((p) => {
-      if (p.user_id === target.user_id) return false; // Not self
-      if (p.sahabat_safar_user_id) return false; // Must be unpaired
-      if (!p.safarData?.is_completed) return false; // Must have filled initial process
+      if (p.user_id === target.user_id) return false;
+      if (p.sahabat_safar_user_id) return false;
+      if (!p.safarData?.is_completed) return false;
+      if (p.batch_id !== target.batch_id) return false; // HARUS SATU BATCH
       return true;
     });
 
@@ -354,10 +371,13 @@ export default function AdminSahabatSafarPage() {
     const matchesGender =
       genderFilter === "ALL" || pGender.toLowerCase() === genderFilter.toLowerCase();
 
+    const matchesBatch =
+      batchFilter === "ALL" || p.batch_id === batchFilter;
+
     const isPaired = Boolean(p.sahabat_safar_user_id);
     const matchesTab = tabView === "PAIRED" ? isPaired : !isPaired;
 
-    return matchesSearch && matchesGender && matchesTab;
+    return matchesSearch && matchesGender && matchesBatch && matchesTab;
   });
 
   return (
@@ -459,6 +479,23 @@ export default function AdminSahabatSafarPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Batch Filter */}
+          <select
+            value={batchFilter}
+            onChange={(e) => setBatchFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border border-[#EAE5D9] bg-white text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
+          >
+            <option value="ALL">Semua Batch ({participants.length})</option>
+            {batches.map((b) => {
+              const count = participants.filter((p) => p.batch_id === b.id).length;
+              return (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({count})
+                </option>
+              );
+            })}
+          </select>
+
           <div className="flex items-center gap-1 bg-[#FAF8F4] p-1 rounded-xl border border-[#EAE5D9] text-xs">
             <button
               type="button"
@@ -567,6 +604,12 @@ export default function AdminSahabatSafarPage() {
                     {birthYear && (
                       <span className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-0.5 rounded-lg border border-[#EAE5D9]">
                         Tahun {birthYear}
+                      </span>
+                    )}
+                    {p.batch_name && (
+                      <span className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 text-blue-700 font-bold">
+                        <Building className="h-3 w-3 text-blue-400" />
+                        {p.batch_name}
                       </span>
                     )}
                   </div>
