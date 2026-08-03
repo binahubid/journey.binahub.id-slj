@@ -37,6 +37,11 @@ export const metadata: Metadata = {
 export const viewport = {
   themeColor: "#071A33",
   colorScheme: "light",
+  width: "device-width",
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -46,7 +51,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" className={`scroll-smooth ${jakartaSans.variable} ${inter.variable}`}>
-      <body className={`antialiased bg-[#FAF8F4] text-[#0B2C6B] min-h-screen ${jakartaSans.className}`}>
+      <body className={`antialiased bg-[#FAF8F4] text-[#0B2C6B] min-h-screen overflow-x-hidden ${jakartaSans.className}`}>
         <PwaProvider>{children}</PwaProvider>
       </body>
     </html>

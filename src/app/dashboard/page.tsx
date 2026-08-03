@@ -21,6 +21,8 @@ import { PrayerTracker } from "@/components/domain/PrayerTracker";
 import { QuranTracker } from "@/components/domain/QuranTracker";
 import { DailyHadithWidget } from "@/components/domain/DailyHadithWidget";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeTransformationArea } from "@/lib/transformation-areas";
+import AreaProgressGraph from "@/components/AreaProgressGraph";
 import { parseJournalContent } from "@/lib/journal";
 import { getActiveProgramMonth, getProgramDay } from "@/lib/program-timeline";
 import { DEFAULT_TIME_ZONE, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
@@ -43,7 +45,7 @@ import {
   Sunset,
   Search,
   ArrowUpRight,
-  Heart,
+  Bell,
   Maximize2,
   Minimize2,
   X,
@@ -120,6 +122,7 @@ export default function DashboardPage() {
   const [safarRemindLoading, setSafarRemindLoading] = useState(false);
   const [safarRemindError, setSafarRemindError] = useState<string | null>(null);
   const [isScreenSaver, setIsScreenSaver] = useState(false);
+  const [areaChartData, setAreaChartData] = useState<{ day: string; avg: number }[]>([]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -749,6 +752,86 @@ export default function DashboardPage() {
           habitList.length > 0 ? Math.round((totalScore / habitList.length) * 100) : 0
         );
 
+        // 3b. Area Progress Chart — cumulative average score from transformation areas
+        try {
+          const rawAreas: string[] = Array.isArray(journey?.area_transformasi)
+            ? journey!.area_transformasi
+            : [];
+          const areas = rawAreas.map(normalizeTransformationArea);
+          const startDateVal = profile?.start_date || journey?.start_date;
+
+          if (areas.length > 0 && startDateVal) {
+            const startD = new Date(startDateVal);
+            const endD = new Date(todayStr);
+            const numDays = Math.min(90, Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / 86400000) + 1));
+
+            const dateRange: string[] = [];
+            for (let i = 0; i < numDays; i++) {
+              const d = new Date(startD);
+              d.setDate(d.getDate() + i);
+              dateRange.push(d.toISOString().split("T")[0]);
+            }
+
+            const apAreaMap: Record<string, string> = {};
+            (actionPlansData || []).forEach((ap: any) => {
+              apAreaMap[ap.id] = normalizeTransformationArea(ap.area_category || ap.category || "Spiritual Growth");
+            });
+
+            const habitsWithArea = userHabits.map((h: any) => ({
+              id: h.id,
+              area: h.area_category ? normalizeTransformationArea(h.area_category) : (apAreaMap[h.action_plan_id] || "Spiritual Growth"),
+              qty: h.quantity || 1,
+              effectiveFrom: h.effective_from || null,
+              effectiveUntil: h.effective_until || null,
+            }));
+
+            const { data: rangeLogs } = await supabase
+              .from("habit_logs").select("habit_id,date,completed,completed_count")
+              .eq("user_id", user.id).gte("date", dateRange[0]).lte("date", dateRange[dateRange.length - 1]);
+
+            const calcScore = (area: string, dateStr: string, logsForDay: any[]) => {
+              const areaHabits = habitsWithArea.filter(h =>
+                h.area === area && (!h.effectiveFrom || h.effectiveFrom <= dateStr) && (!h.effectiveUntil || h.effectiveUntil >= dateStr)
+              );
+              if (areaHabits.length === 0) return 0;
+              const w = areaHabits.reduce((t, h) => {
+                const log = logsForDay.find((l: any) => l.habit_id === h.id);
+                const cnt = log ? (log.completed_count || (log.completed ? h.qty : 0)) : 0;
+                return t + Math.min(1, cnt / h.qty);
+              }, 0);
+              return Number((w / areaHabits.length).toFixed(2));
+            };
+
+            const running: Record<string, number> = Object.fromEntries(areas.map(a => [a, 0]));
+            const started: Record<string, boolean> = Object.fromEntries(areas.map(a => [a, false]));
+            const chart: { day: string; avg: number }[] = [];
+
+            dateRange.forEach(dateStr => {
+              const logsForDay = (rangeLogs || []).filter((l: any) => l.date === dateStr);
+              let sum = 0;
+              areas.forEach(area => {
+                const activeH = habitsWithArea.filter(h =>
+                  h.area === area && (!h.effectiveFrom || h.effectiveFrom <= dateStr) && (!h.effectiveUntil || h.effectiveUntil >= dateStr)
+                );
+                if (activeH.length === 0) { sum += running[area]; return; }
+                const done = logsForDay.some((l: any) => activeH.some(h => h.id === l.habit_id) && (l.completed || (l.completed_count || 0) > 0));
+                if (done) started[area] = true;
+                const change = done ? calcScore(area, dateStr, logsForDay) : started[area] ? -1 : 0;
+                running[area] = Number((running[area] + change).toFixed(2));
+                sum += running[area];
+              });
+              const avg = Number((sum / areas.length).toFixed(2));
+              const dObj = new Date(dateStr);
+              const label = numDays <= 7
+                ? dObj.toLocaleDateString("id-ID", { weekday: "short" })
+                : `${dObj.getDate()}/${dObj.getMonth() + 1}`;
+              chart.push({ day: label, avg });
+            });
+
+            setAreaChartData(chart);
+          }
+        } catch { /* ignore area chart errors */ }
+
         // 4. Load All Journals & Last Journal
         const { data: journalsData, error: journalsError } = await supabase
           .from("journals")
@@ -1148,8 +1231,8 @@ export default function DashboardPage() {
                   type="button"
                   onClick={handleRemindSafar}
                   disabled={!safarPartnerName || safarRemindedToday || safarRemindLoading}
-                  title={safarPartnerName ? `Kirim pengingat kepada ${safarPartnerName}` : "Sahabat Safar belum ditetapkan"}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-sm ${
+                  title={safarRemindedToday ? "Pengingat sudah terkirim" : safarPartnerName ? `Kirim pengingat kepada ${safarPartnerName}` : "Sahabat Safar belum ditetapkan"}
+                  className={`inline-flex items-center justify-center h-7 w-7 rounded-full transition-all shadow-sm ${
                     safarRemindedToday
                       ? "bg-emerald-500/90 text-white border border-emerald-300"
                       : !safarPartnerName
@@ -1157,17 +1240,13 @@ export default function DashboardPage() {
                       : "bg-white/20 hover:bg-white/30 text-amber-200 border border-white/30 backdrop-blur-md"
                   } disabled:cursor-not-allowed`}
                 >
-                  <Heart className={`h-3 w-3 ${safarRemindedToday ? "fill-white text-white" : "text-amber-300"}`} />
-                  <span>
-                    {safarRemindLoading
-                      ? "Mengirim..."
-                      : safarRemindedToday
-                        ? "Pengingat Terkirim"
-                        : safarPartnerName
-                          ? `Ingatkan ${safarPartnerName.split(" ")[0]}`
-                          : "Sahabat Safar Belum Ditentukan"}
-                  </span>
-                  {safarRemindedToday && <Check className="h-3 w-3 text-white ml-0.5" />}
+                  {safarRemindLoading ? (
+                    <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : safarRemindedToday ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : (
+                    <Bell className="h-3.5 w-3.5" />
+                  )}
                 </button>
 
                 <button
@@ -1272,25 +1351,31 @@ export default function DashboardPage() {
 
           {/* BOTTOM ROW: Digital Clock (Bottom-Left) & Progress Card (Bottom-Right) */}
           <div className="relative z-10 flex flex-row items-end justify-between gap-2 sm:gap-6 mt-auto pt-3">
-            {/* Left: Big Clock + Date & :Seconds WIB below */}
-            <div className="space-y-0.5 sm:space-y-1.5 pb-0.5 min-w-0">
-              <h2 className="text-3xl sm:text-7xl md:text-8xl lg:text-9xl font-black text-white font-mono tracking-tighter drop-shadow-lg leading-none">
-                {heroClockMain}
-              </h2>
-              <div className="flex flex-wrap items-baseline gap-1 sm:gap-2.5 pt-0.5">
-                <span className="text-xs sm:text-base font-bold text-amber-200/90 truncate">{heroDate}</span>
-                <span className="text-white/30 text-xs sm:text-lg">|</span>
-                <span className="text-xs sm:text-3xl font-mono font-bold text-white/80">:{heroClockSeconds}</span>
-                <span className="text-xs sm:text-3xl font-mono font-bold text-white/80">{timeZoneStr}</span>
+            {/* Left: Big Clock + small seconds/WIB beside it */}
+            <div className="space-y-0.5 sm:space-y-1.5 pb-0.5 min-w-0 flex-1">
+              <div className="flex items-baseline gap-1.5 sm:gap-3">
+                <h2 className="text-3xl sm:text-7xl md:text-8xl lg:text-9xl font-black text-white font-mono tracking-tighter drop-shadow-lg leading-none">
+                  {heroClockMain}
+                </h2>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[10px] sm:text-sm font-mono font-bold text-white/60">:{heroClockSeconds}</span>
+                  <span className="text-[9px] sm:text-xs font-bold text-white/50">{timeZoneStr}</span>
+                </div>
               </div>
+              <span className="text-xs sm:text-base font-bold text-amber-200/90 truncate block">{heroDate}</span>
             </div>
 
-            {/* Right: Progress Hari Ini Card */}
-            <div className="bg-black/20 p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-white/15 backdrop-blur-md space-y-1.5 sm:space-y-3 shrink-0 w-36 sm:w-auto min-w-0 sm:min-w-[260px] md:max-w-xs shadow-md">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[11px] sm:text-xs font-bold text-slate-200 uppercase tracking-wider truncate">
-                  Progress Hari Ini
-                </span>
+            {/* Right: Compact Progress Card */}
+            <div className="bg-black/20 px-3 py-2 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/15 backdrop-blur-md shrink-0 w-32 sm:w-auto sm:min-w-[200px] md:max-w-xs shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-baseline space-x-1 sm:space-x-2 min-w-0">
+                  <span className="text-base sm:text-2xl font-black text-white">
+                    {completedTodayCount}
+                  </span>
+                  <span className="text-[10px] sm:text-sm text-slate-300 font-bold">
+                    / {habits.length} selesai
+                  </span>
+                </div>
                 <button
                   onClick={() => setTodayTasksModalOpen(true)}
                   className="p-0.5 sm:p-1 rounded-md sm:rounded-lg bg-white/15 hover:bg-white/30 text-white transition-all border border-white/20 cursor-pointer"
@@ -1300,21 +1385,9 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div className="flex items-baseline space-x-1 sm:space-x-2">
-                <span className="text-base sm:text-3xl font-black text-white">
-                  {completedTodayCount}
-                </span>
-                <span className="text-[10px] sm:text-sm text-slate-300 font-bold">
-                  / {habits.length} selesai
-                </span>
-              </div>
-
-              {/* Progress bar */}
-              <div className="w-full bg-white/20 h-1.5 sm:h-2.5 rounded-full overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-amber-400 to-amber-200 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${habitPercentage}%` }}
-                ></div>
+              {/* Area Progress Line Graph */}
+              <div className="h-10 sm:h-14 w-full mt-1.5 sm:mt-2">
+                <AreaProgressGraph data={areaChartData} className="w-full h-full" />
               </div>
             </div>
           </div>

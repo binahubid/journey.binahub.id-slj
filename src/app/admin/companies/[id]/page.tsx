@@ -560,7 +560,7 @@ export default function CompanyDetailPage() {
             <p className="text-xs text-slate-500 font-medium py-8 text-center">Belum ada peserta di perusahaan ini.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full min-w-[52rem] text-left text-xs">
                 <thead>
                   <tr className="border-b border-[#EAE5D9] text-slate-400 font-bold">
                     <th className="pb-3">Nama Peserta</th>

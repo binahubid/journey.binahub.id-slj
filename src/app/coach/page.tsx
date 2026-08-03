@@ -212,16 +212,16 @@ export default function CoachViewPage() {
     <div className="min-h-screen bg-warm-bg text-navy-900 font-sans pb-16">
       {/* Top Navbar */}
       <header className="bg-white border-b border-warm-border sticky top-0 z-40">
-        <div className="max-w-dashboard mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+        <div className="max-w-dashboard mx-auto px-3 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="gap-1">
-                <ArrowLeft className="h-4 w-4" /> Dashboard Peserta
+              <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2 sm:px-3">
+                <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Dashboard Peserta</span>
               </Button>
             </Link>
-            <span className="text-gray-300">|</span>
-            <h1 className="text-lg font-bold text-navy-900 flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-accent" /> Coach Monitoring Dashboard
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <h1 className="truncate text-sm font-bold text-navy-900 sm:text-lg">
+              <span className="sm:hidden">Coach Monitoring</span><span className="hidden sm:inline">Coach Monitoring Dashboard</span>
             </h1>
           </div>
         </div>

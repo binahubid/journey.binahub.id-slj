@@ -210,7 +210,7 @@ export default function ParticipantsPage() {
 
       {/* Participants Table */}
       <div className="bg-white rounded-2xl border border-[#EAE5D9] overflow-hidden shadow-2xs">
-        <div className="p-4 border-b border-[#EAE5D9] bg-[#FAF8F4]/50 flex items-center justify-between">
+        <div className="flex flex-col items-start gap-2 border-b border-[#EAE5D9] bg-[#FAF8F4]/50 p-4 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-xs font-extrabold text-[#071A33]">
             Menampilkan {filtered.length} dari {participants.length} Peserta Terdaftar
           </span>
@@ -220,7 +220,7 @@ export default function ParticipantsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[62rem] text-left text-xs">
             <thead>
               <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
                 <th className="p-4 font-semibold">Nama Peserta</th>

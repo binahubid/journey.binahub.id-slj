@@ -535,7 +535,7 @@ export default function RefactoredJournalPage() {
                     >
                       <div className="flex items-center gap-2">
                         <Target className="h-4 w-4 text-amber-600 shrink-0" />
-                        <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider">
+                        <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider truncate">
                           Panduan Istiqamah — Refleksi 90 Hari
                         </span>
                       </div>
@@ -638,7 +638,7 @@ export default function RefactoredJournalPage() {
 
                 {/* FOOTER BAR */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-4 sm:pt-5">
-                  <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-medium">
                     <span className="flex items-center gap-1.5">
                       <Lock className="h-3.5 w-3.5 text-slate-400" />
                       Jurnal ini bersifat privat dan terenkripsi.

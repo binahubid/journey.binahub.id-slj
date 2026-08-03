@@ -218,7 +218,7 @@ export function ParticipantLayout({
 
       {/* ─── MOBILE DRAWER (Slide-out Sheet Menu) ─── */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden h-[100dvh] w-screen overflow-hidden">
+        <div className="fixed inset-0 z-50 flex h-[100dvh] w-full overflow-hidden md:hidden">
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             onClick={() => setMobileMenuOpen(false)}
@@ -343,7 +343,7 @@ export function ParticipantLayout({
         </header>
 
         {/* Page Content */}
-        <main className={`flex-1 ${noPadding ? "" : "p-4 md:p-8 pb-20 md:pb-8"}`}>
+        <main className={`flex-1 overflow-x-hidden ${noPadding ? "" : "p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8"}`}>
           {/* Back to Home bar — shown on pages except Home or when hidden explicitly */}
           {!hideBackToHome && currentPath !== "/dashboard" && (
             <div className="mb-4 md:mb-6">
@@ -380,7 +380,7 @@ export function ParticipantLayout({
 
       {/* ─── MOBILE BOTTOM DOCK NAVIGATION (Hidden on Baseline Page) ─── */}
       {!currentPath?.startsWith("/baseline") && (
-        <nav className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-warm-border px-2 py-1.5 items-center justify-around shadow-lg">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-warm-border bg-white/95 px-1 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] shadow-lg backdrop-blur-md md:hidden">
           {bottomNavItems.map((item) => {
             const isActive = currentPath === item.href;
             const Icon = item.icon;
@@ -388,12 +388,12 @@ export function ParticipantLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
+                className={`flex min-w-0 flex-1 flex-col items-center rounded-lg px-1 py-1 transition-colors ${
                   isActive ? "text-[#0B2C6B] font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
                 }`}
               >
                 <Icon className={`h-5 w-5 mb-0.5 ${isActive ? "text-[#C79A3C]" : "text-slate-400"}`} />
-                <span className="text-[10px] tracking-tight">{item.label}</span>
+                <span className="max-w-full truncate text-[9px] tracking-tight min-[375px]:text-[10px]">{item.label}</span>
               </Link>
             );
           })}

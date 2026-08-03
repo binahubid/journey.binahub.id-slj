@@ -68,8 +68,8 @@ function DialogContent({ children, className, ...props }: DialogContentProps) {
       <DialogOverlay />
       <div
         className={cn(
-          "fixed left-1/2 top-1/2 z-[300] w-full max-w-md -translate-x-1/2 -translate-y-1/2",
-          "bg-white rounded-lg shadow-lg border border-warm-border p-6",
+          "fixed left-1/2 top-1/2 z-[300] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2",
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-white rounded-lg shadow-lg border border-warm-border p-4 sm:p-6",
           "animate-in fade-in-0 zoom-in-95 duration-200",
           className
         )}
@@ -78,7 +78,7 @@ function DialogContent({ children, className, ...props }: DialogContentProps) {
         {/* Close button */}
         <button
           onClick={() => onOpenChange(false)}
-          className="absolute right-4 top-4 text-gray-400 hover:text-navy-900 transition-colors"
+          className="absolute right-3 top-3 rounded-md p-1 text-gray-400 transition-colors hover:bg-slate-100 hover:text-navy-900 sm:right-4 sm:top-4"
           aria-label="Tutup dialog"
         >
           <X className="h-4 w-4" />

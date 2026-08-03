@@ -276,7 +276,7 @@ export default function SettingsPage() {
         {errorMsg && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{errorMsg}</div>}
         <form onSubmit={handleSave} className="space-y-6">
           <Tabs defaultValue="notifikasi">
-              <TabsList className="mb-4 w-full justify-start">
+              <TabsList className="mb-4 w-full justify-start overflow-x-auto">
                 <TabsTrigger value="notifikasi" className="gap-1.5 text-xs">
                   <Bell className="h-3.5 w-3.5" /> Notifikasi & Lokasi
                 </TabsTrigger>
@@ -362,7 +362,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={() => setDateFormat("full")}
-                        className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                        className={`py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold border transition-all text-center leading-tight ${
                           dateFormat === "full"
                             ? "bg-navy-900 text-white border-navy-900"
                             : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
@@ -373,7 +373,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={() => setDateFormat("short")}
-                        className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                        className={`py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold border transition-all text-center leading-tight ${
                           dateFormat === "short"
                             ? "bg-navy-900 text-white border-navy-900"
                             : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
@@ -535,31 +535,31 @@ export default function SettingsPage() {
                   {/* Google registered user: Set Password / Change Password */}
                   {authProvider === "google" && (
                     <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
+                      <div className="flex items-center justify-between gap-3 min-w-0">
+                        <div className="min-w-0">
                           <span className="text-xs font-bold text-navy-900 block">Metode Login: Google OAuth</span>
-                          <span className="text-[11px] text-slate-600">
+                          <span className="text-[11px] text-slate-600 line-clamp-2">
                             {hasPassword ? "Fitur password aktif (Anda dapat merubah password akun Anda)" : "Anda terdaftar dengan Google. Set password di bawah untuk mengaktifkan fitur ganti password."}
                           </span>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase">
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase shrink-0">
                           Google Login
                         </span>
                       </div>
 
-                      <div className="pt-2 flex items-center gap-2">
+                      <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         <Input
                           type="password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder={hasPassword ? "Masukkan password baru (min. 6 karakter)" : "Set password baru (min. 6 karakter)"}
-                          className="text-xs max-w-sm bg-white"
+                          className="text-xs bg-white flex-1 min-w-0"
                         />
                         <Button
                           type="button"
                           onClick={handleUpdatePassword}
                           disabled={updatingSecurity || !newPassword}
-                          className="text-xs bg-navy-900 text-white font-bold"
+                          className="text-xs bg-navy-900 text-white font-bold shrink-0"
                         >
                           {hasPassword ? "Ganti Password" : "Set Password"}
                         </Button>
@@ -576,19 +576,19 @@ export default function SettingsPage() {
                           <span className="text-xs font-bold text-navy-900 block">Email Terdaftar</span>
                           <span className="text-[11px] text-slate-500">{userEmail}</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <Input
                             type="email"
                             value={newEmail}
                             onChange={(e) => setNewEmail(e.target.value)}
                             placeholder="Email baru..."
-                            className="text-xs max-w-sm bg-white"
+                            className="text-xs bg-white flex-1 min-w-0"
                           />
                           <Button
                             type="button"
                             onClick={handleUpdateEmail}
                             disabled={updatingSecurity || !newEmail}
-                            className="text-xs bg-navy-900 text-white font-bold"
+                            className="text-xs bg-navy-900 text-white font-bold shrink-0"
                           >
                             Ganti Email
                           </Button>
@@ -601,19 +601,19 @@ export default function SettingsPage() {
                           <span className="text-xs font-bold text-navy-900 block">Password Akun</span>
                           <span className="text-[11px] text-slate-500">Ubah password akun email Anda.</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <Input
                             type="password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             placeholder="Password baru (min 6 karakter)..."
-                            className="text-xs max-w-sm bg-white"
+                            className="text-xs bg-white flex-1 min-w-0"
                           />
                           <Button
                             type="button"
                             onClick={handleUpdatePassword}
                             disabled={updatingSecurity || !newPassword}
-                            className="text-xs bg-navy-900 text-white font-bold"
+                            className="text-xs bg-navy-900 text-white font-bold shrink-0"
                           >
                             Ganti Password
                           </Button>

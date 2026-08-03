@@ -219,13 +219,13 @@ export default function AdminMonitoringPage() {
 
       {/* Results Table */}
       <div className="bg-white rounded-2xl border border-[#EAE5D9] overflow-hidden shadow-2xs space-y-0">
-        <div className="flex items-center justify-between p-6 pb-4 border-b border-[#EAE5D9]">
+        <div className="flex items-center justify-between border-b border-[#EAE5D9] p-4 sm:p-6 sm:pb-4">
           <h2 className="text-base font-extrabold text-[#071A33]">
             Hasil Drill-Down ({filtered.length} Peserta)
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[58rem] text-left text-xs">
             <thead>
               <tr className="border-b border-[#EAE5D9] text-slate-400 font-bold bg-[#FAF8F4]">
                 <th className="p-4 font-semibold">Peserta</th>

@@ -38,8 +38,8 @@ export function DonutChart({
   return (
     <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full">
       {/* Donut SVG Chart */}
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+      <div className="relative aspect-square w-full max-w-[200px] shrink" style={{ maxWidth: size }}>
+        <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90">
           <circle
             cx={center}
             cy={center}
@@ -85,13 +85,13 @@ export function DonutChart({
         {segments.map((seg, idx) => (
           <div
             key={idx}
-            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs"
+            className="flex items-start justify-between gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs"
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex min-w-0 items-start gap-2.5">
               <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
               <span className="font-bold text-slate-700">{seg.label}</span>
             </div>
-            <div className="text-right">
+            <div className="shrink-0 text-right">
               <span className="font-black text-[#0F1E3D]">{seg.count} Orang</span>
               <span className="text-[10px] text-slate-500 font-bold block">({seg.percentage}%)</span>
             </div>

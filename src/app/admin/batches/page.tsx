@@ -267,7 +267,7 @@ export default function BatchesPage() {
       {/* Batches Table / Cards */}
       <div className="bg-white rounded-2xl border border-[#EAE5D9] overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[54rem] text-left text-xs">
             <thead>
               <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
                 <th className="p-4 font-semibold">Perusahaan (Company)</th>

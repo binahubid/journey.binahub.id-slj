@@ -139,7 +139,7 @@ export default function MonitoringPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Timeframe filter state: '1d' | '7d' | '1m' | '3m'
-  const [timeframe, setTimeframe] = useState<"1d" | "7d" | "1m" | "3m">("7d");
+  const [timeframe, setTimeframe] = useState<"7d" | "1m" | "3m">("7d");
   const [chartData, setChartData] = useState<{ day: string; scores: Record<string, number> }[]>([]);
   const [areaActionPlanCounts, setAreaActionPlanCounts] = useState<Record<string, number>>({});
   const [heatmapData, setHeatmapData] = useState<{ date: string; count: number; level: number }[]>([]);
@@ -363,7 +363,7 @@ export default function MonitoringPage() {
       });
 
       // Build cumulative chart based on timeframe (1d, 7d, 1m, 3m).
-      const numDays = timeframe === "1d" ? 1 : timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
+      const numDays = timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
       const today = new Date();
       const todayStr = today.toISOString().split("T")[0];
       const datesArr: string[] = [];
@@ -417,9 +417,7 @@ export default function MonitoringPage() {
         const areaHasStarted: Record<string, boolean> = Object.fromEntries(areas.map(area => [area, false]));
         const cumulativeChart = accumulationDates.map((dateStr) => {
           const dObj = new Date(dateStr);
-          const label = numDays === 1
-            ? "Hari Ini"
-            : numDays <= 7
+          const label = numDays <= 7
             ? dObj.toLocaleDateString("id-ID", { weekday: "short" })
             : `${dObj.getDate()}/${dObj.getMonth() + 1}`;
 
@@ -674,6 +672,13 @@ export default function MonitoringPage() {
   const chartScaleMin = chartMinScore - chartScalePadding;
   const chartScaleMax = chartMaxScore + chartScalePadding;
   const chartScaleRange = chartScaleMax - chartScaleMin;
+  const chartZeroY = Math.max(18, Math.min(158, 160 - ((0 - chartScaleMin) / chartScaleRange) * 144));
+  const chartLabelInterval = Math.max(1, Math.ceil(chartData.length / 7));
+  const visibleChartLabels = chartData
+    .map((row, index) => ({ ...row, index }))
+    .filter(({ index }) => index === 0 || index === chartData.length - 1 || index % chartLabelInterval === 0);
+  const activeIstiqamahDays = heatmapData.filter(item => item.count > 0).length;
+  const totalIstiqamahExecutions = heatmapData.reduce((total, item) => total + item.count, 0);
 
   if (loading) {
     return (
@@ -714,9 +719,9 @@ export default function MonitoringPage() {
           <div className="flex-1 w-full space-y-7 min-w-0">
 
             {/* ─── 1. HERO BANNER (Solid Dark Navy - No Gradient) ───────────── */}
-            <div className="bg-[#071A33] text-white p-6 sm:p-8 rounded-3xl shadow-xs">
+            <div className="bg-[#071A33] text-white p-4 sm:p-8 rounded-3xl shadow-xs">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="space-y-3 max-w-xl">
+                <div className="space-y-3 max-w-xl min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-amber-300 font-bold flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
@@ -728,7 +733,7 @@ export default function MonitoringPage() {
                     </span>
                   </div>
 
-                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white truncate">
                     Monitoring Perjalanan {userName.split(" ")[0]}
                   </h1>
 
@@ -853,33 +858,35 @@ export default function MonitoringPage() {
               </div>
             </div>
 
-            {/* ─── 3. PROGRESS ANALYTICS & 90-DAY GRID (Border-free) ───────────── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* ─── 3. PROGRESS ANALYTICS & 90-DAY GRID ─────────────────────────── */}
+            <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
 
               {/* Dynamic Multi-Timeframe Chart (2 cols) */}
-              <div className="md:col-span-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+              <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm md:col-span-2">
                 <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
                         <TrendingUp className="h-3.5 w-3.5" />
                       </span>
                       Grafik Progress Action Plan
                     </h3>
-                    <p className="ml-9 mt-0.5 text-[11px] text-slate-400">Pergerakan saldo poin kumulatif per area</p>
+                    <p className="ml-10 mt-0.5 text-[11px] leading-relaxed text-slate-500">Akumulasi penyelesaian habit pada setiap area</p>
                   </div>
 
                   {/* Timeframe Filter Toggle */}
                   <div className="flex shrink-0 items-center gap-0.5 self-start rounded-lg border border-slate-200 bg-slate-50 p-0.5 sm:self-auto">
-                    {(["1d", "7d", "1m", "3m"] as const).map(tf => (
+                    {(["7d", "1m", "3m"] as const).map(tf => (
                       <button
                         key={tf}
+                        type="button"
                         onClick={() => setTimeframe(tf)}
-                        className={`rounded-md px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
+                        aria-pressed={timeframe === tf}
+                        className={`rounded-md px-2.5 py-1.5 text-[11px] font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 ${
                           timeframe === tf ? "bg-white text-navy-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]" : "text-slate-400 hover:text-slate-700"
                         }`}
                       >
-                        {tf === "1d" ? "1 Hari" : tf === "7d" ? "7 Hari" : tf === "1m" ? "1 Bulan" : "3 Bulan"}
+                        {tf === "7d" ? "7 Hari" : tf === "1m" ? "1 Bulan" : "3 Bulan"}
                       </button>
                     ))}
                   </div>
@@ -897,7 +904,7 @@ export default function MonitoringPage() {
                   <div className="px-5 py-16 text-center text-xs text-slate-400">Belum ada log habit pada rentang waktu ini.</div>
                 ) : (
                   <div className="px-3 pb-2 pt-5 sm:px-5">
-                    <div className="relative h-[220px] w-full rounded-xl bg-slate-50/60 px-2 pb-7 pt-2 sm:h-[250px]">
+                    <div className="relative h-[220px] w-full px-2 pb-7 pt-2 sm:h-[250px]">
                     <svg className="h-full w-full overflow-visible" viewBox="0 0 720 180" preserveAspectRatio="none" role="img" aria-label="Grafik progres Action Plan per area transformasi">
                       {[0, 1, 2, 3, 4].map(step => {
                         const y = 16 + step * 36;
@@ -906,6 +913,10 @@ export default function MonitoringPage() {
                         );
                       })}
                       <line x1="42" y1="16" x2="42" y2="160" stroke="#CBD5E1" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      <line x1="42" y1={chartZeroY} x2="708" y2={chartZeroY} stroke="#94A3B8" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
+                      <text x="34" y={chartZeroY + 3} fill="#64748B" fontSize="9" fontWeight="700" textAnchor="end">
+                        0
+                      </text>
                       {selectedAreas.map((area, areaIndex) => {
                         const pts = chartData.map((row, i) => {
                           const score = row.scores[area] || 0;
@@ -942,9 +953,15 @@ export default function MonitoringPage() {
                         );
                       })}
                     </svg>
-                    <div className="absolute inset-x-10 bottom-2 flex justify-between text-[9px] font-semibold text-slate-400">
-                      {chartData.map((row, i) => (
-                        <span key={i}>{row.day}</span>
+                    <div className="absolute inset-x-10 bottom-2 h-3 text-[9px] font-semibold tabular-nums text-slate-400">
+                      {visibleChartLabels.map((row) => (
+                        <span
+                          key={`${row.day}-${row.index}`}
+                          className="absolute -translate-x-1/2 whitespace-nowrap"
+                          style={{ left: `${chartData.length === 1 ? 50 : (row.index / (chartData.length - 1)) * 100}%` }}
+                        >
+                          {row.day}
+                        </span>
                       ))}
                     </div>
                     </div>
@@ -952,63 +969,76 @@ export default function MonitoringPage() {
                 )}
 
                 {/* Legend */}
-                <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 bg-white px-5 py-3">
+                <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
                   {selectedAreas.map(area => (
                     <div key={area} className="flex items-center gap-2 text-[11px] text-slate-600">
                       <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: getTransformationAreaColor(area), boxShadow: `0 0 0 1px ${getTransformationAreaColor(area)}33` }} />
                       <span className="font-bold">{area}</span>
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600">
-                        {(chartData[chartData.length - 1]?.scores[area] || 0).toFixed(2)}
-                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              {/* 90-Day Grid Heatmap (GitHub Contribution Style with distinct empty boxes) */}
-              <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between">
-                <div>
-                  <div className="border-b border-slate-100 pb-3">
-                    <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2">
-                      <Flame className="h-4 w-4 text-amber-500" />
-                      Grid Istiqamah 90 Hari
-                    </h3>
+              {/* 90-Day Grid Heatmap */}
+              <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                          <Flame className="h-4 w-4" />
+                        </span>
+                        Grid Istiqamah 90 Hari
+                      </h3>
+                      <p className="ml-10 mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                        Konsistensi eksekusi Action Plan harian
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="block text-xl font-black leading-none tabular-nums text-navy-900">{activeIstiqamahDays}</span>
+                      <span className="mt-1 block text-[10px] font-semibold text-slate-500">hari aktif</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                    Semakin banyak Action Plan dikerjakan, semakin gelap warnanya. Level tertinggi dicapai jika lebih dari 10 eksekusi.
-                  </p>
                 </div>
 
-                {/* 90-Day Grid */}
-                <div className="grid grid-cols-10 gap-1.5 py-2">
-                  {heatmapData.map((item, idx) => (
-                    <div
-                      key={idx}
-                      title={`${item.date}: ${item.count} eksekusi Action Plan`}
-                      className={`h-4.5 w-4.5 rounded-xs border transition-transform hover:scale-125 cursor-pointer ${
-                        item.level === 4 ? "bg-[#216E39] border-[#1A5A2E]"
-                        : item.level === 3 ? "bg-[#30A14E] border-[#27883F]"
-                        : item.level === 2 ? "bg-[#40C463] border-[#35A653]"
-                        : item.level === 1 ? "bg-[#9BE9A8] border-[#7FD68E]"
-                        : "bg-[#EBEDF0] border-slate-200/80"
-                      }`}
-                    />
-                  ))}
-                </div>
+                <div className="space-y-4 px-5 pb-4 pt-4">
+                  <div>
+                    <div className="mb-3 flex justify-end">
+                      <span className="text-right text-[10px] font-semibold tabular-nums text-slate-500">{totalIstiqamahExecutions} total eksekusi</span>
+                    </div>
 
-                {/* Legend */}
-                <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100 pt-2">
-                  <span>Kurang</span>
-                  <div className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 bg-[#ebedf0] border border-slate-200/80 rounded-xs" />
-                    <span className="h-2.5 w-2.5 bg-[#9BE9A8] border border-[#7FD68E] rounded-xs" title="1-3 eksekusi" />
-                    <span className="h-2.5 w-2.5 bg-[#40C463] border border-[#35A653] rounded-xs" title="4-6 eksekusi" />
-                    <span className="h-2.5 w-2.5 bg-[#30A14E] border border-[#27883F] rounded-xs" title="7-10 eksekusi" />
-                    <span className="h-2.5 w-2.5 bg-[#216E39] border border-[#1A5A2E] rounded-xs" title=">10 eksekusi" />
+                    <div className="grid grid-flow-col grid-rows-7 grid-cols-[repeat(13,minmax(0,1fr))] gap-1.5" role="img" aria-label={`Grid istiqamah 90 hari, ${activeIstiqamahDays} hari aktif`}>
+                      {heatmapData.map((item) => (
+                        <span
+                          key={item.date}
+                          title={`${item.date}: ${item.count} eksekusi Action Plan`}
+                          aria-label={`${item.date}: ${item.count} eksekusi Action Plan`}
+                          className={`aspect-square w-full rounded-[3px] border transition-transform duration-200 hover:relative hover:z-10 hover:scale-125 ${
+                            item.level === 4 ? "border-emerald-800 bg-emerald-700"
+                            : item.level === 3 ? "border-emerald-700 bg-emerald-600"
+                            : item.level === 2 ? "border-emerald-600 bg-emerald-500"
+                            : item.level === 1 ? "border-emerald-300 bg-emerald-200"
+                            : "border-slate-200 bg-slate-100"
+                          }`}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <span>Istiqamah</span>
+
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-[10px] font-medium text-slate-500">
+                    <span>Belum aktif</span>
+                    <div className="flex items-center gap-1" aria-label="Intensitas istiqamah dari rendah ke tinggi">
+                      <span className="mr-1">Rendah</span>
+                      <span className="h-3 w-3 rounded-[3px] border border-slate-200 bg-slate-100" />
+                      <span className="h-3 w-3 rounded-[3px] border border-emerald-300 bg-emerald-200" title="1-3 eksekusi" />
+                      <span className="h-3 w-3 rounded-[3px] border border-emerald-600 bg-emerald-500" title="4-6 eksekusi" />
+                      <span className="h-3 w-3 rounded-[3px] border border-emerald-700 bg-emerald-600" title="7-10 eksekusi" />
+                      <span className="h-3 w-3 rounded-[3px] border border-emerald-800 bg-emerald-700" title=">10 eksekusi" />
+                      <span className="ml-1">Tinggi</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
 
             </div>
 
@@ -1016,7 +1046,7 @@ export default function MonitoringPage() {
             <div>
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
                     Area Transformasi & Pelaporan Bulanan
                   </h2>
                   <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
@@ -1067,9 +1097,9 @@ export default function MonitoringPage() {
                         }`}
                       >
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                            <span className={`text-xs font-extrabold ${monthEditState === "ACTIVE" ? "text-navy-900" : "text-slate-600"}`}>{area}</span>
-                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 min-w-0 gap-2">
+                            <span className={`text-xs font-extrabold min-w-0 truncate ${monthEditState === "ACTIVE" ? "text-navy-900" : "text-slate-600"}`}>{area}</span>
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
                               !hasFilledData && isEarlyStage
                                 ? "bg-slate-100 text-slate-600"
                                 : score >= 80 ? "bg-emerald-50 text-emerald-700"
@@ -1203,12 +1233,12 @@ export default function MonitoringPage() {
 
               {/* Coach Conversation Thread (2 cols) */}
               <div className="md:col-span-2 bg-white p-5 rounded-2xl shadow-2xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-navy-900" />
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 min-w-0 gap-2">
+                  <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2 min-w-0 truncate">
+                    <MessageSquare className="h-4 w-4 text-navy-900 shrink-0" />
                     Feedback & Catatan Evaluasi (Bulan {selectedMonth})
                   </h3>
-                  <span className="text-xs text-slate-500 font-medium">
+                  <span className="text-xs text-slate-500 font-medium shrink-0">
                     {coachName}
                   </span>
                 </div>
@@ -1349,9 +1379,9 @@ export default function MonitoringPage() {
                 {/* Top Area: Solid Green Background Fill as explicitly requested */}
                 {healthData.highestArea ? (
                   <div className="bg-emerald-600 text-white p-3.5 rounded-xl space-y-1 shadow-xs">
-                    <p className="font-bold flex items-center gap-1.5 text-white">
+                    <p className="font-bold flex items-center gap-1.5 text-white min-w-0">
                       <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
-                      Area Terbaik: {healthData.highestArea}
+                      <span className="truncate">Area Terbaik: {healthData.highestArea}</span>
                     </p>
                     <p className="text-emerald-50 text-[11px] leading-relaxed">
                       Skor capaian mencapai <strong>{healthData.areas[healthData.highestArea]}%</strong>. Pertahankan ritme istiqamah ini.
@@ -1361,9 +1391,9 @@ export default function MonitoringPage() {
 
                 {healthData.lowestArea && healthData.lowestArea !== healthData.highestArea ? (
                   <div className="bg-amber-50 p-3 rounded-xl space-y-1">
-                    <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <p className="font-bold text-amber-900 flex items-center gap-1.5 min-w-0">
                       <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                      Fokus Perhatian: {healthData.lowestArea}
+                      <span className="truncate">Fokus Perhatian: {healthData.lowestArea}</span>
                     </p>
                     <p className="text-slate-600 text-[11px] leading-relaxed">
                       Skor capaian saat ini berada di <strong>{healthData.areas[healthData.lowestArea]}%</strong>.

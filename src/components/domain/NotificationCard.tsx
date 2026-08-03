@@ -46,10 +46,10 @@ export function NotificationCard({
       <div className="p-2 rounded-full bg-warm-bg border border-warm-border flex-shrink-0 mt-0.5">
         {getIcon()}
       </div>
-      <div className="flex-grow space-y-1">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-navy-900">{title}</h4>
-          <span className="text-[11px] text-gray-400">{createdAt}</span>
+      <div className="flex-grow space-y-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <h4 className="text-sm font-semibold text-navy-900 truncate">{title}</h4>
+          <span className="text-[11px] text-gray-400 shrink-0">{createdAt}</span>
         </div>
         <p className="text-xs text-gray-600 leading-relaxed">{message}</p>
       </div>

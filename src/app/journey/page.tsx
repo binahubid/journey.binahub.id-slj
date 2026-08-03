@@ -1508,7 +1508,7 @@ interface BatchMate {
       {renderPageAlert()}
 
       {/* ── MOBILE (< lg) ─────────────────────────────────────── */}
-      <div className="lg:hidden flex flex-col h-[calc(100dvh-64px-56px)] overflow-hidden">
+      <div className="flex h-[calc(100dvh-64px-56px-env(safe-area-inset-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-64px)] xl:hidden">
 
         {/* MOBILE: Celebration */}
         {showCelebration && (
@@ -1664,7 +1664,7 @@ interface BatchMate {
       </div>
 
       {/* ── DESKTOP (>= lg) ────────────────────────────────────── */}
-      <div className="hidden lg:flex flex-col h-[calc(100vh-64px)] bg-white">
+      <div className="hidden h-[calc(100dvh-64px)] flex-col bg-white xl:flex">
         {renderStatsBar()}
         <div className="flex flex-1 overflow-hidden">
           {/* Left panel: Section Navigator (Collapsible) */}

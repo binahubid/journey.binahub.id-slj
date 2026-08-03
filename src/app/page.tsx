@@ -136,14 +136,14 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#FAF8F4] text-[#0F1E3D] flex flex-col font-sans selection:bg-[#C79A3C]/20">
       {/* ─── HEADER / NAVBAR (FIXED TOP) ─── */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FAF8F4]/90 backdrop-blur-md transition-all border-b border-[#0F1E3D]/10">
-        <div className="w-full px-6 md:px-12 lg:px-16 h-20 sm:h-24 flex items-center justify-between">
+        <div className="w-full px-3 min-[375px]:px-4 sm:px-6 md:px-12 lg:px-16 h-20 sm:h-24 flex items-center justify-between gap-3">
           {/* Logo */}
           <div className="flex items-center space-x-4 sm:space-x-6">
             <Link href="/" className="inline-block group py-1">
               <img
                 src="/BinaJourney_logo.webp"
                 alt="BinaJourney Logo"
-                className="h-9 sm:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+                className="h-7 min-[375px]:h-8 sm:h-11 w-auto max-w-[118px] min-[375px]:max-w-[145px] sm:max-w-none object-contain transition-transform duration-300 group-hover:scale-[1.02]"
               />
             </Link>
           </div>
@@ -170,7 +170,7 @@ export default function LandingPage() {
           {/* Action Button */}
           <div className="flex items-center space-x-4">
             <Link href={isLoggedIn ? "/dashboard" : "/register"}>
-              <button className="inline-flex items-center justify-center gap-2 rounded-[9px] bg-[#0F1E3D] hover:bg-[#07132B] text-white text-[10px] md:text-[11px] font-extrabold uppercase tracking-[0.14em] px-6 py-2.5 shadow-[0_18px_42px_-20px_rgba(15,30,61,0.8)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95">
+              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] bg-[#0F1E3D] hover:bg-[#07132B] text-white text-[9px] min-[375px]:text-[10px] md:text-[11px] font-extrabold uppercase tracking-[0.1em] min-[375px]:tracking-[0.14em] px-3 min-[375px]:px-4 sm:px-6 py-2.5 shadow-[0_18px_42px_-20px_rgba(15,30,61,0.8)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95">
                 {isLoggedIn ? "Dashboard" : "Mulai Journey"}
               </button>
             </Link>
@@ -655,7 +655,7 @@ export default function LandingPage() {
 
             {/* Comparison Table */}
             <div className="overflow-x-auto rounded-2xl border border-[#EAE5D9] shadow-md">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[34rem] text-left border-collapse">
                 <thead>
                   <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9]">
                     <th className="p-3.5 sm:p-6 text-xs sm:text-base font-bold text-slate-500 w-1/2">

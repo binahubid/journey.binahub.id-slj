@@ -67,12 +67,12 @@ function InfoRow({
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <span className="text-[11px] text-slate-500 flex items-center gap-2 font-medium">
+    <div className="flex items-center justify-between gap-4 py-3 min-w-0">
+      <span className="text-[11px] text-slate-500 flex items-center gap-2 font-medium shrink-0">
         <span className="text-slate-400">{icon}</span>
         {label}
       </span>
-      <span className="text-[13px] font-semibold text-navy-900 text-right">{value}</span>
+      <span className="text-[13px] font-semibold text-navy-900 text-right min-w-0 truncate">{value}</span>
     </div>
   );
 }

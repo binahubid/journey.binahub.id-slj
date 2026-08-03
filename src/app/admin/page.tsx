@@ -129,7 +129,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Dynamic Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 min-[375px]:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Card 1: Companies */}
         <Link href="/admin/companies" className="block group">
           <div className="p-5 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs group-hover:border-[#C79A3C] transition-all space-y-2">
@@ -189,7 +189,7 @@ export default function AdminDashboardPage() {
         </Link>
 
         {/* Card 5: Program Health */}
-        <Link href="/admin/monitoring" className="block group col-span-2 lg:col-span-1">
+        <Link href="/admin/monitoring" className="block group min-[375px]:col-span-2 lg:col-span-1">
           <div className="p-5 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs group-hover:border-[#C79A3C] transition-all space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500">Program Health</span>
@@ -210,8 +210,8 @@ export default function AdminDashboardPage() {
       {/* Grid Overview: Recent Companies & Batches */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left: Companies Table */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-[#EAE5D9] p-6 space-y-5 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-4">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-[#EAE5D9] p-4 sm:p-6 space-y-5 shadow-2xs">
+          <div className="flex flex-col items-start gap-3 border-b border-[#EAE5D9] pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-extrabold text-[#071A33] flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-[#C79A3C]" /> Perusahaan Terdaftar (Company)
@@ -234,7 +234,7 @@ export default function AdminDashboardPage() {
                 </Link>
               </div>
             ) : (
-              <table className="w-full text-left text-xs">
+              <table className="w-full min-w-[48rem] text-left text-xs">
                 <thead>
                   <tr className="border-b border-[#EAE5D9] text-slate-400 font-bold">
                     <th className="pb-3 font-semibold">Nama Perusahaan</th>
@@ -263,8 +263,8 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Right: Active Batches & Access Codes */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-[#EAE5D9] p-6 space-y-5 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-4">
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-[#EAE5D9] p-4 sm:p-6 space-y-5 shadow-2xs">
+          <div className="flex flex-col items-start gap-3 border-b border-[#EAE5D9] pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-extrabold text-[#071A33] flex items-center gap-2">
                 <Layers className="h-4 w-4 text-[#C79A3C]" /> Batch & Access Code

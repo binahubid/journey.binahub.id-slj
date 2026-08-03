@@ -80,21 +80,21 @@ export default function CompanyDashboardPage() {
     <div className="min-h-screen bg-[#FAF8F4] font-sans pb-16">
       {/* Top Navbar */}
       <header className="bg-white border-b border-[#EAE5D9] sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#0B2C6B] flex items-center justify-center text-[#C79A3C] font-extrabold text-sm shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-20 py-3 flex flex-col items-stretch gap-3 md:flex-row md:items-center md:justify-between md:py-0">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-[#0B2C6B] flex items-center justify-center text-[#C79A3C] font-extrabold text-sm shadow-md">
               HR
             </div>
-            <div>
-              <h1 className="text-base font-extrabold text-[#071A33] flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-[#C79A3C]" /> {selectedCompany.name} — Corporate HR Portal
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-extrabold text-[#071A33] sm:text-base">
+                {selectedCompany.name} <span className="hidden sm:inline">— Corporate HR Portal</span>
               </h1>
               <p className="text-xs text-slate-500 font-medium">BinaHub Spiritual Leadership Journey</p>
             </div>
           </div>
 
           {/* Company Switcher */}
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <span className="text-xs font-bold text-slate-500 hidden sm:inline">Pilih Entitas HR:</span>
             <select
               value={selectedCompany.id}
@@ -102,7 +102,7 @@ export default function CompanyDashboardPage() {
                 const found = companies.find((c) => c.id === e.target.value);
                 if (found) setSelectedCompany(found);
               }}
-              className="px-3.5 py-2 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4] text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
+              className="min-w-0 flex-1 px-3 py-2 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4] text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C] md:flex-none md:max-w-56"
             >
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -112,7 +112,7 @@ export default function CompanyDashboardPage() {
             </select>
             <Link href="/admin">
               <button className="px-3.5 py-2 rounded-xl border border-[#0B2C6B]/20 bg-white hover:bg-[#FAF8F4] text-[#071A33] text-xs font-bold transition-all">
-                Portal Admin
+                <span className="sm:hidden">Admin</span><span className="hidden sm:inline">Portal Admin</span>
               </button>
             </Link>
           </div>
@@ -120,7 +120,7 @@ export default function CompanyDashboardPage() {
       </header>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-6 pt-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 sm:pt-8 space-y-6 sm:space-y-8">
         {errorMsg && (
           <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
             {errorMsg}
@@ -142,7 +142,7 @@ export default function CompanyDashboardPage() {
               </p>
             </div>
           </div>
-          <span className="px-3 py-1 rounded-full bg-[#C79A3C]/20 border border-[#C79A3C]/40 text-[#C79A3C] text-[11px] font-extrabold whitespace-nowrap">
+          <span className="max-w-full px-3 py-1 rounded-full bg-[#C79A3C]/20 border border-[#C79A3C]/40 text-[#C79A3C] text-[10px] sm:text-[11px] font-extrabold text-center">
             STRICT HR PRIVACY PROTECTED
           </span>
         </div>
@@ -190,8 +190,8 @@ export default function CompanyDashboardPage() {
         </div>
 
         {/* Corporate Batches Overview */}
-        <div className="bg-white rounded-2xl border border-[#EAE5D9] p-6 space-y-5 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-[#EAE5D9] pb-4">
+        <div className="bg-white rounded-2xl border border-[#EAE5D9] p-4 sm:p-6 space-y-5 shadow-2xs">
+          <div className="flex flex-col items-start gap-3 border-b border-[#EAE5D9] pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-extrabold text-[#071A33] flex items-center gap-2">
                 <Layers className="h-4 w-4 text-[#C79A3C]" /> Batch Rombongan Karyawan {selectedCompany.name}

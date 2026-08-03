@@ -36,13 +36,13 @@ export function ParticipantMonitoringRow({
       }`}
     >
       {/* Participant Info */}
-      <div className="flex items-center space-x-3 min-w-[200px]">
+      <div className="flex min-w-0 items-center space-x-3 md:min-w-[200px]">
         <div className="h-10 w-10 rounded-full bg-navy-900 text-accent font-semibold flex items-center justify-center text-sm shadow-sm flex-shrink-0">
           {fullName.charAt(0).toUpperCase()}
         </div>
-        <div>
-          <h4 className="text-sm font-bold text-navy-900 flex items-center gap-2">
-            {fullName}
+        <div className="min-w-0">
+          <h4 className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-bold text-navy-900">
+            <span className="break-words">{fullName}</span>
             {flag && (
               <Badge variant="warning" className="text-[10px] py-0 px-1.5 gap-1 font-medium">
                 <AlertTriangle className="h-3 w-3" /> {flag.label}
@@ -67,7 +67,7 @@ export function ParticipantMonitoringRow({
       </div>
 
       {/* Checkpoint Status */}
-      <div className="flex items-center space-x-2 min-w-[140px]">
+      <div className="flex items-center space-x-2 md:min-w-[140px]">
         <span className="text-xs text-gray-500 hidden md:inline">Checkpoint:</span>
         {lastCheckpointStatus === "ON_TRACK" ? (
           <Badge variant="success" className="gap-1">
