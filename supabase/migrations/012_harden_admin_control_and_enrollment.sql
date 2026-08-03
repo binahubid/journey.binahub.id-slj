@@ -79,7 +79,6 @@ BEGIN
   FROM public.batches
   WHERE upper(access_code) = clean_code
     AND lower(COALESCE(status, 'active')) IN ('active', 'upcoming')
-    AND (start_date IS NULL OR start_date = '' OR start_date::date <= CURRENT_DATE)
     AND (end_date IS NULL OR end_date = '' OR end_date::date >= CURRENT_DATE)
   FOR UPDATE;
 
