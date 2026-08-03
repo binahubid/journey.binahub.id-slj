@@ -339,7 +339,7 @@ export default function JourneySetupPage() {
   };
 
   const areaOptions = [
-    { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: "hubungan kita dengan Allah ﷻ", color: TRANSFORMATION_AREAS["Spiritual Growth"].color },
+    { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: <>hubungan kita dengan Allah <span className="text-[1.15em] leading-none">ﷻ</span></>, color: TRANSFORMATION_AREAS["Spiritual Growth"].color },
     { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", color: TRANSFORMATION_AREAS["Personal Development"].color },
     { id: "Leadership Excellence", icon: Award, label: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", color: TRANSFORMATION_AREAS["Leadership Excellence"].color },
     { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", color: TRANSFORMATION_AREAS.Relationship.color },
@@ -446,7 +446,7 @@ export default function JourneySetupPage() {
                   2. Niat Perubahan <Heart className="h-6 w-6 text-accent fill-accent" />
                 </h2>
                 <p className="text-xs text-gray-600">
-                  Landasi seluruh ikhtiar perubahan ini semata-mata karena Allah ﷻ.
+                  Landasi seluruh ikhtiar perubahan ini semata-mata karena Allah <span className="text-[1.15em] leading-none">ﷻ</span>.
                 </p>
               </div>
 
