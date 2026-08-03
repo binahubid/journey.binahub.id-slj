@@ -705,223 +705,129 @@ export default function AdminSahabatSafarPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {(() => {
                 const processed = new Set<string>();
-                const trios: Array<{ trio_id: string; members: ParticipantProfile[] }> = [];
-                const pairs: Array<{ a: ParticipantProfile; b: ParticipantProfile }> = [];
+                const elements: React.ReactNode[] = [];
 
-                // First: group trios
+                const trioMap = new Map<string, ParticipantProfile[]>();
                 filteredParticipants.forEach((p) => {
-                  if (!p.trio_id || processed.has(p.id)) return;
-                  const members = filteredParticipants.filter(
-                    (pp) => pp.trio_id === p.trio_id && !processed.has(pp.id)
-                  );
+                  if (!p.trio_id) return;
+                  if (!trioMap.has(p.trio_id)) trioMap.set(p.trio_id, []);
+                  trioMap.get(p.trio_id)!.push(p);
+                });
+                trioMap.forEach((members, trio_id) => {
                   members.forEach((m) => processed.add(m.id));
-                  trios.push({ trio_id: p.trio_id, members });
+                  elements.push(
+                    <Card key={`trio-${trio_id}`} className="bg-white border-[#C79A3C]/40 p-5 rounded-2xl shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-center gap-1">
+                          {members.map((person, idx) => (
+                            <div key={person.id} className="flex items-center gap-1">
+                              <div className="h-9 w-9 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-xs shadow-sm shrink-0">{person.full_name.charAt(0).toUpperCase()}</div>
+                              {idx < members.length - 1 && <HeartHandshake className="h-4 w-4 text-blue-500 shrink-0" />}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-center">
+                          <h3 className="font-extrabold text-sm text-[#071A33] leading-snug">{members.map((p) => p.full_name).join(" + ")}</h3>
+                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">Trio Sahabat Safar</p>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-1.5 text-[11px] text-slate-600">
+                          {members.map((person) => (
+                            <span key={person.id} className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-0.5 rounded-lg border border-[#EAE5D9]">
+                              <MapPin className="h-3 w-3 text-slate-400" />{person.safarData?.layer1?.city || person.location || "—"}
+                            </span>
+                          ))}
+                        </div>
+                        {members[0]?.batch_name && (
+                          <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold">
+                            <Building className="h-3 w-3 text-blue-400" />{members[0].batch_name}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {members.map((person) => {
+                            const filled = Boolean(person.safarData?.is_completed);
+                            return (
+                              <div key={person.id} className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-1 rounded-lg border ${filled ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
+                                {filled ? <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" />}
+                                <span className="truncate">{person.full_name.split(" ")[0]}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="pt-3 border-t border-slate-100 flex gap-2">
+                        <Button onClick={() => setUnpairTrioTarget({ trio_id, members })} variant="outline" className="flex-1 text-[11px] font-bold border-amber-200 text-amber-700 hover:bg-amber-50 h-9 rounded-xl gap-1.5">
+                          <UserX className="h-3.5 w-3.5" /> Lepas 1 Orang
+                        </Button>
+                        <Button onClick={() => setDissolveTrioTarget({ trio_id, members })} variant="outline" className="flex-1 text-[11px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5">
+                          <UserX className="h-3.5 w-3.5" /> Bubarkan
+                        </Button>
+                      </div>
+                    </Card>
+                  );
                 });
 
-                // Then: find regular pairs (skip trio members)
                 filteredParticipants.forEach((p) => {
                   if (!p.sahabat_safar_user_id || processed.has(p.id)) return;
                   if (p.trio_id) return;
                   const partner = participants.find((pp) => pp.id === p.sahabat_safar_user_id);
-                  if (!partner || partner.trio_id) return;
+                  if (!partner) return;
                   processed.add(p.id);
                   processed.add(partner.id);
-                  pairs.push({ a: p, b: partner });
+                  const a = p, b = partner;
+                  const gA = a.safarData?.layer1?.gender || "—";
+                  const gB = b.safarData?.layer1?.gender || "—";
+                  const cityA = a.safarData?.layer1?.city || a.location || "—";
+                  const cityB = b.safarData?.layer1?.city || b.location || "—";
+                  const filledA = Boolean(a.safarData?.is_completed);
+                  const filledB = Boolean(b.safarData?.is_completed);
+                  elements.push(
+                    <Card key={`pair-${a.id}`} className="bg-white border-[#EAE5D9] p-5 rounded-2xl shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">{a.full_name.charAt(0).toUpperCase()}</div>
+                            <div className="min-w-0">
+                              <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{a.full_name}</h3>
+                              <p className="text-[11px] text-slate-500 font-medium truncate">{cityA}</p>
+                            </div>
+                          </div>
+                          <HeartHandshake className="h-5 w-5 text-blue-500 shrink-0" />
+                          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                            <div className="min-w-0 text-right">
+                              <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{b.full_name}</h3>
+                              <p className="text-[11px] text-slate-500 font-medium truncate">{cityB}</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">{b.full_name.charAt(0).toUpperCase()}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-center gap-2">
+                          <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gA.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gA.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>{gA === "Pria" ? "Pria" : gA === "Wanita" ? "Wanita" : "—"}</Badge>
+                          <span className="text-slate-300 text-xs">·</span>
+                          <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gB.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gB.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>{gB === "Pria" ? "Pria" : gB === "Wanita" ? "Wanita" : "—"}</Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                          <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]"><MapPin className="h-3 w-3 text-slate-400 shrink-0" /><span className="truncate">{cityA}</span></div>
+                          <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]"><MapPin className="h-3 w-3 text-slate-400 shrink-0" /><span className="truncate">{cityB}</span></div>
+                        </div>
+                        {a.batch_name && (
+                          <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold"><Building className="h-3 w-3 text-blue-400" />{a.batch_name}</div>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledA ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>{filledA ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}<span className="truncate">{filledA ? "Lengkap" : "Belum Isi"}</span></div>
+                          <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledB ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>{filledB ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}<span className="truncate">{filledB ? "Lengkap" : "Belum Isi"}</span></div>
+                        </div>
+                      </div>
+                      <div className="pt-3 border-t border-slate-100">
+                        <Button onClick={() => setUnpairTarget(a)} variant="outline" className="w-full text-xs font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5">
+                          <UserX className="h-3.5 w-3.5" /> Lepas Pasangan
+                        </Button>
+                      </div>
+                    </Card>
+                  );
                 });
 
-                return { trios, pairs };
-              })().trios.map(({ trio_id, members }) => {
-                const m = members;
-                return (
-                  <Card
-                    key={`trio-${trio_id}`}
-                    className="bg-white border-[#C79A3C]/40 p-5 rounded-2xl shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-3">
-                      {/* 3 avatars with handshake icons */}
-                      <div className="flex items-center justify-center gap-1">
-                        {m.map((person, idx) => (
-                          <div key={person.id} className="flex items-center gap-1">
-                            <div className="h-9 w-9 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-xs shadow-sm shrink-0">
-                              {person.full_name.charAt(0).toUpperCase()}
-                            </div>
-                            {idx < m.length - 1 && (
-                              <HeartHandshake className="h-4 w-4 text-blue-500 shrink-0" />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Names */}
-                      <div className="text-center">
-                        <h3 className="font-extrabold text-sm text-[#071A33] leading-snug">
-                          {m.map((p) => p.full_name).join(" + ")}
-                        </h3>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                          Trio Sahabat Safar
-                        </p>
-                      </div>
-
-                      {/* Cities */}
-                      <div className="flex flex-wrap justify-center gap-1.5 text-[11px] text-slate-600">
-                        {m.map((person) => {
-                          const city = person.safarData?.layer1?.city || person.location || "—";
-                          return (
-                            <span key={person.id} className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-0.5 rounded-lg border border-[#EAE5D9]">
-                              <MapPin className="h-3 w-3 text-slate-400" />
-                              {city}
-                            </span>
-                          );
-                        })}
-                      </div>
-
-                      {/* Batch */}
-                      {m[0]?.batch_name && (
-                        <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold">
-                          <Building className="h-3 w-3 text-blue-400" />
-                          {m[0].batch_name}
-                        </div>
-                      )}
-
-                      {/* IP Status for all 3 */}
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {m.map((person) => {
-                          const filled = Boolean(person.safarData?.is_completed);
-                          return (
-                            <div key={person.id} className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-1 rounded-lg border ${filled ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
-                              {filled ? <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" />}
-                              <span className="truncate">{person.full_name.split(" ")[0]}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 flex gap-2">
-                      <Button
-                        onClick={() => setUnpairTrioTarget({ trio_id, members: m })}
-                        variant="outline"
-                        className="flex-1 text-[11px] font-bold border-amber-200 text-amber-700 hover:bg-amber-50 h-9 rounded-xl gap-1.5"
-                      >
-                        <UserX className="h-3.5 w-3.5" /> Lepas 1 Orang
-                      </Button>
-                      <Button
-                        onClick={() => setDissolveTrioTarget({ trio_id, members: m })}
-                        variant="outline"
-                        className="flex-1 text-[11px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5"
-                      >
-                        <UserX className="h-3.5 w-3.5" /> Bubarkan
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-
-              {/* Regular pairs (not in trio) */}
-              {(() => {
-                const processed = new Set<string>();
-                const pairs: Array<{ a: ParticipantProfile; b: ParticipantProfile }> = [];
-                filteredParticipants.forEach((p) => {
-                  if (!p.sahabat_safar_user_id || processed.has(p.id) || p.trio_id) return;
-                  const partner = participants.find((pp) => pp.id === p.sahabat_safar_user_id);
-                  if (!partner || partner.trio_id) return;
-                  processed.add(p.id);
-                  processed.add(partner.id);
-                  pairs.push({ a: p, b: partner });
-                });
-                return pairs;
-              })().map(({ a, b }) => {
-                const gA = a.safarData?.layer1?.gender || "—";
-                const gB = b.safarData?.layer1?.gender || "—";
-                const cityA = a.safarData?.layer1?.city || a.location || "—";
-                const cityB = b.safarData?.layer1?.city || b.location || "—";
-                const filledA = Boolean(a.safarData?.is_completed);
-                const filledB = Boolean(b.safarData?.is_completed);
-
-                return (
-                  <Card
-                    key={`pair-${a.id}`}
-                    className="bg-white border-[#EAE5D9] p-5 rounded-2xl shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">
-                            {a.full_name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{a.full_name}</h3>
-                            <p className="text-[11px] text-slate-500 font-medium truncate">{cityA}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-center shrink-0">
-                          <HeartHandshake className="h-5 w-5 text-blue-500" />
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                          <div className="min-w-0 text-right">
-                            <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{b.full_name}</h3>
-                            <p className="text-[11px] text-slate-500 font-medium truncate">{cityB}</p>
-                          </div>
-                          <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">
-                            {b.full_name.charAt(0).toUpperCase()}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-center gap-2">
-                        <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gA.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gA.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>
-                          {gA === "Pria" ? "👨" : gA === "Wanita" ? "👩" : "—"} {gA}
-                        </Badge>
-                        <span className="text-slate-300 text-xs">·</span>
-                        <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gB.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gB.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>
-                          {gB === "Pria" ? "👨" : gB === "Wanita" ? "👩" : "—"} {gB}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]">
-                          <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
-                          <span className="truncate">{cityA}</span>
-                        </div>
-                        <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]">
-                          <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
-                          <span className="truncate">{cityB}</span>
-                        </div>
-                      </div>
-
-                      {a.batch_name && (
-                        <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold">
-                          <Building className="h-3 w-3 text-blue-400" />
-                          {a.batch_name}
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledA ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
-                          {filledA ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}
-                          <span className="truncate">{filledA ? "Lengkap" : "Belum Isi"}</span>
-                        </div>
-                        <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledB ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
-                          {filledB ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}
-                          <span className="truncate">{filledB ? "Lengkap" : "Belum Isi"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100">
-                      <Button
-                        onClick={() => setUnpairTarget(a)}
-                        variant="outline"
-                        className="w-full text-xs font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5"
-                      >
-                        <UserX className="h-3.5 w-3.5" /> Lepas Pasangan
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
+                return elements;
+              })()}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
