@@ -713,7 +713,7 @@ export default function MonitoringPage() {
         )}
         
         {/* Two-column layout: Left Main Content (70%), Right Analytics & Guidance Sidebar (30%) */}
-        <div className="flex flex-col lg:flex-row gap-7 items-start">
+        <div className="flex flex-col xl:flex-row gap-7 items-start">
 
           {/* ─── LEFT MAIN CONTENT COLUMN ───────────────────────────────────── */}
           <div className="flex-1 w-full space-y-7 min-w-0">
@@ -1364,7 +1364,7 @@ export default function MonitoringPage() {
           </div>
 
           {/* ─── RIGHT SIDEBAR COLUMN (Border-free, Solid Green for Top Area) ─── */}
-          <div className="w-full lg:w-80 xl:w-96 shrink-0 space-y-6">
+          <div className="w-full xl:w-96 shrink-0 space-y-6">
 
             {/* 1. Real Analytical Progress Summary Card */}
             <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-4">

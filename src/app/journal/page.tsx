@@ -359,10 +359,10 @@ export default function RefactoredJournalPage() {
 
         {/* ─── MAIN CONTENT WRAPPER (2-COLUMN: 75% LEFT / 25% RIGHT) ───────────── */}
         <div className="w-full pt-4 sm:pt-6 pb-28 sm:pb-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-7 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 sm:gap-7 items-start">
 
             {/* ─── LEFT COLUMN (75% / col-span-8 or col-span-9) ───────────────── */}
-            <div className="lg:col-span-8 xl:col-span-9 space-y-5 sm:space-y-7 w-full">
+            <div className="xl:col-span-9 space-y-5 sm:space-y-7 w-full">
               
               {/* 1. CLEAN HERO BANNER WITH FULL ADAPTIVE TIME BACKGROUND */}
               <div
@@ -675,7 +675,7 @@ export default function RefactoredJournalPage() {
             </div>
 
             {/* ─── RIGHT COLUMN INSTAGRAM FEED GRID ─── */}
-            <div className="lg:col-span-4 xl:col-span-3 space-y-4 w-full pt-4 lg:pt-0">
+            <div className="xl:col-span-3 space-y-4 w-full pt-4 xl:pt-0">
               
               {/* Header Section */}
               <div className="flex items-center gap-2.5 border-b border-slate-200/80 pb-3">

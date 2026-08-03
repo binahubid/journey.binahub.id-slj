@@ -1354,7 +1354,7 @@ export default function DashboardPage() {
             {/* Left: Big Clock + small seconds/WIB beside it */}
             <div className="space-y-0.5 sm:space-y-1.5 pb-0.5 min-w-0 flex-1">
               <div className="flex items-baseline gap-1.5 sm:gap-3">
-                <h2 className="text-3xl sm:text-7xl md:text-8xl lg:text-9xl font-black text-white font-mono tracking-tighter drop-shadow-lg leading-none">
+                <h2 className="text-3xl sm:text-7xl md:text-8xl xl:text-9xl font-black text-white font-mono tracking-tighter drop-shadow-lg leading-none">
                   {heroClockMain}
                 </h2>
                 <div className="flex items-baseline gap-1">
@@ -1394,7 +1394,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── BARIS 1: 3 CARDS BENTO (JADWAL SHOLAT, HABITS HARI INI, HADITS HARI INI) ─── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
           {/* Card 1: Jadwal Sholat Hari Ini */}
           <PrayerTimesWidget
             location={userLocation}

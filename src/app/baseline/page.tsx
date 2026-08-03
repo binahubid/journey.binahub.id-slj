@@ -475,10 +475,10 @@ export default function BaselinePage() {
         {isIntro ? (
           <div className="space-y-5">
             {/* 2-Column Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
 
               {/* ─── LEFT COLUMN (75% / col-span-8) ───────────────────────── */}
-              <div className="lg:col-span-8 space-y-6">
+              <div className="xl:col-span-8 space-y-6">
 
                 {/* HERO CARD WITH WEBP ILLUSTRATION */}
                 <Card className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xs border border-slate-200/70 relative overflow-hidden">
@@ -659,7 +659,7 @@ export default function BaselinePage() {
               </div>
 
               {/* ─── RIGHT COLUMN (25% / col-span-4) ──────────────────────── */}
-              <div className="lg:col-span-4 space-y-6">
+              <div className="xl:col-span-4 space-y-6">
 
                 {/* CARD 1: SEBELUM MEMULAI */}
                 <Card className="bg-white p-6 rounded-3xl shadow-2xs border border-slate-200/70 space-y-5">
