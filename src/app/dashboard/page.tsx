@@ -1213,14 +1213,14 @@ export default function DashboardPage() {
       <div className="space-y-7 max-w-6xl w-full mx-auto pb-10 md:pb-0">
         {/* ─── UNIFIED 16:9 HERO BANNER ─── */}
         <div
-          className="relative rounded-3xl overflow-hidden text-white p-3.5 sm:p-8 md:p-10 shadow-lg border border-white/15 transition-all duration-700 aspect-auto md:aspect-[16/9] w-full flex flex-col justify-between bg-cover bg-center min-h-[260px] sm:min-h-[360px] md:min-h-[440px]"
+          className="relative rounded-3xl overflow-hidden text-white p-3.5 sm:p-8 lg:p-10 shadow-lg border border-white/15 transition-all duration-700 aspect-auto lg:aspect-[16/9] w-full flex flex-col justify-between bg-cover bg-center min-h-[260px] sm:min-h-[360px] md:min-h-[440px]"
           style={{ backgroundImage: `url('${adaptiveHeroBgImage}')` }}
         >
           {/* Dark Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/60 pointer-events-none"></div>
 
           {/* TOP ROW: Greeting (Top-Left) & Next Prayer (Top-Right) */}
-          <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 sm:gap-4">
+          <div className="relative z-10 flex flex-col lg:flex-row items-stretch lg:items-start justify-between gap-3 lg:gap-4">
             {/* Left: Day badge (TOP) & Assalamu'alaikum Greeting (BOTTOM) */}
             <div className="space-y-1.5 min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -1274,7 +1274,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Right: Next Prayer Card (Desktop Only: inside Hero top-right) */}
-            <div className={`hidden sm:flex p-2.5 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-md transition-all duration-500 w-auto sm:min-w-[240px] md:min-w-[260px] sm:max-w-[280px] ${
+            <div className={`hidden lg:flex p-2.5 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-md transition-all duration-500 w-auto sm:min-w-[240px] lg:min-w-[260px] sm:max-w-[280px] ${
               nextPrayerInfo.isGracePeriod
                 ? "bg-emerald-950/80 border border-emerald-400/60 shadow-emerald-950/40 p-4"
                 : "bg-black/20 border border-white/15"
@@ -1350,11 +1350,11 @@ export default function DashboardPage() {
           </div>
 
           {/* BOTTOM ROW: Digital Clock (Bottom-Left) & Progress Card (Bottom-Right) */}
-          <div className="relative z-10 flex flex-row items-end justify-between gap-2 sm:gap-6 mt-auto pt-3">
+          <div className="relative z-10 flex flex-row items-end justify-between gap-2 lg:gap-6 mt-auto pt-3">
             {/* Left: Big Clock + small seconds/WIB beside it */}
             <div className="space-y-0.5 sm:space-y-1.5 pb-0.5 min-w-0 flex-1">
               <div className="flex items-baseline gap-1.5 sm:gap-3">
-                <h2 className="text-3xl sm:text-7xl md:text-8xl xl:text-9xl font-black text-white font-mono tracking-tighter drop-shadow-lg leading-none">
+                <h2 className="text-3xl sm:text-7xl lg:text-8xl xl:text-9xl font-black text-white font-mono tracking-tighter drop-shadow-lg leading-none">
                   {heroClockMain}
                 </h2>
                 <div className="flex items-baseline gap-1">
@@ -1366,7 +1366,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Right: Compact Progress Card */}
-            <div className="bg-black/20 px-3 py-2 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/15 backdrop-blur-md shrink-0 w-32 sm:w-auto sm:min-w-[200px] md:max-w-xs shadow-md">
+            <div className="bg-black/20 px-3 py-2 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/15 backdrop-blur-md shrink-0 w-32 lg:w-auto lg:min-w-[200px] lg:max-w-xs shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-baseline space-x-1 sm:space-x-2 min-w-0">
                   <span className="text-base sm:text-2xl font-black text-white">
