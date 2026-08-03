@@ -121,7 +121,7 @@ export function PtpSheet({ open, onOpenChange = () => {}, readOnly = false }: Pt
   };
 
   const areaList = [
-    { id: "Spiritual Growth", label: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT" },
+    { id: "Spiritual Growth", label: "Spiritual Growth", desc: "hubungan kita dengan Allah ﷻ" },
     { id: "Personal Development", label: "Personal Development", desc: "hubungan kita dengan diri sendiri" },
     { id: "Leadership Excellence", label: "Leadership/Profesional Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan" },
     { id: "Relationship", label: "Relationship", desc: "hubungan kita dengan orang lain" },

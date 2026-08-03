@@ -606,7 +606,7 @@ export default function InitialProcessPage() {
 
             <div className="space-y-4">
               {[
-                { key: "spiritual_growth", title: "Spiritual Growth", desc: "hubungan kita dengan Allah SWT" },
+                { key: "spiritual_growth", title: "Spiritual Growth", desc: "hubungan kita dengan Allah ﷻ" },
                 { key: "personal_development", title: "Personal Development", desc: "hubungan kita dengan diri sendiri" },
                 { key: "leadership_excellence", title: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan" },
                 { key: "relationship", title: "Relationship", desc: "hubungan kita dengan orang lain" },
