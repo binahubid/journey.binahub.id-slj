@@ -2304,37 +2304,39 @@ export default function DashboardPage() {
         <Dialog open={welcomeModalOpen} onOpenChange={(open) => {
           if (!open) void handleDismissWelcome();
         }}>
-          <DialogContent className="sm:max-w-md bg-white border border-[#EAE5D9] rounded-xl shadow-xl p-0 overflow-hidden">
-            <div className="h-1 bg-[#C79A3C]" />
-            <div className="p-6 sm:p-7">
-            <DialogHeader className="space-y-2 text-left">
-              <p className="text-[11px] font-bold uppercase text-[#9A762C]">BinaJourney</p>
-              <DialogTitle className="text-xl font-bold text-[#071A33] leading-snug">
-                Selamat datang, perjalanan Anda dimulai di sini.
-              </DialogTitle>
-            </DialogHeader>
+          <DialogContent className="overflow-hidden rounded-2xl border border-[#E7E2D8] bg-white p-0 shadow-[0_24px_70px_-24px_rgba(15,30,61,0.28)] sm:max-w-[420px]">
+            <div className="h-1 w-full bg-[#C79A3C]" />
+            <div className="px-6 pb-6 pt-8 sm:px-8 sm:pb-8">
+              <DialogHeader className="items-center space-y-0 text-center">
+                <img
+                  src="/BinaJourney_logo.webp"
+                  alt="BinaJourney"
+                  className="h-8 w-auto object-contain"
+                />
+                <div className="my-6 h-px w-12 bg-[#C79A3C]/60" />
+                <DialogTitle className="max-w-xs text-2xl font-bold leading-tight tracking-[-0.02em] text-[#0F1E3D]">
+                  Selamat Datang, {userName}!
+                </DialogTitle>
+                <p className="pt-2 text-sm leading-relaxed text-slate-500">
+                  Perjalanan 90 hari Anda dimulai.
+                </p>
+              </DialogHeader>
 
-            <div className="pt-3">
-              <p className="max-w-sm text-sm text-slate-600 leading-relaxed">
-                Mulai dengan melengkapi Initial Process agar perjalanan 90 hari Anda lebih personal dan terarah.
-              </p>
-            </div>
-
-            <DialogFooter className="flex-col gap-2 pt-6 sm:flex-col">
-              <Button
-                onClick={handleWelcomeCTA}
-                className="w-full bg-[#071A33] hover:bg-[#102A4D] text-white font-bold text-sm h-11 rounded-lg active:scale-[0.98]"
-              >
-                Mulai Initial Process
-              </Button>
-              <Button
-                onClick={handleDismissWelcome}
-                variant="ghost"
-                className="w-full text-xs font-semibold text-slate-500 hover:bg-slate-50 h-10 rounded-lg active:scale-[0.98]"
-              >
-                Nanti Saja
-              </Button>
-            </DialogFooter>
+              <DialogFooter className="mt-7 flex-col gap-2 sm:flex-col">
+                <Button
+                  onClick={handleWelcomeCTA}
+                  className="h-11 w-full rounded-lg bg-[#0F1E3D] text-sm font-bold text-white transition-all duration-200 hover:bg-[#182B50] active:scale-[0.98]"
+                >
+                  Matching
+                </Button>
+                <Button
+                  onClick={handleDismissWelcome}
+                  variant="ghost"
+                  className="h-10 w-full rounded-lg text-xs font-semibold text-slate-500 transition-colors hover:bg-[#FAF8F4] hover:text-[#0F1E3D] active:scale-[0.98]"
+                >
+                  Nanti saja
+                </Button>
+              </DialogFooter>
             </div>
           </DialogContent>
         </Dialog>
