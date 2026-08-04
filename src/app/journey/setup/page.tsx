@@ -341,7 +341,7 @@ export default function JourneySetupPage() {
   const areaOptions = [
     { id: "Spiritual Growth", icon: Compass, label: "Spiritual Growth", desc: <>hubungan kita dengan Allah <span className="text-[1.15em] leading-none">ﷻ</span></>, color: TRANSFORMATION_AREAS["Spiritual Growth"].color },
     { id: "Personal Development", icon: Zap, label: "Personal Development", desc: "hubungan kita dengan diri sendiri", color: TRANSFORMATION_AREAS["Personal Development"].color },
-    { id: "Leadership Excellence", icon: Award, label: "Leadership Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", color: TRANSFORMATION_AREAS["Leadership Excellence"].color },
+    { id: "Leadership Excellence", icon: Award, label: "Leadership/Profesional Excellence", desc: "amanah, tugas dan tanggung jawab kita dalam pekerjaan", color: TRANSFORMATION_AREAS["Leadership Excellence"].color },
     { id: "Relationship", icon: Users, label: "Relationship", desc: "hubungan kita dengan orang lain", color: TRANSFORMATION_AREAS.Relationship.color },
     { id: "Community Impact", icon: Globe, label: "Community Impact", desc: "dampak terhadap lingkungan sekitar", color: TRANSFORMATION_AREAS["Community Impact"].color },
   ];
