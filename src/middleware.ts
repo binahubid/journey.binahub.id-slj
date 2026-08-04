@@ -151,18 +151,6 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
       }
 
-      if (isCompletedOnboarding && !baselineCompleted && path !== "/baseline") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/baseline";
-        return NextResponse.redirect(url);
-      }
-
-      if (isCompletedOnboarding && baselineCompleted && !initialProcessCompleted && path !== "/initial-process") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/initial-process";
-        return NextResponse.redirect(url);
-      }
-
       const ptpRequiredRoutes = ["/dashboard", "/monitoring"];
       if (
         isCompletedOnboarding &&

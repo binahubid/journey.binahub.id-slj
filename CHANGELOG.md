@@ -4,6 +4,23 @@ Semua perubahan penting pada proyek Spiritual Leadership Journey (SLJ) dicatat d
 
 Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) dan proyek ini mematuhi [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-08-04
+
+### Added
+- **Trio Sahabat Safar (Backdoor Pairing)**: Fitur baru untuk kasus peserta ganjil yang tidak punya pasangan. Admin bisa menggabungkan 1 orang unpaired dengan pasangan yang sudah ada → menjadi trio (3 orang saling terhubung). Card trio di tab "Sudah Dipasangkan" menampilkan 3 avatar dengan handshake icons, nama, kota, batch, status IP, serta tombol "Lepas 1 Orang" dan "Bubarkan". Tombol "Buat Trio" tersedia di bar filter batch. Modal 3-step: pilih unpaired → rekomendasi pair paling cocok → konfirmasi. Migration `024_trio_support.sql`: kolom `trio_id`, RPC `pair_trio`, `unpair_trio_member`, `dissolve_trio`.
+- **Notifikasi Selamat Datang Otomatis**: Saat user baru enroll (masukkan kode akses), RPC `enroll_participant_by_access_code` otomatis membuat 2 notifikasi: (1) "Selamat datang di BinaJourney!" (category: welcome), (2) "Langkah selanjutnya: Initial Process" (category: onboarding). Dedupe key mencegah duplikasi.
+- **Modal Selamat Datang di Dashboard**: Setelah login, dashboard mendeteksi notifikasi welcome yang belum dibaca → menampilkan modal 3 detik kemudian. Isi: ucapan selamat datang, 5 tahapan perjalanan, tombol "Mulai Perjalananku" (navigate ke /initial-process) dan "Nanti Saja". Notifikasi ditandai sudah dibaca setelah dismiss. Migration `025_welcome_notification.sql`.
+
+### Fixed
+- **Tab Sudah Dipasangkan Tidak Tampil**: Lookup partner sebelumnya membandingkan `pp.id` dengan `sahabat_safar_user_id` yang menyimpan `user_id` — partner tidak ditemukan. Diperbaiki menjadi `pp.user_id === p.sahabat_safar_user_id`. Card pasangan sekarang tampil normal.
+- **Paired Tab Dual IIFE Rendering**: Menggabungkan dua IIFE terpisah (trios + pairs) menjadi satu IIFE yang return `React.ReactNode[]` — memastikan trios dan pairs dirender dalam satu grid container.
+
+### Changed
+- **Tombol Trio Dipindah ke Header Filter**: Tombol "Buat Trio" sebelumnya ada di setiap card peserta → dipindah ke bar filter batch (samping dropdown Batch). Card peserta kembali memiliki satu tombol "Cari Rekomendasi Pasangan".
+- **NotificationCard & NotificationsPage — Tipe Kategori Diperluas**: Menambahkan kategori `welcome` dan `onboarding` ke type `category` di `NotificationCard` dan halaman `/notifications`.
+
+---
+
 ## [0.6.3] — 2026-08-03
 
 ### Fixed

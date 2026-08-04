@@ -13,10 +13,11 @@ DECLARE
   v_start_date TIMESTAMPTZ;
 BEGIN
   -- Get user info
-  SELECT full_name, batch_name, start_date
+  SELECT p.full_name, b.name AS batch_name, p.start_date
   INTO v_user_name, v_batch_name, v_start_date
-  FROM public.profiles
-  WHERE user_id = p_user_id;
+  FROM public.profiles p
+  LEFT JOIN public.batches b ON b.id = p.batch_id
+  WHERE p.user_id = p_user_id;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'User tidak ditemukan.';
