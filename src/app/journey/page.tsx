@@ -873,7 +873,7 @@ interface BatchMate {
                         {/* 4 Dimension indicators (Flexible / Optional per relevance) */}
                         <div className="space-y-3 pt-1">
                           <div className="border-t border-[#EAE5D9] pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                            <p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan (4 Dimensi)</p>
+                            <p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan</p>
                             <p className="text-[11px] text-slate-500 italic">Isi dimensi yang paling relevan dengan sasaran Anda (opsional)</p>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
