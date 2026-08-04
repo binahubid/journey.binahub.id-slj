@@ -124,6 +124,10 @@ export default function DashboardPage() {
   const [isScreenSaver, setIsScreenSaver] = useState(false);
   const [areaChartData, setAreaChartData] = useState<{ day: string; avg: number }[]>([]);
 
+  // Welcome modal
+  const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
+  const [welcomeNotificationId, setWelcomeNotificationId] = useState<string | null>(null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -874,6 +878,30 @@ export default function DashboardPage() {
     loadDashboard();
   }, [supabase]);
 
+  // Welcome modal: check for unread welcome notification → show after 3 seconds
+  useEffect(() => {
+    if (!userId) return;
+    let timeout: ReturnType<typeof setTimeout>;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("notifications")
+        .select("id, title, message")
+        .eq("user_id", user.id)
+        .eq("category", "welcome")
+        .eq("is_read", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setWelcomeNotificationId(data.id);
+        timeout = setTimeout(() => setWelcomeModalOpen(true), 3000);
+      }
+    })();
+    return () => clearTimeout(timeout);
+  }, [userId, supabase]);
+
   // Helper functions for habit category detection (same as in loadDashboard)
   const detectHabitCategory = (title: string): "prayer" | "quran" | "hadith" | "general" => {
     const t = title.toLowerCase();
@@ -881,6 +909,24 @@ export default function DashboardPage() {
     if (t.includes("quran") || t.includes("qur'an") || t.includes("tilawah") || t.includes("tahsin") || t.includes("tadarus")) return "quran";
     if (t.includes("hadist") || t.includes("hadith") || t.includes("hadis") || t.includes("baca hadis")) return "hadith";
     return "general";
+  };
+
+  // Welcome modal handlers
+  const handleDismissWelcome = async () => {
+    if (welcomeNotificationId) {
+      await supabase.from("notifications").update({ is_read: true }).eq("id", welcomeNotificationId);
+    }
+    setWelcomeModalOpen(false);
+    setWelcomeNotificationId(null);
+  };
+
+  const handleWelcomeCTA = async () => {
+    if (welcomeNotificationId) {
+      await supabase.from("notifications").update({ is_read: true }).eq("id", welcomeNotificationId);
+    }
+    setWelcomeModalOpen(false);
+    setWelcomeNotificationId(null);
+    router.push("/initial-process");
   };
 
   const getPrayerKeyFromTitle = (title: string): string | null => {
@@ -2252,6 +2298,68 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── WELCOME MODAL ────────────────────────────────────────────── */}
+      {welcomeModalOpen && (
+        <Dialog open={welcomeModalOpen} onOpenChange={() => setWelcomeModalOpen(false)}>
+          <DialogContent className="sm:max-w-lg bg-white border border-[#EAE5D9] rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="text-center space-y-3">
+              <div className="mx-auto h-14 w-14 rounded-full bg-amber-100 flex items-center justify-center">
+                <Sparkles className="h-7 w-7 text-amber-600" />
+              </div>
+              <DialogTitle className="text-xl font-black text-[#071A33] leading-snug">
+                Selamat Datang di BinaJourney
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-slate-600 leading-relaxed text-center">
+                Perjalanan transformasi 90 hari Anda dimulai hari ini. Ikuti tahapan berikut untuk memaksimalkan pertumbuhan:
+              </p>
+
+              <div className="space-y-2.5">
+                {[
+                  { num: 1, label: "Kenali Diri", desc: "Isi profil & tujuan pertumbuhan" },
+                  { num: 2, label: "Baseline", desc: "Dokumentasikan kondisi awal Anda" },
+                  { num: 3, label: "Journey & PTP", desc: "Rencanakan perjalanan & tindak lanjut" },
+                  { num: 4, label: "Habit & Journal", desc: "Bangun kebiasaan & refleksi harian" },
+                  { num: 5, label: "Checkpoint", desc: "Evaluasi progres di hari ke-30, 60 & 90" },
+                ].map((step) => (
+                  <div key={step.num} className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FAF8F4] border border-[#EAE5D9]">
+                    <div className="h-7 w-7 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-xs shrink-0">
+                      {step.num}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-extrabold text-[#071A33] leading-snug">{step.label}</p>
+                      <p className="text-[11px] text-slate-500 font-medium">{step.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-slate-500 text-center italic">
+                Mulai dari tahap pertama untuk memulai perjalanan Anda.
+              </p>
+            </div>
+
+            <DialogFooter className="flex-col gap-2 pt-3 border-t border-[#EAE5D9]">
+              <Button
+                onClick={handleWelcomeCTA}
+                className="w-full bg-[#071A33] hover:bg-black text-amber-300 font-extrabold text-sm h-11 rounded-xl shadow-sm"
+              >
+                Mulai Perjalananku
+              </Button>
+              <Button
+                onClick={handleDismissWelcome}
+                variant="outline"
+                className="w-full text-xs font-bold border-[#EAE5D9] text-slate-500 hover:bg-slate-50 h-9 rounded-xl"
+              >
+                Nanti Saja
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </ParticipantLayout>
   );
 }

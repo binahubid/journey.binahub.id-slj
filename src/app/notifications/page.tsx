@@ -13,7 +13,7 @@ interface NotificationItemData {
   id: string;
   title: string;
   message: string;
-  category: "reminder" | "checkpoint" | "coach" | "system";
+  category: "reminder" | "checkpoint" | "coach" | "system" | "welcome" | "onboarding";
   isRead: boolean;
   createdAt: string;
 }
