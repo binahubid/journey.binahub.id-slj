@@ -7,6 +7,7 @@ import { ArrowRight, BookOpen, Check, History, MessageSquare, Send } from "lucid
 import { CoachLayout } from "@/components/coach/CoachLayout";
 import { DetailHeader, ScoreBar, SectionHeading } from "@/components/coach/CoachUi";
 import { getCoachParticipant } from "@/lib/coach-mock-data";
+import { calculateCoachAssessment, calculateValidatedOutcome, coachAssessmentRubric } from "@/lib/assessment-methodology";
 
 const checkpointStyles = { ON_TRACK: "bg-emerald-50 text-emerald-700", NEED_SUPPORT: "bg-amber-50 text-amber-800", NOT_FILLED: "bg-slate-100 text-slate-500" };
 
@@ -15,9 +16,14 @@ export default function CoachParticipantDetailPage() {
   const participant = getCoachParticipant(id);
   const [note, setNote] = useState("");
   const [sent, setSent] = useState(false);
+  const [coachScores, setCoachScores] = useState([4, 3, 4, 3]);
+  const [validationStatus, setValidationStatus] = useState("Terverifikasi");
   if (!participant) notFound();
 
   const sendMockNote = () => { if (!note.trim()) return; setSent(true); setNote(""); setTimeout(() => setSent(false), 3000); };
+  const participantOutcome = Math.round(Object.values(participant.baseline).reduce((sum, value) => sum + value, 0) / Object.values(participant.baseline).length + 18);
+  const coachAssessment = calculateCoachAssessment(coachScores);
+  const validatedOutcome = calculateValidatedOutcome(participantOutcome, coachAssessment);
 
   return (
     <CoachLayout pageTitle="Detail Peserta" backHref="/coach">
@@ -41,6 +47,7 @@ export default function CoachParticipantDetailPage() {
         </div>
 
         <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
+          <div className="rounded-xl bg-white p-5 ring-1 ring-[#E5E7EB]"><div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wide text-[#9A762C]">Coach Assessment</p><h2 className="mt-1 text-sm font-bold text-[#0F1E3D]">Validasi outcome</h2></div><span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Mock MVP</span></div><div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-[#E5E7EB]"><div className="bg-[#FAF8F4] p-3 text-center"><p className="text-[9px] font-bold text-slate-400">PESERTA</p><p className="mt-1 text-xl font-black text-[#0F1E3D]">{participantOutcome}</p></div><div className="bg-[#FAF8F4] p-3 text-center"><p className="text-[9px] font-bold text-slate-400">COACH</p><p className="mt-1 text-xl font-black text-[#0F1E3D]">{coachAssessment}</p></div><div className="bg-[#0F1E3D] p-3 text-center"><p className="text-[9px] font-bold text-slate-400">VALIDATED</p><p className="mt-1 text-xl font-black text-amber-300">{validatedOutcome}</p></div></div><div className="mt-5 space-y-4">{coachAssessmentRubric.map((rubric, rubricIndex) => <div key={rubric.label}><div className="flex items-center justify-between"><div><p className="text-xs font-bold text-[#0F1E3D]">{rubric.label}</p><p className="text-[9px] text-slate-400">Bobot {rubric.weight}%</p></div><span className="text-xs font-black text-[#9A762C]">{coachScores[rubricIndex]}/5</span></div><div className="mt-2 grid grid-cols-5 gap-1">{[1, 2, 3, 4, 5].map((score) => <button key={score} type="button" onClick={() => setCoachScores((current) => current.map((value, index) => index === rubricIndex ? score : value))} className={`h-8 rounded-md text-[10px] font-bold ${coachScores[rubricIndex] === score ? "bg-[#0F1E3D] text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>{score}</button>)}</div></div>)}</div><label className="mt-5 block text-[10px] font-bold text-slate-500">STATUS VALIDASI<select value={validationStatus} onChange={(event) => setValidationStatus(event.target.value)} className="mt-2 h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-xs font-semibold text-[#0F1E3D] outline-none focus:border-[#C79A3C]"><option>Terverifikasi</option><option>Perlu Klarifikasi</option><option>Tidak Dapat Diverifikasi</option><option>Belum Ditinjau</option></select></label><p className="mt-4 text-[10px] leading-relaxed text-slate-400">Simulasi formula: Participant 60% + Coach 40%. Belum tersimpan ke database.</p></div>
           <div className="rounded-xl bg-[#0F1E3D] p-5 text-white"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">Indikator keberhasilan</p><div className="mt-4 space-y-3">{participant.successIndicators.map((indicator) => <div key={indicator} className="flex items-start gap-2.5"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" /><p className="text-xs leading-relaxed text-slate-200">{indicator}</p></div>)}</div></div>
           <div className="rounded-xl bg-white p-5 ring-1 ring-[#E5E7EB]"><div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-[#C79A3C]" /><h2 className="text-sm font-bold text-[#0F1E3D]">Catatan pendampingan</h2></div><p className="mt-2 text-[11px] leading-relaxed text-slate-500">Simulasi MVP. Catatan belum disimpan ke database.</p>{sent && <div className="mt-4 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">Catatan simulasi berhasil dikirim.</div>}<textarea value={note} onChange={(event) => setNote(event.target.value)} rows={5} placeholder="Tulis apresiasi, pertanyaan reflektif, atau arahan berikutnya..." className="mt-4 w-full resize-none rounded-lg border border-[#E5E7EB] p-3 text-xs leading-relaxed outline-none focus:border-[#C79A3C]" /><button onClick={sendMockNote} disabled={!note.trim()} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0F1E3D] text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Kirim catatan<Send className="h-3.5 w-3.5" /></button></div>
           <Link href={`/coach/participants/${participant.id}/history`} className="group flex min-h-12 items-center justify-between rounded-xl bg-white px-5 text-xs font-bold text-[#0F1E3D] ring-1 ring-[#E5E7EB] hover:bg-slate-50"><span>Riwayat lengkap peserta</span><ArrowRight className="h-4 w-4 text-[#C79A3C] transition-transform group-hover:translate-x-0.5" /></Link>
