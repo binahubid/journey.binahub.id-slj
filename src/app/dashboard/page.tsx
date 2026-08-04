@@ -2305,24 +2305,22 @@ export default function DashboardPage() {
           if (!open) void handleDismissWelcome();
         }}>
           <DialogContent className="overflow-hidden rounded-2xl border border-[#E7E2D8] bg-white p-0 shadow-[0_24px_70px_-24px_rgba(15,30,61,0.28)] sm:max-w-[420px]">
-            <div className="h-1 w-full bg-[#C79A3C]" />
-            <div className="px-6 pb-6 pt-8 sm:px-8 sm:pb-8">
+            <div className="px-6 py-7 sm:px-8 sm:py-8">
               <DialogHeader className="items-center space-y-0 text-center">
                 <img
                   src="/BinaJourney_logo.webp"
                   alt="BinaJourney"
                   className="h-8 w-auto object-contain"
                 />
-                <div className="my-6 h-px w-12 bg-[#C79A3C]/60" />
-                <DialogTitle className="max-w-xs text-2xl font-bold leading-tight tracking-[-0.02em] text-[#0F1E3D]">
+                <DialogTitle className="max-w-xs pt-7 text-2xl font-bold leading-tight tracking-[-0.02em] text-[#0F1E3D]">
                   Selamat Datang, {userName}!
                 </DialogTitle>
-                <p className="pt-2 text-sm leading-relaxed text-slate-500">
+                <p className="pt-2.5 text-sm leading-relaxed text-slate-500">
                   Perjalanan 90 hari Anda dimulai.
                 </p>
               </DialogHeader>
 
-              <DialogFooter className="mt-7 flex-col gap-2 sm:flex-col">
+              <DialogFooter className="mt-8 flex-col gap-2 sm:flex-col">
                 <Button
                   onClick={handleWelcomeCTA}
                   className="h-11 w-full rounded-lg bg-[#0F1E3D] text-sm font-bold text-white transition-all duration-200 hover:bg-[#182B50] active:scale-[0.98]"
