@@ -11,7 +11,7 @@ export const assessmentDimensions = [
 export const coachAssessmentRubric = [
   { label: "Kesesuaian bukti", weight: 30, description: "Bukti mendukung capaian yang dilaporkan peserta." },
   { label: "Konsistensi perilaku", weight: 30, description: "Perubahan konsisten dengan habit dan checkpoint." },
-  { label: "Relevansi terhadap target", weight: 25, description: "Perubahan berkaitan langsung dengan target PTP." },
+  { label: "Pencapaian Target", weight: 25, description: "Perubahan berkaitan langsung dengan target PTP." },
   { label: "Keberlanjutan", weight: 15, description: "Perubahan berpotensi bertahan setelah program." },
 ] as const;
 
