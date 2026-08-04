@@ -48,6 +48,11 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
+  // Public preview during the mock-data Coach Portal MVP phase.
+  if (path.startsWith("/coach")) {
+    return supabaseResponse;
+  }
+
   // Protected routes list
   const protectedRoutes = [
     "/dashboard",
@@ -57,7 +62,6 @@ export async function middleware(request: NextRequest) {
     "/journey",
     "/monitoring",
     "/journal",
-    "/coach",
     "/admin",
     "/profile",
     "/settings",
@@ -91,13 +95,6 @@ export async function middleware(request: NextRequest) {
     if (path.startsWith("/admin") && role !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = role === "coach" ? "/coach" : "/dashboard";
-      return NextResponse.redirect(url);
-    }
-
-    // Coach route protection: Only coach or admin
-    if (path.startsWith("/coach") && role !== "coach" && role !== "admin") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
 
