@@ -2301,62 +2301,41 @@ export default function DashboardPage() {
 
       {/* ─── WELCOME MODAL ────────────────────────────────────────────── */}
       {welcomeModalOpen && (
-        <Dialog open={welcomeModalOpen} onOpenChange={() => setWelcomeModalOpen(false)}>
-          <DialogContent className="sm:max-w-lg bg-white border border-[#EAE5D9] rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-            <DialogHeader className="text-center space-y-3">
-              <div className="mx-auto h-14 w-14 rounded-full bg-amber-100 flex items-center justify-center">
-                <Sparkles className="h-7 w-7 text-amber-600" />
-              </div>
-              <DialogTitle className="text-xl font-black text-[#071A33] leading-snug">
-                Selamat Datang di BinaJourney
+        <Dialog open={welcomeModalOpen} onOpenChange={(open) => {
+          if (!open) void handleDismissWelcome();
+        }}>
+          <DialogContent className="sm:max-w-md bg-white border border-[#EAE5D9] rounded-xl shadow-xl p-0 overflow-hidden">
+            <div className="h-1 bg-[#C79A3C]" />
+            <div className="p-6 sm:p-7">
+            <DialogHeader className="space-y-2 text-left">
+              <p className="text-[11px] font-bold uppercase text-[#9A762C]">BinaJourney</p>
+              <DialogTitle className="text-xl font-bold text-[#071A33] leading-snug">
+                Selamat datang, perjalanan Anda dimulai di sini.
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 pt-2">
-              <p className="text-sm text-slate-600 leading-relaxed text-center">
-                Perjalanan transformasi 90 hari Anda dimulai hari ini. Ikuti tahapan berikut untuk memaksimalkan pertumbuhan:
-              </p>
-
-              <div className="space-y-2.5">
-                {[
-                  { num: 1, label: "Kenali Diri", desc: "Isi profil & tujuan pertumbuhan" },
-                  { num: 2, label: "Baseline", desc: "Dokumentasikan kondisi awal Anda" },
-                  { num: 3, label: "Journey & PTP", desc: "Rencanakan perjalanan & tindak lanjut" },
-                  { num: 4, label: "Habit & Journal", desc: "Bangun kebiasaan & refleksi harian" },
-                  { num: 5, label: "Checkpoint", desc: "Evaluasi progres di hari ke-30, 60 & 90" },
-                ].map((step) => (
-                  <div key={step.num} className="flex items-start gap-3 p-2.5 rounded-xl bg-[#FAF8F4] border border-[#EAE5D9]">
-                    <div className="h-7 w-7 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-xs shrink-0">
-                      {step.num}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-extrabold text-[#071A33] leading-snug">{step.label}</p>
-                      <p className="text-[11px] text-slate-500 font-medium">{step.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-xs text-slate-500 text-center italic">
-                Mulai dari tahap pertama untuk memulai perjalanan Anda.
+            <div className="pt-3">
+              <p className="max-w-sm text-sm text-slate-600 leading-relaxed">
+                Mulai dengan melengkapi Initial Process agar perjalanan 90 hari Anda lebih personal dan terarah.
               </p>
             </div>
 
-            <DialogFooter className="flex-col gap-2 pt-3 border-t border-[#EAE5D9]">
+            <DialogFooter className="flex-col gap-2 pt-6 sm:flex-col">
               <Button
                 onClick={handleWelcomeCTA}
-                className="w-full bg-[#071A33] hover:bg-black text-amber-300 font-extrabold text-sm h-11 rounded-xl shadow-sm"
+                className="w-full bg-[#071A33] hover:bg-[#102A4D] text-white font-bold text-sm h-11 rounded-lg active:scale-[0.98]"
               >
-                Mulai Perjalananku
+                Mulai Initial Process
               </Button>
               <Button
                 onClick={handleDismissWelcome}
-                variant="outline"
-                className="w-full text-xs font-bold border-[#EAE5D9] text-slate-500 hover:bg-slate-50 h-9 rounded-xl"
+                variant="ghost"
+                className="w-full text-xs font-semibold text-slate-500 hover:bg-slate-50 h-10 rounded-lg active:scale-[0.98]"
               >
                 Nanti Saja
               </Button>
             </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       )}

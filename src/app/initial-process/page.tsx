@@ -18,6 +18,7 @@ import {
   Compass,
   HeartHandshake,
   CheckCircle2,
+  ArrowRight,
   ChevronRight,
   ChevronLeft,
   Sliders,
@@ -958,17 +959,18 @@ export default function InitialProcessPage() {
               <div className="flex justify-between"><span className="text-slate-500">Status Test:</span><span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Terverifikasi Selesai</span></div>
             </div>
 
-            <div className="pt-2 flex justify-center gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
               <Button
-                variant="outline"
-                onClick={() => { setSubmitted(false); setActiveStep(1); }}
-                className="rounded-xl h-10 text-xs font-bold border-slate-200"
+                onClick={() => router.push("/baseline")}
+                className="order-1 bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-11 w-full sm:w-auto"
               >
-                Edit Jawaban
+                Lanjut ke Baseline
+                <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
               <Button
+                variant="outline"
                 onClick={() => router.push("/dashboard")}
-                className="bg-navy-900 hover:bg-slate-900 text-white font-bold text-xs rounded-xl px-6 h-10"
+                className="order-2 rounded-xl h-11 px-6 text-xs font-bold border-slate-200 text-slate-600 w-full sm:w-auto"
               >
                 Ke Dashboard
               </Button>
