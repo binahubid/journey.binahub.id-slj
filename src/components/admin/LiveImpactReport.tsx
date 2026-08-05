@@ -96,11 +96,11 @@ export function LiveImpactReport() {
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-3">
             {[
               ["Outcome", score(summary.outcome.score), `${summary.outcome.measured}/${summary.participantCount} peserta`],
+              ["Baseline (Before)", score(summary.baseline.score), `${summary.baseline.measured}/${summary.baseline.denominator} peserta`],
               ["Execution", score(summary.execution.score), `${summary.execution.numerator}/${summary.execution.denominator} eksekusi`],
               ["Peer Support", score(summary.peerSupport.score), `${summary.peerSupport.numerator}/${summary.peerSupport.denominator} minggu`],
               ["Coach Assessment", score(summary.coachAssessment.score), `${summary.coachAssessment.measured}/${summary.coachAssessment.denominator} dinilai`],
               ["Validated Outcome", score(summary.validatedOutcome.score), `${summary.validatedOutcome.measured}/${summary.validatedOutcome.denominator} tervalidasi`],
-              ["Peserta", summary.participantCount, "scope terpilih"],
             ].map(([label, value, detail]) => <div key={label} className="bg-[#142747] p-4"><span className="text-[9px] font-bold uppercase tracking-wider text-blue-200">{label}</span><p className="mt-1 text-xl font-black tabular-nums text-amber-400">{value}</p><p className="mt-1 text-[10px] text-blue-200">{detail}</p></div>)}
           </div>
         </div>

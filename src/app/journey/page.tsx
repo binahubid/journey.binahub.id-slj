@@ -577,7 +577,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     } catch (err) {
       console.error("Save error:", err);
       setSaveStatus("idle");
-      setSaveError("Perubahan PTP belum tersimpan. Periksa koneksi lalu coba lagi.");
+      const message = err instanceof Error ? err.message : err && typeof err === "object" && "message" in err ? String((err as any).message) : "";
+      setSaveError(message || "Perubahan PTP belum tersimpan. Periksa koneksi lalu coba lagi.");
     }
   };
 
@@ -997,7 +998,10 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                             <div><p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">Tentukan apa yang diukur pada area ini, nilai awalnya, dan target angka yang ingin dicapai.</p></div>
                             <p className="text-[11px] text-slate-500 italic">1-4 indikator terukur per area</p>
                           </div>
-                          {(targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)])).map((indicator, index) => (
+                          {(targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)])).map((indicator, index) => {
+                            const areaIndicators = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
+                            const usedTypes = new Set(areaIndicators.filter(item => item.active && item.key !== indicator.key).map(item => item.type));
+                            return (
                             <div key={indicator.key} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3.5">
                               <div className="flex items-center justify-between gap-3">
                                 <span className="text-xs font-extrabold text-navy-900">{index + 1}. Apa yang ingin diukur?</span>
@@ -1010,7 +1014,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                                   }} className="text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                                 </div>
                               </div>
-                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jenis indikator</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(area.id, index, { type, direction: preset.defaultDirection }); }} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key}>{type.label}</option>)}</select><span className="block text-[10px] leading-relaxed text-slate-400">{indicatorTypes.find(type => type.key === indicator.type)?.description} Contoh: {indicatorTypes.find(type => type.key === indicator.type)?.example}.</span></label>
+                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jenis indikator</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(area.id, index, { type, direction: preset.defaultDirection }); }} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select>{usedTypes.has(indicator.type) && <span className="block text-[10px] font-semibold text-rose-600">Jenis ini sudah dipakai indikator aktif lain di area ini.</span>}<span className="block text-[10px] leading-relaxed text-slate-400">{indicatorTypes.find(type => type.key === indicator.type)?.description} Contoh: {indicatorTypes.find(type => type.key === indicator.type)?.example}.</span></label>
                               <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Nama indikator</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(area.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-9 text-xs" /></label>
                               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                 <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Kondisi saat ini</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(area.id, index, { baseline: Number(e.target.value) })} placeholder="Contoh: 2" className="h-9 text-xs" /></label>
@@ -1020,7 +1024,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                               </div>
                               <p className="text-[10px] leading-relaxed text-slate-400">Contoh: kondisi saat ini 2 kali, target 7 kali, pilih “Naik lebih baik”, lalu isi satuan “kali”. Untuk durasi atau biaya yang ingin dikurangi, pilih “Turun lebih baik”.</p>
                             </div>
-                          ))}
+                            );
+                          })}
                           {!locked && (targetData.indicators?.length || legacyIndicators(targetData).length || 1) < 4 && <Button type="button" variant="outline" onClick={() => {
                             const current = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
                             const next = [...current, createIndicator(current.length)];

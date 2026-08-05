@@ -26,6 +26,7 @@ export type ParticipantAssessment = {
   journey_id: string | null;
   methodology_version: string;
   indicators?: unknown[];
+  baseline?: { completed: boolean; score: number | null; areas: { area: string; score: number }[] };
   metrics: {
     outcome: AssessmentMetric;
     execution: AssessmentMetric;
@@ -63,12 +64,18 @@ export function summarizeGroupImpact(report: GroupImpactReport) {
   };
   const assessed = participants.filter((row) => row.metrics.coach_assessment?.coach_score != null);
   const validated = participants.filter((row) => row.metrics.coach_assessment?.validated_outcome != null);
+  const baselineScores = participants.map((row) => row.baseline?.score).filter((score): score is number => typeof score === "number");
 
   return {
     participantCount: participants.length,
     outcome: metric((row) => row.metrics.outcome),
     execution: metric((row) => row.metrics.execution),
     peerSupport: metric((row) => row.metrics.peer_support),
+    baseline: {
+      score: baselineScores.length ? Math.round(baselineScores.reduce((sum, score) => sum + score, 0) / baselineScores.length) : null,
+      measured: baselineScores.length, denominator: participants.length,
+      coverage: participants.length ? Math.round(baselineScores.length / participants.length * 100) : 0,
+    },
     engagement: {
       baseline: component("baseline"), ptp: component("ptp"), checkpoint: component("checkpoint"),
       journal: component("journal"), tracking: component("tracking"),
