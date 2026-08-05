@@ -10,6 +10,7 @@ describe("summarizeGroupImpact", () => {
           user_id: "participant-1",
           journey_id: "journey-1",
           methodology_version: "1.0",
+          baseline: { completed: true, score: 64, areas: [{ area: "Spiritual Growth", score: 64 }] },
           metrics: {
             outcome: { score: null, numerator: 0, denominator: 0 },
             execution: { score: null, numerator: 0, denominator: 0 },
@@ -34,5 +35,7 @@ describe("summarizeGroupImpact", () => {
     expect(summary.engagement.ptp.coverage).toBe(0);
     expect(summary.engagement.checkpoint.coverage).toBe(0);
     expect(summary.engagement.journal.coverage).toBe(0);
+    expect(summary.baseline.score).toBe(64);
+    expect(summary.baseline.coverage).toBe(100);
   });
 });

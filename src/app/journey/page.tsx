@@ -163,12 +163,12 @@ interface BatchMate {
   fullName: string;
 }
 
-const createIndicator = (index: number): IndicatorDefinition => ({
+const createIndicator = (index: number, type: IndicatorType = "quantity"): IndicatorDefinition => ({
   key: `indicator-${index + 1}`,
-  type: "quantity",
+  type,
   label: "",
   active: true,
-  direction: "higher_is_better",
+  direction: indicatorTypes.find(item => item.key === type)?.defaultDirection || "higher_is_better",
   baseline: 0,
   target: 0,
   unit: "",
@@ -1028,7 +1028,12 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                           })}
                           {!locked && (targetData.indicators?.length || legacyIndicators(targetData).length || 1) < 4 && <Button type="button" variant="outline" onClick={() => {
                             const current = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
-                            const next = [...current, createIndicator(current.length)];
+                            const usedTypes = new Set(current.filter(indicator => indicator.active).map(indicator => indicator.type));
+                            const nextType = indicatorTypes.find(type => !usedTypes.has(type.key))?.key || "quantity";
+                            const usedKeys = new Set(current.map(indicator => indicator.key));
+                            let nextIndex = current.length;
+                            while (usedKeys.has(`indicator-${nextIndex + 1}`)) nextIndex += 1;
+                            const next = [...current, createIndicator(nextIndex, nextType)];
                             const updated = { ...areaTargetsMap, [area.id]: { ...targetData, indicators: next } };
                             setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3);
                           }} className="h-9 w-full border-dashed text-xs"><Plus className="mr-1 h-3.5 w-3.5" /> Tambah indikator</Button>}
