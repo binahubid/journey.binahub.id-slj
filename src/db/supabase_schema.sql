@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS public.journeys (
   area_transformasi JSONB NOT NULL DEFAULT '[]'::jsonb,
   main_target TEXT,
   success_indicators JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ptp_draft JSONB,
+  ptp_draft_updated_at TIMESTAMP WITH TIME ZONE,
+  ptp_published_at TIMESTAMP WITH TIME ZONE,
   final_reflection TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
@@ -316,4 +319,3 @@ ALTER TABLE public.hadith_logs ENABLE ROW LEVEL SECURITY;
 
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-

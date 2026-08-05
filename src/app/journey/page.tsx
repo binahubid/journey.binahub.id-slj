@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { TRANSFORMATION_AREAS } from "@/lib/transformation-areas";
@@ -135,6 +136,7 @@ export default function JourneyPage() {
 
   // UI
   const [activeSection, setActiveSection] = useState(1);
+  const [maxUnlockedSection, setMaxUnlockedSection] = useState(1);
   const [mobileView, setMobileView] = useState<"navigator" | "editor" | "tips">("navigator");
   const [showCelebration, setShowCelebration] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -142,6 +144,8 @@ export default function JourneyPage() {
   const [openAreaEditor, setOpenAreaEditor] = useState<string>("");
   const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
   const [recsOpen, setRecsOpen] = useState(false);
+  const [areaPendingRemoval, setAreaPendingRemoval] = useState<string | null>(null);
+  const [section3Published, setSection3Published] = useState(false);
 
   // Autosave
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -277,6 +281,11 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           setJourneyId(journey.id);
           setPtpStatus((journey.ptp_status as "EDITABLE" | "LOCKED") || "EDITABLE");
           setMuhasabah(journey.muhasabah || "");
+          setMaxUnlockedSection(
+            journey.muhasabah?.trim() && journey.niat?.trim()
+              ? Array.isArray(journey.area_transformasi) && journey.area_transformasi.length === 3 ? 4 : 3
+              : journey.muhasabah?.trim() ? 2 : 1
+          );
 
           // Niat: try parse as JSON (new format) or plain text (legacy)
           try {
@@ -330,6 +339,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             .from("ptp_indicators")
             .select("area, indicator_key, indicator_type, label, active, direction, baseline_value, target_value, unit")
             .eq("journey_id", journey.id)
+            .eq("active", true)
             .order("created_at", { ascending: true });
           if (indicatorError && !isUnavailableRelation(indicatorError)) throw indicatorError;
           if (structuredIndicators?.length) {
@@ -357,6 +367,39 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               return next;
             });
           }
+
+          let hasDraft = false;
+          if (journey.ptp_draft && typeof journey.ptp_draft === "object") {
+            hasDraft = true;
+            const draft = journey.ptp_draft as { selected_areas?: string[]; targets?: Record<string, AreaTargetData> };
+            const draftAreas = Array.isArray(draft.selected_areas) ? draft.selected_areas : [];
+            if (draftAreas.length) {
+              setSelectedAreas(draftAreas);
+              setActiveAreaTab(draftAreas[0]);
+              setNewActionArea(draftAreas[0]);
+            }
+            if (draft.targets && typeof draft.targets === "object") setAreaTargetsMap(draft.targets);
+            setMaxUnlockedSection(current => Math.max(current, 3));
+          } else {
+            try {
+              const storedDraft = localStorage.getItem(`ptp_draft:${journey.id}`);
+              if (storedDraft) {
+                hasDraft = true;
+                const draft = JSON.parse(storedDraft) as { selected_areas?: string[]; targets?: Record<string, AreaTargetData> };
+                const draftAreas = Array.isArray(draft.selected_areas) ? draft.selected_areas : [];
+                if (draftAreas.length) {
+                  setSelectedAreas(draftAreas);
+                  setActiveAreaTab(draftAreas[0]);
+                  setNewActionArea(draftAreas[0]);
+                }
+                if (draft.targets && typeof draft.targets === "object") setAreaTargetsMap(draft.targets);
+                setMaxUnlockedSection(current => Math.max(current, 3));
+              }
+            } catch {
+              localStorage.removeItem(`ptp_draft:${journey.id}`);
+            }
+          }
+          setSection3Published(!hasDraft && Array.isArray(journey.area_transformasi) && journey.area_transformasi.length === 3);
 
           // Action Plans
           const { data: plans, error: plansError } = await supabase.from("action_plans").select("id, title, frequency, quantity, target, category, area_category").eq("journey_id", journey.id);
@@ -423,6 +466,32 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   }, []);
 
   // ─── Autosave ──────────────────────────────────────────────────
+  const buildPtpDraft = () => ({
+    selected_areas: selectedAreasRef.current,
+    targets: Object.fromEntries(selectedAreasRef.current.map(area => {
+      const target = areaTargetsMapRef.current[area] || {};
+      return [area, {
+        ...target,
+        indicators: target.indicators?.length ? target.indicators : legacyIndicators(target),
+      }];
+    })),
+    status: isSection3ReadyForAutosave() ? "READY" : "INCOMPLETE",
+  });
+
+  const handleSavePtpDraft = async () => {
+    const _journeyId = journeyIdRef.current;
+    if (!_journeyId || ptpStatusRef.current === "LOCKED") return;
+    const draft = buildPtpDraft();
+    const { error } = await supabase.rpc("save_ptp_draft", { p_journey_id: _journeyId, p_draft: draft });
+    if (error) {
+      if (error.code === "PGRST202" || error.code === "42883") localStorage.setItem(`ptp_draft:${_journeyId}`, JSON.stringify(draft));
+      else throw error;
+    } else localStorage.removeItem(`ptp_draft:${_journeyId}`);
+    setSaveStatus("saved");
+    setLastSaved(new Date());
+    setSection3Published(false);
+  };
+
   const isSection3ReadyForAutosave = () => {
     const areas = selectedAreasRef.current;
     const targets = areaTargetsMapRef.current;
@@ -437,24 +506,30 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   const scheduleAutosave = (sectionNum: number) => {
     if (ptpStatusRef.current === "LOCKED") return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    if (sectionNum === 3 && !isSection3ReadyForAutosave()) {
-      setSaveStatus("idle");
-      setSaveError(null);
-      return;
+    if (sectionNum === 3) {
+      setSection3Published(false);
+      setMaxUnlockedSection(current => Math.min(current, 3));
     }
     setSaveStatus("saving");
     // Store sectionNum in the closure, but read field values from refs at fire time
-    saveTimerRef.current = setTimeout(() => handleSaveSection(sectionNum), 1500);
+    saveTimerRef.current = setTimeout(() => {
+      const operation = sectionNum === 3 ? handleSavePtpDraft() : handleSaveSection(sectionNum);
+      void operation.catch(error => {
+        console.error("Autosave error:", error);
+        setSaveStatus("idle");
+        setSaveError(error instanceof Error ? error.message : (error as { message?: string })?.message || "Draft belum dapat disimpan.");
+      });
+    }, 1500);
   };
 
-  const handleSaveSection = async (sectionNum: number) => {
+  const handleSaveSection = async (sectionNum: number): Promise<boolean> => {
     // Always read from refs — guarantees latest value even if called from stale closure
     const _journeyId = journeyIdRef.current;
     const _ptpStatus = ptpStatusRef.current;
-    if (_ptpStatus === "LOCKED" || !_journeyId) return;
+    if (_ptpStatus === "LOCKED" || !_journeyId) return false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) return false;
       switch (sectionNum) {
         case 1: {
           const { error } = await supabase.from("journeys").update({ muhasabah: muhasabahRef.current, updated_at: new Date().toISOString() }).eq("id", _journeyId);
@@ -590,11 +665,13 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       }
       setSaveStatus("saved");
       setLastSaved(new Date());
+      return true;
     } catch (err) {
       console.error("Save error:", err);
       setSaveStatus("idle");
       const message = err instanceof Error ? err.message : err && typeof err === "object" && "message" in err ? String((err as any).message) : "";
       setSaveError(message || "Perubahan PTP belum tersimpan. Periksa koneksi lalu coba lagi.");
+      return false;
     }
   };
 
@@ -603,7 +680,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     switch (num) {
       case 1: return muhasabah.trim().length > 0;
       case 2: return niat.trim().length > 0;
-      case 3: return selectedAreas.length === 3 && selectedAreas.every(area => {
+      case 3: return section3Published && selectedAreas.length === 3 && selectedAreas.every(area => {
         const target = areaTargetsMap[area];
         if (!target?.mainTarget?.trim()) return false;
         const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
@@ -624,6 +701,11 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     return "not-started";
   };
 
+  const canOpenSection = (num: number) => num <= maxUnlockedSection
+    && (num < 2 || isSectionComplete(1))
+    && (num < 3 || isSectionComplete(2))
+    && (num < 4 || isSectionComplete(3));
+
   const getLastSavedText = () => {
     if (!lastSaved) return "";
     const diff = Math.floor((Date.now() - lastSaved.getTime()) / 60000);
@@ -640,12 +722,33 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         setSaveError(`Pindahkan atau hapus Action Plan pada area ${id} sebelum membatalkan area ini.`);
         return;
       }
+      const target = areaTargetsMap[id];
+      const hasContent = Boolean(target?.mainTarget?.trim() || target?.targetAlasan?.trim() || target?.indicators?.some(indicator => indicator.label.trim() || indicator.unit?.trim() || indicator.baseline !== 0 || indicator.target !== 0));
+      if (hasContent) {
+        setAreaPendingRemoval(id);
+        return;
+      }
       next = selectedAreas.filter(a => a !== id);
     }
     else { if (selectedAreas.length >= 3) return; next = [...selectedAreas, id]; }
     setSaveError(null);
     setSelectedAreas(next);
     selectedAreasRef.current = next;
+    scheduleAutosave(3);
+  };
+
+  const confirmAreaRemoval = () => {
+    if (!areaPendingRemoval) return;
+    const removedArea = areaPendingRemoval;
+    const next = selectedAreas.filter(area => area !== removedArea);
+    const nextTargets = { ...areaTargetsMap };
+    delete nextTargets[removedArea];
+    setAreaPendingRemoval(null);
+    setSelectedAreas(next);
+    selectedAreasRef.current = next;
+    setAreaTargetsMap(nextTargets);
+    areaTargetsMapRef.current = nextTargets;
+    if (activeAreaTab === removedArea) setActiveAreaTab(next[0] || "");
     scheduleAutosave(3);
   };
 
@@ -709,12 +812,51 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     }
   };
 
-  const goToNext = () => {
-    if (!isSectionComplete(activeSection)) {
+  const isSection3FormComplete = () => selectedAreas.length === 3 && selectedAreas.every(area => {
+    const target = areaTargetsMap[area];
+    if (!target?.mainTarget?.trim()) return false;
+    const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
+    return validateAreaIndicators(indicators, area).valid;
+  });
+
+  const goToNext = async () => {
+    const currentValid = activeSection === 3 ? isSection3FormComplete() : isSectionComplete(activeSection);
+    if (!currentValid) {
       setSaveError(`Lengkapi bagian "${SECTIONS[activeSection - 1].title}" sebelum melanjutkan.`);
       return;
     }
-    if (activeSection < SECTIONS.length) { setSaveError(null); setActiveSection(activeSection + 1); setMobileView("editor"); }
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (activeSection === 3) {
+      if (!journeyIdRef.current) return;
+      setSaveStatus("saving");
+      setSaveError(null);
+      try {
+        const { error } = await supabase.rpc("publish_ptp_draft", { p_journey_id: journeyIdRef.current, p_draft: buildPtpDraft() });
+        if (error) {
+          if (error.code === "PGRST202" || error.code === "42883") {
+            if (!await handleSaveSection(3)) return;
+          } else throw error;
+        }
+        localStorage.removeItem(`ptp_draft:${journeyIdRef.current}`);
+        setSection3Published(true);
+        setSaveStatus("saved");
+        setLastSaved(new Date());
+      } catch (error) {
+        console.error("Publish PTP error:", error);
+        setSaveStatus("idle");
+        setSaveError(error instanceof Error ? error.message : (error as { message?: string })?.message || "PTP belum dapat diterapkan.");
+        return;
+      }
+    } else if (!await handleSaveSection(activeSection)) {
+      return;
+    }
+    if (activeSection < SECTIONS.length) {
+      const nextSection = activeSection + 1;
+      setMaxUnlockedSection(current => Math.max(current, nextSection));
+      setSaveError(null);
+      setActiveSection(nextSection);
+      setMobileView("editor");
+    }
     else { setShowCelebration(true); }
   };
 
@@ -729,7 +871,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       {saveStatus === "saving" ? (
         <><div className="h-1.5 w-1.5 bg-amber-400 rounded-full animate-pulse" /><span className="text-slate-600 font-medium">Menyimpan...</span></>
       ) : saveStatus === "saved" ? (
-        <><div className="h-1.5 w-1.5 bg-green-500 rounded-full" /><span className="text-slate-600 font-medium">Tersimpan otomatis {getLastSavedText()}</span></>
+        <><div className={`h-1.5 w-1.5 rounded-full ${activeSection === 3 && !section3Published ? "bg-amber-500" : "bg-green-500"}`} /><span className="text-slate-600 font-medium">{activeSection === 3 && !section3Published ? "Draft tersimpan" : "Tersimpan otomatis"} {getLastSavedText()}</span></>
       ) : (
         <><div className="h-1.5 w-1.5 bg-slate-400 rounded-full" /><span className="text-slate-600 font-medium">Siap disimpan</span></>
       )}
@@ -1432,9 +1574,9 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   const StepDots = () => (
     <div className="flex items-center gap-1.5">
       {SECTIONS.map(s => (
-        <button key={s.num} onClick={() => setActiveSection(s.num)}
-          className={`rounded-full transition-all flex items-center justify-center font-bold text-xs ${s.num === activeSection ? "h-7 w-7 bg-amber-500 text-white shadow" : isSectionComplete(s.num) ? "h-6 w-6 bg-amber-200 text-amber-700" : "h-5 w-5 bg-slate-200 text-slate-400"}`}>
-          {isSectionComplete(s.num) && s.num !== activeSection ? <Check className="h-3 w-3" /> : s.num}
+        <button key={s.num} disabled={!canOpenSection(s.num)} onClick={() => canOpenSection(s.num) && setActiveSection(s.num)}
+          className={`rounded-full transition-all flex items-center justify-center font-bold text-xs disabled:cursor-not-allowed disabled:opacity-45 ${s.num === activeSection ? "h-7 w-7 bg-amber-500 text-white shadow" : isSectionComplete(s.num) ? "h-6 w-6 bg-amber-200 text-amber-700" : "h-5 w-5 bg-slate-200 text-slate-400"}`}>
+          {!canOpenSection(s.num) ? <Lock className="h-3 w-3" /> : isSectionComplete(s.num) && s.num !== activeSection ? <Check className="h-3 w-3" /> : s.num}
         </button>
       ))}
     </div>
@@ -1474,6 +1616,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       </button>
     </div>
   ) : null;
+
+  const canProceed = activeSection === 3 ? isSection3FormComplete() : isSectionComplete(activeSection);
 
   // ─── Desktop Stats Bar ─────────────────────────────────────────
   const renderStatsBar = () => (
@@ -1558,16 +1702,17 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           return (
             <button
               key={sec.num}
-              onClick={() => setActiveSection(sec.num)}
+              disabled={!canOpenSection(sec.num)}
+              onClick={() => canOpenSection(sec.num) && setActiveSection(sec.num)}
               title={desktopNavCollapsed ? `${sec.num}. ${sec.title}` : undefined}
-              className={`w-full flex items-center ${desktopNavCollapsed ? "justify-center px-0 py-3" : "gap-3 p-3 text-left"} rounded-xl transition-all ${
+              className={`w-full flex items-center ${desktopNavCollapsed ? "justify-center px-0 py-3" : "gap-3 p-3 text-left"} rounded-xl transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                 isActive ? "bg-amber-50 border-2 border-amber-300 shadow-xs" : "hover:bg-slate-50 border-2 border-transparent"
               }`}
             >
               <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 font-bold text-xs transition-colors ${
                 status === "completed" || isActive ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-400"
               }`}>
-                {status === "completed" ? <Check className="h-4 w-4" /> : sec.num}
+                {!canOpenSection(sec.num) ? <Lock className="h-3.5 w-3.5" /> : status === "completed" ? <Check className="h-4 w-4" /> : sec.num}
               </div>
               {!desktopNavCollapsed && (
                 <>
@@ -1606,6 +1751,20 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       <ParticipantLayout activePath="/journey" pageTitle="Journey (PTP)" hideBackToHome noPadding hideFooter>
 
       {renderPageAlert()}
+      <Dialog open={areaPendingRemoval !== null} onOpenChange={(open) => { if (!open) setAreaPendingRemoval(null); }}>
+        <DialogContent className="max-w-md border border-rose-200 p-6">
+          <DialogHeader>
+            <DialogTitle className="pr-6 text-base font-black text-navy-900">Hapus Area dan Target?</DialogTitle>
+            <DialogDescription>
+              Target 90 hari serta indikator pada area <strong>{areaPendingRemoval}</strong> akan dihapus dari draft Anda. Perubahan ini belum memengaruhi Impact Report sampai Anda menekan Selanjutnya dan menerapkan PTP.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAreaPendingRemoval(null)}>Tidak, Pertahankan</Button>
+            <Button type="button" onClick={confirmAreaRemoval} className="bg-rose-600 text-white hover:bg-rose-700">Ya, Hapus Area</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── MOBILE (< lg) ─────────────────────────────────────── */}
       <div className="flex h-[calc(100dvh-64px-56px-env(safe-area-inset-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-64px)] xl:hidden">
@@ -1668,8 +1827,9 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                   return (
                     <button
                       key={sec.num}
-                      onClick={() => { setActiveSection(sec.num); setMobileView("editor"); }}
-                      className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left transition-all border-2 ${
+                      disabled={!canOpenSection(sec.num)}
+                      onClick={() => { if (canOpenSection(sec.num)) { setActiveSection(sec.num); setMobileView("editor"); } }}
+                      className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left transition-all border-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                         isInProgress
                           ? "bg-amber-50 border-amber-300 shadow-sm"
                           : isCompleted
@@ -1682,7 +1842,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                         isInProgress ? "bg-amber-500 text-white ring-4 ring-amber-100" :
                         "bg-slate-100 text-slate-400"
                       }`}>
-                        {isCompleted ? <Check className="h-4 w-4" /> : sec.num}
+                        {!canOpenSection(sec.num) ? <Lock className="h-4 w-4" /> : isCompleted ? <Check className="h-4 w-4" /> : sec.num}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-bold leading-tight ${
@@ -1742,7 +1902,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               <Button variant="outline" onClick={goToPrev} className="flex-1 flex items-center justify-center gap-2 border-warm-border text-slate-700 rounded-xl h-11 font-bold">
                 <ArrowLeft className="h-4 w-4" />Sebelumnya
               </Button>
-              <Button onClick={goToNext} className="flex-1 flex items-center justify-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 font-bold shadow-sm">
+              <Button onClick={goToNext} disabled={!canProceed} className="flex-1 flex items-center justify-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 font-bold shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
                 {activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
               </Button>
             </div>
@@ -1795,7 +1955,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                     <Button variant="outline" onClick={goToPrev} disabled={activeSection === 1} className="flex items-center gap-2 border-warm-border text-slate-600 rounded-xl h-10 px-4">
                       <ArrowLeft className="h-4 w-4" /><span className="text-sm font-semibold">Sebelumnya</span>
                     </Button>
-                    <Button onClick={goToNext} className="flex items-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 font-bold shadow-sm">
+                    <Button onClick={goToNext} disabled={!canProceed} className="flex items-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 font-bold shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
                       <span className="text-sm">{activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
