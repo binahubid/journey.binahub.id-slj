@@ -75,6 +75,7 @@ DECLARE j public.journeys%ROWTYPE; p public.profiles%ROWTYPE; start_date DATE; p
     SELECT ans.area, SUM(ans.score) total, COUNT(*) cnt
     FROM public.baseline_assessments ba JOIN public.baseline_answers ans ON ans.assessment_id=ba.id
     WHERE ba.user_id=p_participant_user_id AND ba.completed
+      AND ans.area IN ('spiritual_growth','personal_development','leadership_excellence','relationship','community_impact')
     GROUP BY ans.area
   ), baseline_mapped AS (
     SELECT
@@ -89,8 +90,10 @@ DECLARE j public.journeys%ROWTYPE; p public.profiles%ROWTYPE; start_date DATE; p
       ROUND((b.total::NUMERIC/(b.cnt*10))*100) score
     FROM baseline_raw b
   )
-  SELECT COALESCE(jsonb_agg(jsonb_build_object('area',area,'score',score) ORDER BY area),'[]'::JSONB), ROUND(AVG(score))
-    INTO baseline_areas, baseline_score FROM baseline_mapped;
+  SELECT
+    COALESCE(jsonb_agg(jsonb_build_object('area',bm.area,'score',bm.score) ORDER BY bm.area),'[]'::JSONB),
+    ROUND(AVG(bm.score) FILTER (WHERE jsonb_array_length(COALESCE(j.area_transformasi,'[]'::JSONB))=0 OR COALESCE(j.area_transformasi,'[]'::JSONB) ? bm.area))
+    INTO baseline_areas, baseline_score FROM baseline_mapped bm;
   WITH checkpoint_schedule AS (
     SELECT month_number, start_date + ((month_number - 1) * 30) open_date, start_date + (month_number * 30 - 1) due_date, start_date + (month_number * 30 + 6) grace_cutoff
     FROM generate_series(1,3) month_number
