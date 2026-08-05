@@ -423,10 +423,26 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   }, []);
 
   // ─── Autosave ──────────────────────────────────────────────────
+  const isSection3ReadyForAutosave = () => {
+    const areas = selectedAreasRef.current;
+    const targets = areaTargetsMapRef.current;
+    return areas.length === 3 && areas.every(area => {
+      const target = targets[area];
+      if (!target?.mainTarget?.trim()) return false;
+      const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
+      return validateAreaIndicators(indicators, area).valid;
+    });
+  };
+
   const scheduleAutosave = (sectionNum: number) => {
     if (ptpStatusRef.current === "LOCKED") return;
-    setSaveStatus("saving");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (sectionNum === 3 && !isSection3ReadyForAutosave()) {
+      setSaveStatus("idle");
+      setSaveError(null);
+      return;
+    }
+    setSaveStatus("saving");
     // Store sectionNum in the closure, but read field values from refs at fire time
     saveTimerRef.current = setTimeout(() => handleSaveSection(sectionNum), 1500);
   };
@@ -810,6 +826,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           const prev = areaTargetsMap[areaId] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
           const updated = { ...areaTargetsMap, [areaId]: { ...prev, [field]: value } };
           setAreaTargetsMap(updated);
+          areaTargetsMapRef.current = updated;
           scheduleAutosave(3);
         };
 
