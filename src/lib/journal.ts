@@ -1,6 +1,11 @@
 const LESSON_SEPARATOR = "--- Pelajaran: ---";
 const IMPROVEMENT_SEPARATOR = "--- Perbaikan Besok: ---";
 
+export function getCanonicalJournalDate(value: string | null | undefined): string {
+  const match = value?.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match?.[1] || "";
+}
+
 export function parseJournalContent(content: string | null | undefined) {
   const value = content?.trim() || "";
   const [reflectionPart, lessonAndImprovement = ""] = value.split(LESSON_SEPARATOR, 2);
@@ -28,7 +33,7 @@ export function getJourneyDayForDate(date: string, startDate?: string | null) {
 }
 
 export function getJournalStreak(dates: string[]) {
-  const uniqueDates = [...new Set(dates.map(date => date.slice(0, 10)))].sort().reverse();
+  const uniqueDates = [...new Set(dates.map(getCanonicalJournalDate).filter(Boolean))].sort().reverse();
   if (uniqueDates.length === 0) return 0;
 
   const today = new Date();

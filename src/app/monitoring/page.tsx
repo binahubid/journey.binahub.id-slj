@@ -37,6 +37,36 @@ import { getTransformationAreaColor, normalizeTransformationArea } from "@/lib/t
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getActiveProgramMonth, getMonthEditState, getProgramDay } from "@/lib/program-timeline";
 import Link from "next/link";
+import { calculateAreaOutcome, calculateIndicatorCoverage, calculateIndicatorOutcomes, calculateScheduledHabitCompletion, type IndicatorDefinition } from "@/lib/assessment-methodology";
+import { addCalendarDays, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
+
+type HabitFrequency = "daily" | "weekly" | "unsupported";
+type AreaExecutionStatus = "MEASURED" | "NOT_MEASURED" | "UNSUPPORTED";
+
+function normalizeHabitFrequency(value?: string | null): HabitFrequency {
+  const frequency = String(value || "").trim().toLowerCase();
+  if (["daily", "harian", "setiap hari"].includes(frequency)) return "daily";
+  if (["weekly", "pekanan"].includes(frequency) || frequency.includes("minggu")) return "weekly";
+  return "unsupported";
+}
+
+function getMondayWeekStart(dateString: string): string {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const dayOfWeek = new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
+  return addCalendarDays(dateString, -((dayOfWeek + 6) % 7));
+}
+
+function getCompletedUnits(log: any, quantity: number): number {
+  if (!log) return 0;
+  const count = Number(log.completed_count);
+  if (Number.isFinite(count) && count > 0) return count;
+  return log.completed ? quantity : 0;
+}
+
+function normalizeHabitQuantity(...values: unknown[]): number {
+  const quantity = values.map(Number).find(value => Number.isFinite(value) && value > 0);
+  return quantity ? Math.max(1, quantity) : 1;
+}
 
 interface MonthlyReviewItem {
   id?: string;
@@ -65,46 +95,29 @@ interface AreaReport {
   biayaActual: string;
   isSaved?: boolean;
   baselineScore?: number;
+  indicators?: IndicatorDefinition[];
+  indicatorActuals?: Record<string, number | undefined>;
+  indicatorEvidenceNotes?: Record<string, string | undefined>;
 }
 
 // ── Formula Calculation Functions ──────────────────────────────────────────
 
-function calcKuantitasScore(baseline: string, target: string, actual: string): number {
-  const b = parseFloat(baseline);
-  const t = parseFloat(target);
-  const a = parseFloat(actual);
-  if (isNaN(b) || isNaN(t) || isNaN(a) || Math.abs(t - b) < 0.001) return 0;
-  const pct = (Math.abs(a - b) / Math.abs(t - b)) * 100;
-  return Math.min(100, Math.max(0, Math.round(pct)));
-}
-
-function calcWaktuScore(actualDays: string): number {
-  const d = parseFloat(actualDays);
-  if (isNaN(d)) return 0;
-  return Math.min(100, Math.round((d / 30) * 100));
-}
-
-function calcBiayaScore(biayaTarget: string, biayaActual: string): number {
-  const t = parseFloat(biayaTarget.replace(/[^0-9.]/g, ""));
-  const a = parseFloat(biayaActual.replace(/[^0-9.]/g, ""));
-  if (isNaN(t) || isNaN(a) || t === 0) return 0;
-  return Math.min(100, Math.round((a / t) * 100));
-}
-
 // ── Month Edit Window Helper ────────────────────────────────────────────────
 // Bulan ke-N aktif diisi mulai hari ke-((N-1)*30+1), tetap bisa diedit sampai
 // 7 hari masuk ke bulan berikutnya (masa tenggang), lalu terkunci permanen.
-function calcAreaScore(rep: AreaReport): number {
-  if (!rep.isSaved) return rep.baselineScore || 0;
+function calcAreaScore(rep: AreaReport): number | null {
+  if (!rep.indicators?.length) return null;
+  return calculateAreaOutcome(calculateIndicatorOutcomes(rep.indicators, rep.indicatorActuals || {})).score;
+}
 
-  const scores: number[] = [];
-  if (rep.targets.kualitas) scores.push(rep.kualitasRating * 20);
-  if (rep.targets.kuantitas && rep.kuantitasBaseline && rep.kuantitasActual)
-    scores.push(calcKuantitasScore(rep.kuantitasBaseline, rep.targets.kuantitas, rep.kuantitasActual));
-  if (rep.targets.waktu && rep.waktuActualDays) scores.push(calcWaktuScore(rep.waktuActualDays));
-  if (rep.targets.biaya && rep.biayaActual) scores.push(calcBiayaScore(rep.targets.biaya, rep.biayaActual));
-  if (scores.length === 0) return rep.kualitasRating * 20;
-  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+function getMeasurementCoverage(rep?: AreaReport) {
+  const active = rep?.indicators?.filter((indicator) => indicator.active) || [];
+  if (!active.length) return 0;
+  const measured = active.filter((indicator) => {
+    const actual = rep?.indicatorActuals?.[indicator.key];
+    return Number.isFinite(actual) && (actual as number) >= 0;
+  }).length;
+  return Math.round(measured / active.length * 100);
 }
 
 export default function MonitoringPage() {
@@ -144,6 +157,8 @@ export default function MonitoringPage() {
   const [areaActionPlanCounts, setAreaActionPlanCounts] = useState<Record<string, number>>({});
   const [heatmapData, setHeatmapData] = useState<{ date: string; count: number; level: number }[]>([]);
   const [habitConsistencyPct, setHabitConsistencyPct] = useState<number>(0);
+  const [indicatorCoverage, setIndicatorCoverage] = useState<Record<string, number>>({});
+  const [areaExecutionStatuses, setAreaExecutionStatuses] = useState<Record<string, AreaExecutionStatus>>({});
 
   // Modal Drawer for 4-Dimension Indicator Update
   const [editingAreaModal, setEditingAreaModal] = useState<string | null>(null);
@@ -161,8 +176,8 @@ export default function MonitoringPage() {
       if (profile) {
         setUserName(profile.full_name || "Peserta SLJ");
         if (profile.start_date) {
-          const currentDay = Math.min(90, getProgramDay(profile.start_date));
-          initialMonth = getActiveProgramMonth(currentDay);
+          const currentDay = getProgramDay(profile.start_date);
+          initialMonth = getActiveProgramMonth(currentDay) ?? 1;
           setDayCount(currentDay);
           setSelectedMonth(initialMonth);
         }
@@ -231,6 +246,16 @@ export default function MonitoringPage() {
         }
       } catch {}
 
+      const { data: indicatorRows, error: indicatorsError } = await supabase.from("ptp_indicators")
+        .select("id, area, indicator_key, indicator_type, label, active, direction, baseline_value, target_value, unit")
+        .eq("journey_id", journey.id).order("created_at", { ascending: true });
+      const structuredAvailable = !indicatorsError;
+      if (indicatorsError && indicatorsError.code !== "42P01" && indicatorsError.code !== "PGRST205") throw indicatorsError;
+      const { data: actualRows, error: actualsError } = structuredAvailable
+        ? await supabase.from("ptp_indicator_actuals").select("indicator_id, month_number, actual_value, evidence_note").eq("journey_id", journey.id)
+        : { data: [], error: null };
+      if (actualsError && actualsError.code !== "42P01" && actualsError.code !== "PGRST205") throw actualsError;
+
       // Fetch Baseline Assessment Answers if available
       const { data: baselineAssessment } = await supabase.from("baseline_assessments")
         .select("id").eq("user_id", user.id).eq("completed", true).maybeSingle();
@@ -275,6 +300,21 @@ export default function MonitoringPage() {
           const saved = (indReports || []).find((r: any) => r.month_number === month && r.area === area);
           const ptpBaseline = targetsMap[area]?.kuantitasBaseline || "";
           const bScore = baselineScoresMap[area];
+          const definitions = (indicatorRows || []).filter((row: any) => row.area === area).slice(0, 4).map((row: any) => ({
+            key: row.indicator_key, type: row.indicator_type || "quantity", label: row.label, active: row.active, direction: row.direction,
+            baseline: Number(row.baseline_value), target: Number(row.target_value), unit: row.unit || "",
+          } as IndicatorDefinition));
+          const monthActualRows = (actualRows || []).filter((row: any) => row.month_number === month);
+          const actuals = Object.fromEntries(monthActualRows.flatMap((row: any) => {
+            const definition = (indicatorRows || []).find((item: any) => item.id === row.indicator_id);
+            const actual = Number(row.actual_value);
+            return definition && Number.isFinite(actual) && actual >= 0 ? [[definition.indicator_key, actual]] : [];
+          }));
+          const evidenceNotes = Object.fromEntries(monthActualRows.flatMap((row: any) => {
+            const definition = (indicatorRows || []).find((item: any) => item.id === row.indicator_id);
+            return definition && row.evidence_note ? [[definition.indicator_key, row.evidence_note]] : [];
+          }));
+          if (month === initialMonth) setIndicatorCoverage(current => ({ ...current, [area]: calculateIndicatorCoverage(definitions.filter(indicator => indicator.active).length).score || 0 }));
           newReports[month][area] = saved
             ? {
                 area,
@@ -286,8 +326,11 @@ export default function MonitoringPage() {
                 biayaActual: saved.biaya_actual?.toString() || "",
                 isSaved: true,
                 baselineScore: bScore,
+                indicators: definitions,
+                indicatorActuals: actuals,
+                indicatorEvidenceNotes: evidenceNotes,
               }
-            : buildEmptyReport(area, targetsMap[area] || { mainTarget: "", kualitas: "", kuantitas: "", waktu: "", biaya: "" }, bScore);
+            : { ...buildEmptyReport(area, targetsMap[area] || { mainTarget: "", kualitas: "", kuantitas: "", waktu: "", biaya: "" }, bScore), indicators: definitions, indicatorActuals: actuals, indicatorEvidenceNotes: evidenceNotes };
 
           if (!saved && ptpBaseline) {
             newReports[month][area].kuantitasBaseline = ptpBaseline;
@@ -329,7 +372,7 @@ export default function MonitoringPage() {
       setAreaActionPlanCounts(planCounts);
 
       const activeHabits = (habitsList || []).filter((h: any) => h.is_archived !== true);
-      const habitsWithArea: { id: string; actionPlanId: string; area: string; qty: number; effectiveFrom?: string; effectiveUntil?: string }[] = [];
+      const habitsWithArea: { id: string; actionPlanId: string; area: string; qty: number; frequency: HabitFrequency; effectiveFrom?: string; effectiveUntil?: string }[] = [];
       const usedHabitIds = new Set<string>();
 
       // Action Plan is the source of truth for area. Matching by title supports legacy habits.
@@ -347,7 +390,8 @@ export default function MonitoringPage() {
             id: `missing:${ap.id}`,
             actionPlanId: ap.id,
             area,
-            qty: ap.quantity || ap.target || 1,
+            qty: normalizeHabitQuantity(ap.quantity, ap.target),
+            frequency: normalizeHabitFrequency(ap.frequency),
           });
           return;
         }
@@ -356,99 +400,127 @@ export default function MonitoringPage() {
           id: habit.id,
           actionPlanId: ap.id,
           area,
-          qty: habit.quantity || habit.target || ap.quantity || ap.target || 1,
+          qty: normalizeHabitQuantity(habit.quantity, habit.target, ap.quantity, ap.target),
+          frequency: normalizeHabitFrequency(habit.frequency),
           effectiveFrom: habit.effective_from || undefined,
           effectiveUntil: habit.effective_until || undefined,
         });
       });
 
-      // Build cumulative chart based on timeframe (1d, 7d, 1m, 3m).
+      // Build the timeline using the participant's calendar, not the browser's UTC date.
       const numDays = timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
       const today = new Date();
-      const todayStr = today.toISOString().split("T")[0];
-      const datesArr: string[] = [];
-      for (let i = numDays - 1; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        datesArr.push(d.toISOString().split("T")[0]);
-      }
+      const participantTimeZone = resolveParticipantTimeZone(
+        profile?.timezone,
+        profile?.timezone_mode === "MANUAL" ? "MANUAL" : "AUTO"
+      );
+      const todayStr = getLocalDateString(today, participantTimeZone);
+      const datesArr = Array.from({ length: numDays }, (_, index) => addCalendarDays(todayStr, index - numDays + 1));
 
       const profileStartDate = profile?.start_date
-        ? new Date(profile.start_date).toISOString().split("T")[0]
+        ? String(profile.start_date).slice(0, 10)
         : datesArr[0];
-      const accumulationStartDate = profileStartDate <= todayStr ? profileStartDate : todayStr;
+      const programEndDate = addCalendarDays(profileStartDate, 89);
+      const accumulationStartDate = profileStartDate;
+      const accumulationEndDate = todayStr < programEndDate ? todayStr : programEndDate;
       const accumulationDates: string[] = [];
-      const accumulationCursor = new Date(`${accumulationStartDate}T00:00:00`);
-      while (accumulationCursor.toISOString().split("T")[0] <= todayStr) {
-        accumulationDates.push(accumulationCursor.toISOString().split("T")[0]);
-        accumulationCursor.setDate(accumulationCursor.getDate() + 1);
+      if (accumulationStartDate <= accumulationEndDate) {
+        for (let dateStr = accumulationStartDate; dateStr <= accumulationEndDate; dateStr = addCalendarDays(dateStr, 1)) {
+          accumulationDates.push(dateStr);
+        }
       }
 
       // Include the full program period so every timeframe starts from the true running balance.
       const [habitLogsRes] = await Promise.all([
         supabase
           .from("habit_logs")
-          .select("habit_id, date, completed, completed_count")
-          .eq("user_id", user.id)
-          .gte("date", accumulationStartDate)
-          .lte("date", todayStr),
+           .select("habit_id, date, completed, completed_count")
+           .eq("user_id", user.id)
+           .gte("date", accumulationStartDate)
+           .lte("date", accumulationEndDate),
       ]);
       if (habitLogsRes.error) throw habitLogsRes.error;
 
       const habitLogs = habitLogsRes.data || [];
 
       if (areas.length > 0) {
-        const calculateAreaScore = (area: string, dateStr: string, logsForDay: any[]) => {
-          const areaHabits = habitsWithArea.filter(h =>
-            h.area === area &&
-            (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
-            (!h.effectiveUntil || h.effectiveUntil >= dateStr)
-          );
-          if (areaHabits.length === 0) return 0;
-          const completedWeight = areaHabits.reduce((total, h) => {
-            const log = h.id.startsWith("missing:") ? null : logsForDay.find((l: any) => l.habit_id === h.id);
-            const cnt = log ? (log.completed_count || (log.completed ? h.qty : 0)) : 0;
-            return total + Math.min(1, cnt / h.qty);
-          }, 0);
-          return Number((completedWeight / areaHabits.length).toFixed(2));
-        };
-
-        const runningScores: Record<string, number> = Object.fromEntries(areas.map(area => [area, 0]));
-        const areaHasStarted: Record<string, boolean> = Object.fromEntries(areas.map(area => [area, false]));
+        const habitExecution = Object.fromEntries(habitsWithArea.map(habit => [habit.id, {
+          scheduled: 0,
+          completed: 0,
+          currentWeek: "",
+          currentWeekCompleted: 0,
+        }]));
         const cumulativeChart = accumulationDates.map((dateStr) => {
-          const dObj = new Date(dateStr);
+          const dObj = new Date(`${dateStr}T12:00:00Z`);
           const label = numDays <= 7
-            ? dObj.toLocaleDateString("id-ID", { weekday: "short" })
-            : `${dObj.getDate()}/${dObj.getMonth() + 1}`;
+            ? dObj.toLocaleDateString("id-ID", { weekday: "short", timeZone: "UTC" })
+            : `${dObj.getUTCDate()}/${dObj.getUTCMonth() + 1}`;
 
           const logsForDay = habitLogs.filter((l: any) => l.date === dateStr);
-          const scores: Record<string, number> = {};
-          areas.forEach(area => {
-            const activeAreaHabits = habitsWithArea.filter(h =>
-              h.area === area &&
-              (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
-              (!h.effectiveUntil || h.effectiveUntil >= dateStr)
-            );
-            // No obligation exists before an Action Plan becomes effective.
-            // Do not penalize those dates, otherwise a late-created habit starts in debt.
-            if (activeAreaHabits.length === 0) {
-              scores[area] = runningScores[area];
+          habitsWithArea.forEach(habit => {
+            if (
+              habit.frequency === "unsupported" ||
+              (habit.effectiveFrom && habit.effectiveFrom > dateStr) ||
+              (habit.effectiveUntil && habit.effectiveUntil < dateStr)
+            ) return;
+
+            const execution = habitExecution[habit.id];
+            const log = habit.id.startsWith("missing:") ? null : logsForDay.find((item: any) => item.habit_id === habit.id);
+            if (habit.frequency === "daily") {
+              execution.scheduled += habit.qty;
+              execution.completed += Math.min(habit.qty, getCompletedUnits(log, habit.qty));
               return;
             }
 
-            const areaHabitIds = new Set(activeAreaHabits.map(h => h.id));
-            const hasCompletedActivity = logsForDay.some((l: any) =>
-              areaHabitIds.has(l.habit_id) && (l.completed || (l.completed_count || 0) > 0)
-            );
-            if (hasCompletedActivity) areaHasStarted[area] = true;
-            const dailyChange = hasCompletedActivity
-              ? calculateAreaScore(area, dateStr, logsForDay)
-              : areaHasStarted[area] ? -1 : 0;
-            runningScores[area] = Number((runningScores[area] + dailyChange).toFixed(2));
-            scores[area] = runningScores[area];
+            const weekStart = getMondayWeekStart(dateStr);
+            if (execution.currentWeek !== weekStart) {
+              execution.currentWeek = weekStart;
+              execution.currentWeekCompleted = 0;
+              execution.scheduled += habit.qty;
+            }
+            const available = habit.qty - execution.currentWeekCompleted;
+            const completed = Math.min(available, getCompletedUnits(log, habit.qty));
+            execution.currentWeekCompleted += completed;
+            execution.completed += completed;
+          });
+
+          const scores: Record<string, number> = {};
+          areas.forEach(area => {
+            const habitScores = habitsWithArea
+              .filter(habit => habit.area === area && habit.frequency !== "unsupported" && habitExecution[habit.id].scheduled > 0)
+              .map(habit => calculateScheduledHabitCompletion({
+                scheduledOccurrences: habitExecution[habit.id].scheduled,
+                completedOccurrences: habitExecution[habit.id].completed,
+              }).score || 0);
+            scores[area] = habitScores.length
+              ? Math.round(habitScores.reduce((sum, score) => sum + score, 0) / habitScores.length)
+              : 0;
           });
           return { day: label, scores };
         });
+
+        const executionStatuses: Record<string, AreaExecutionStatus> = {};
+        const measuredAreaScores: number[] = [];
+        areas.forEach(area => {
+          const areaHabits = habitsWithArea.filter(habit => habit.area === area);
+          const hasUnsupportedSchedule = areaHabits.some(habit => habit.frequency === "unsupported");
+          const measuredHabits = areaHabits.filter(habit => habit.frequency !== "unsupported" && habitExecution[habit.id].scheduled > 0);
+          if (hasUnsupportedSchedule) {
+            executionStatuses[area] = "UNSUPPORTED";
+          } else if (measuredHabits.length === 0) {
+            executionStatuses[area] = "NOT_MEASURED";
+          } else {
+            executionStatuses[area] = "MEASURED";
+            measuredAreaScores.push(Math.round(measuredHabits.reduce((sum, habit) => sum + (calculateScheduledHabitCompletion({
+              scheduledOccurrences: habitExecution[habit.id].scheduled,
+              completedOccurrences: habitExecution[habit.id].completed,
+            }).score || 0), 0) / measuredHabits.length));
+          }
+        });
+        setAreaExecutionStatuses(executionStatuses);
+        setHabitConsistencyPct(measuredAreaScores.length
+          ? Math.round(measuredAreaScores.reduce((sum, score) => sum + score, 0) / measuredAreaScores.length)
+          : 0);
 
         const visibleChart = cumulativeChart.filter((_, idx) => accumulationDates[idx] >= datesArr[0]);
         const chart = visibleChart.filter((_, idx) =>
@@ -463,39 +535,26 @@ export default function MonitoringPage() {
 
       // Build 90-Day Heatmap Data & Calculate Real Habit Consistency %
       const dates90: string[] = [];
-      for (let i = 89; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        dates90.push(d.toISOString().split("T")[0]);
-      }
+      for (let i = 89; i >= 0; i--) dates90.push(addCalendarDays(todayStr, -i));
 
       const { data: logs90 } = await supabase.from("habit_logs")
         .select("habit_id, date, completed, completed_count").eq("user_id", user.id).in("date", dates90);
 
-      let consistencyTotal = 0;
-      let consistencyDays = 0;
-
       const heatmap = dates90.map(dateStr => {
         const activeHabits = habitsWithArea.filter(h =>
+          dateStr >= profileStartDate && dateStr <= programEndDate &&
           (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
           (!h.effectiveUntil || h.effectiveUntil >= dateStr)
         );
         const dayLogs = (logs90 || []).filter((l: any) => l.date === dateStr);
         const completedCount = activeHabits.reduce((sum, h) => {
           const log = h.id.startsWith("missing:") ? null : dayLogs.find((l: any) => l.habit_id === h.id);
-          return sum + (log ? Number(log.completed_count || (log.completed ? 1 : 0)) : 0);
+          return sum + getCompletedUnits(log, h.qty);
         }, 0);
-        const totalUnits = activeHabits.reduce((sum, h) => sum + h.qty, 0);
-        const pct = totalUnits ? Math.round((completedCount / totalUnits) * 100) : 0;
-        if (totalUnits > 0) { consistencyTotal += pct; consistencyDays++; }
         const level = completedCount > 10 ? 4 : completedCount >= 7 ? 3 : completedCount >= 4 ? 2 : completedCount > 0 ? 1 : 0;
         return { date: dateStr, count: completedCount, level };
       });
       setHeatmapData(heatmap);
-
-      // Real calculated habit consistency % over active days
-      const realHabitPct = consistencyDays ? Math.round(consistencyTotal / consistencyDays) : 0;
-      setHabitConsistencyPct(realHabitPct);
 
     } catch (err) {
       const error = err as { code?: string; message?: string; details?: string; hint?: string };
@@ -568,6 +627,11 @@ export default function MonitoringPage() {
     if (!rep) return;
     setSavingArea(area);
     setSaveError(null);
+    const invalidActual = (rep.indicators || []).some((indicator) => indicator.active && rep.indicatorActuals?.[indicator.key] !== undefined && (!Number.isFinite(rep.indicatorActuals[indicator.key]) || (rep.indicatorActuals[indicator.key] as number) < 0));
+    if (invalidActual) {
+      setSaveError(`${area}: actual indikator harus berupa angka valid dan tidak boleh negatif.`);
+      return;
+    }
     const overallPct = calcAreaScore(rep);
     try {
       const { error } = await supabase.from("monthly_indicator_reports").upsert({
@@ -580,10 +644,26 @@ export default function MonitoringPage() {
         kuantitas_actual: parseFloat(rep.kuantitasActual) || null,
         waktu_actual_days: parseFloat(rep.waktuActualDays) || null,
         biaya_actual: parseFloat(rep.biayaActual.replace(/[^0-9.]/g, "")) || null,
-        score_percentage: overallPct,
+        score_percentage: null,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id,month_number,area" });
       if (error) throw error;
+      if (rep.indicators?.length) {
+        for (const indicator of rep.indicators.filter(item => item.active)) {
+          const actual = rep.indicatorActuals?.[indicator.key];
+          if (!Number.isFinite(actual)) continue;
+          const { data: definition, error: definitionError } = await supabase.from("ptp_indicators")
+            .select("id").eq("journey_id", journeyId).eq("area", area).eq("indicator_key", indicator.key).maybeSingle();
+          if (definitionError && definitionError.code !== "42P01" && definitionError.code !== "PGRST205") throw definitionError;
+           if (definition?.id) {
+             const { error: actualError } = await supabase.from("ptp_indicator_actuals").upsert({
+               indicator_id: definition.id, participant_user_id: user.id, journey_id: journeyId,
+               month_number: selectedMonth, actual_value: actual, evidence_note: rep.indicatorEvidenceNotes?.[indicator.key] || null, updated_at: new Date().toISOString(),
+            }, { onConflict: "indicator_id,month_number" });
+            if (actualError && actualError.code !== "42P01" && actualError.code !== "PGRST205") throw actualError;
+          }
+        }
+      }
       setAreaReports(prev => ({
         ...prev,
         [selectedMonth]: {
@@ -628,23 +708,24 @@ export default function MonitoringPage() {
 
   // Overall Health Score Calculation & Guilt-Free Status Helper
   const calculateHealthScores = () => {
-    if (selectedAreas.length === 0) return { overall: 0, areas: {}, highestArea: "", lowestArea: "" };
-    let sum = 0;
-    const areaScores: Record<string, number> = {};
+    if (selectedAreas.length === 0) return { overall: null as number | null, areas: {} as Record<string, number | null>, highestArea: "", lowestArea: "" };
+    const measuredScores: number[] = [];
+    const areaScores: Record<string, number | null> = {};
     let highest = { area: selectedAreas[0] || "", score: -1 };
     let lowest = { area: selectedAreas[0] || "", score: 999 };
 
     selectedAreas.forEach(area => {
       const rep = areaReports[selectedMonth]?.[area];
-      const score = rep ? calcAreaScore(rep) : 0;
+      const score = rep ? calcAreaScore(rep) : null;
       areaScores[area] = score;
-      sum += score;
-
-      if (score > highest.score) highest = { area, score };
-      if (score < lowest.score) lowest = { area, score };
+      if (score !== null) {
+        measuredScores.push(score);
+        if (score > highest.score) highest = { area, score };
+        if (score < lowest.score) lowest = { area, score };
+      }
     });
-    const overall = Math.round(sum / selectedAreas.length);
-    return { overall, areas: areaScores, highestArea: highest.area, lowestArea: lowest.area };
+    const overall = measuredScores.length ? Math.round(measuredScores.reduce((sum, score) => sum + score, 0) / measuredScores.length) : null;
+    return { overall, areas: areaScores, highestArea: measuredScores.length ? highest.area : "", lowestArea: measuredScores.length ? lowest.area : "" };
   };
 
   const healthData = calculateHealthScores();
@@ -653,7 +734,7 @@ export default function MonitoringPage() {
   const daysToNextCheckpoint = dayCount <= 30 ? 30 - dayCount : dayCount <= 60 ? 60 - dayCount : Math.max(0, 90 - dayCount);
 
   // Proyeksi Kelulusan Real
-  const projectedOverallPct = Math.min(100, Math.round((healthData.overall + habitConsistencyPct) / 2));
+  const projectedOverallPct = healthData.overall === null ? null : Math.min(100, Math.round((healthData.overall + habitConsistencyPct) / 2));
 
   // Guilt-Free UX Helper for New Participants (< 7 days or no entries)
   const isEarlyStage = dayCount <= 7;
@@ -725,7 +806,7 @@ export default function MonitoringPage() {
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-amber-300 font-bold flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
-                      Hari ke-{dayCount} dari 90 Hari
+                      Hari ke-{Math.min(90, dayCount)} dari 90 Hari
                     </span>
                     <span className="text-slate-400">•</span>
                     <span className="text-slate-300">
@@ -748,13 +829,13 @@ export default function MonitoringPage() {
                         Journey Health Score {isEarlyStage && "(Skor Awal dari Baseline)"}
                       </span>
                       <span className="font-extrabold text-amber-300">
-                        {healthData.overall}%
+                        {healthData.overall === null ? "Belum Ada Data" : `${healthData.overall}%`}
                       </span>
                     </div>
                     <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-amber-400 rounded-full transition-all duration-700"
-                        style={{ width: `${Math.max(4, healthData.overall)}%` }}
+                        style={{ width: `${healthData.overall === null ? 0 : Math.max(4, healthData.overall)}%` }}
                       />
                     </div>
                   </div>
@@ -790,7 +871,7 @@ export default function MonitoringPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {selectedAreas.map(area => {
-                  const score = healthData.areas[area] || 0;
+                  const score = healthData.areas[area] ?? null;
                   const color = getTransformationAreaColor(area);
                   const rep = areaReports[selectedMonth]?.[area];
                   const hasFilledData = Boolean(rep?.isSaved);
@@ -803,15 +884,15 @@ export default function MonitoringPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[140px]" style={{ color }}>{area}</span>
                       </div>
-                      <div className="flex items-baseline justify-between">
+                          <div className="flex items-baseline justify-between">
                         <span className="text-2xl font-black" style={{ color }}>
-                          {score}%
+                          {score === null ? "--" : `${score}%`}
                         </span>
 
                         {/* Badge: bedakan skor awal (dari baseline, belum ada laporan bulan ini) vs capaian nyata */}
-                        {!hasFilledData ? (
+                        {score === null ? (
                           <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Skor Awal (Baseline)
+                            Belum Ada Data
                           </span>
                         ) : score >= 80 ? (
                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
@@ -827,10 +908,17 @@ export default function MonitoringPage() {
                           </span>
                         )}
                       </div>
+                      <p className="text-[10px] font-semibold text-slate-500">Behavior Execution: {
+                        areaExecutionStatuses[area] === "UNSUPPORTED"
+                          ? "Tidak Dapat Dihitung"
+                          : areaExecutionStatuses[area] === "MEASURED"
+                          ? "Diukur dari occurrence terjadwal"
+                          : "Tidak Diukur"
+                      }</p>
                       <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${Math.max(3, score)}%`, backgroundColor: color }}
+                        style={{ width: `${score === null ? 0 : Math.max(3, score)}%`, backgroundColor: color }}
                         />
                       </div>
                     </div>
@@ -991,7 +1079,7 @@ export default function MonitoringPage() {
                         Grid Istiqamah 90 Hari
                       </h3>
                       <p className="ml-10 mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                        Konsistensi eksekusi Action Plan harian
+                        Aktivitas Action Plan pada setiap tanggal
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
@@ -1083,7 +1171,7 @@ export default function MonitoringPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   {selectedAreas.map(area => {
                     const rep = areaReports[selectedMonth]?.[area];
-                    const score = rep ? calcAreaScore(rep) : 0;
+                    const score = rep ? calcAreaScore(rep) : null;
                     const color = getTransformationAreaColor(area);
                     const hasFilledData = Boolean(rep?.isSaved);
 
@@ -1100,15 +1188,16 @@ export default function MonitoringPage() {
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 min-w-0 gap-2">
                             <span className={`text-xs font-extrabold min-w-0 truncate ${monthEditState === "ACTIVE" ? "text-navy-900" : "text-slate-600"}`}>{area}</span>
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                              !hasFilledData && isEarlyStage
+                              score === null
                                 ? "bg-slate-100 text-slate-600"
                                 : score >= 80 ? "bg-emerald-50 text-emerald-700"
                                 : score >= 50 ? "bg-amber-50 text-amber-700"
                                 : "bg-slate-100 text-slate-600"
                             }`}>
-                              {!hasFilledData ? `${score}% Skor Baseline` : `${score}% Capaian`}
+                              {score === null ? (rep?.indicators?.length ? "Belum Ada Data" : "Definisi Perlu Diperbaiki") : `${score}% Capaian`}
                             </span>
                           </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px] font-semibold text-slate-500"><p>Coverage struktur: {indicatorCoverage[area] || 0}%</p><p>Coverage pengukuran: {getMeasurementCoverage(rep)}%</p></div>
 
                           {rep?.targets?.mainTarget && (
                             <p className="text-xs text-slate-600 line-clamp-2 italic">
@@ -1418,11 +1507,11 @@ export default function MonitoringPage() {
               </div>
               <div className="relative py-1">
                 <span className="text-3xl font-black text-navy-900">
-                  {isEarlyStage && projectedOverallPct === 0 ? "--" : `${projectedOverallPct}%`}
+                  {projectedOverallPct === null ? "--" : `${projectedOverallPct}%`}
                 </span>
                 <p className="text-xs font-bold text-emerald-700 mt-1">
-                  {isEarlyStage && projectedOverallPct === 0
-                    ? "Sedang Berjalan"
+                  {projectedOverallPct === null
+                    ? "Belum cukup data"
                     : projectedOverallPct >= 80 ? "On Track" : "Perlu Penyesuaian Ritme"}
                 </p>
               </div>
@@ -1534,8 +1623,22 @@ export default function MonitoringPage() {
                       <span className="text-sm font-extrabold text-emerald-600">{overallPct}% Berhasil</span>
                     </div>
 
-                    {/* Rating 1 - 5 Bintang Fallback (jika 4D indikator tidak diisi di PTP) */}
-                    {!rep.targets.kualitas && !rep.targets.kuantitas && !rep.targets.waktu && !rep.targets.biaya ? (
+                     {rep.indicators?.length ? (
+                       <div className="space-y-3">
+                         {rep.indicators.filter(indicator => indicator.active).map(indicator => (
+                           <div key={indicator.key} className="rounded-xl border border-slate-200 bg-white p-3">
+                             <div className="mb-2 flex items-center justify-between gap-2"><label className="text-xs font-bold text-slate-700">{indicator.label}</label><span className="text-[10px] text-slate-500">Target {indicator.target} {indicator.unit}</span></div>
+                             <Input type="number" value={rep.indicatorActuals?.[indicator.key] ?? ""} onChange={event => {
+                                const value = event.target.value === "" ? undefined : Number(event.target.value);
+                                if (value !== undefined && (!Number.isFinite(value) || value < 0)) return;
+                                setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorActuals: { ...current[selectedMonth][editingAreaModal].indicatorActuals, [indicator.key]: value } } } }));
+                              }} min={0} placeholder={`Aktual (${indicator.unit || "angka"})`} className="h-9 text-xs" />
+                              <p className="mt-2 text-[10px] text-slate-500">{indicator.type === "quality" ? "Kualitas" : indicator.type === "quantity" ? "Kuantitas" : indicator.type === "time" ? "Waktu" : "Efisiensi/Biaya"} · Kondisi saat ini {indicator.baseline} · Target 90 hari {indicator.target} · {indicator.direction === "higher_is_better" ? "Naik lebih baik" : "Turun lebih baik"} · {indicator.unit || "Satuan belum tersedia"}</p>
+                              <Input value={rep.indicatorEvidenceNotes?.[indicator.key] || ""} onChange={event => setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorEvidenceNotes: { ...current[selectedMonth][editingAreaModal].indicatorEvidenceNotes, [indicator.key]: event.target.value } } } }))} placeholder="Catatan bukti (opsional)" className="mt-2 h-9 text-xs" />
+                           </div>
+                         ))}
+                       </div>
+                     ) : !rep.targets.kualitas && !rep.targets.kuantitas && !rep.targets.waktu && !rep.targets.biaya ? (
                       <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl space-y-3">
                         <div className="flex items-center justify-between">
                           <label className="font-extrabold text-amber-900 text-xs block">Rating Capaian Bulanan (1 – 5 Bintang)</label>

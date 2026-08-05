@@ -20,6 +20,7 @@ import {
   BarChart3,
   HeartHandshake,
   ScrollText,
+  BookOpenCheck,
   Menu,
   X,
 } from "lucide-react";
@@ -63,6 +64,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/report", label: "Impact Report", icon: BarChart3 },
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
+    { href: "/admin/documentation", label: "Documentation", icon: BookOpenCheck },
     { href: "/admin/settings", label: "Settings", icon: Settings },
   ];
 

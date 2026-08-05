@@ -23,9 +23,9 @@ import { DailyHadithWidget } from "@/components/domain/DailyHadithWidget";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeTransformationArea } from "@/lib/transformation-areas";
 import AreaProgressGraph from "@/components/AreaProgressGraph";
-import { parseJournalContent } from "@/lib/journal";
+import { composeJournalContent, getCanonicalJournalDate, parseJournalContent } from "@/lib/journal";
 import { getActiveProgramMonth, getProgramDay } from "@/lib/program-timeline";
-import { DEFAULT_TIME_ZONE, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
+import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalizeHabitFrequency, resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import {
   Compass,
@@ -72,15 +72,16 @@ export default function DashboardPage() {
   const [writeJournalOpen, setWriteJournalOpen] = useState(false);
   const [allJournalsModalOpen, setAllJournalsModalOpen] = useState(false);
   const [userJournals, setUserJournals] = useState<
-    { id: string; date: string; reflection: string; isPinned?: boolean }[]
+    { id: string; date: string; reflection: string; lesson: string; improvement: string; isPrivate: boolean; isPinned?: boolean }[]
   >([]);
   const [journalSearch, setJournalSearch] = useState("");
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [journalSaveError, setJournalSaveError] = useState<string | null>(null);
+  const [journalIsPrivate, setJournalIsPrivate] = useState(true);
 
   // Habits
   const [habits, setHabits] = useState<
-    { id: string; title: string; completedToday: boolean; completedCount: number; quantity: number; category: string; areaCategory: string }[]
+    { id: string; title: string; completedToday: boolean; completedCount: number; quantity: number; category: string; areaCategory: string; frequency: "daily" | "weekly" }[]
   >([]);
   const [completedTodayCount, setCompletedTodayCount] = useState(0);
   const [habitPercentage, setHabitPercentage] = useState(0);
@@ -584,11 +585,13 @@ export default function DashboardPage() {
               (h: any) => h.action_plan_id === ap.id || (h.title && h.title.trim().toLowerCase() === ap.title.trim().toLowerCase())
             );
 
-            if (match && (!match.action_plan_id || !match.area_category)) {
+            const canonicalFrequency = normalizeHabitFrequency(ap.frequency || match?.frequency);
+            if (match && (!match.action_plan_id || !match.area_category || normalizeHabitFrequency(match.frequency) !== canonicalFrequency)) {
               const { data: linked, error: linkError } = await supabase.from("habits").update({
                 action_plan_id: ap.id,
                 area_category: ap.area_category || ap.category || "Spiritual Growth",
                 quantity: ap.quantity || ap.target || match.quantity || match.target || 1,
+                frequency: canonicalFrequency,
               }).eq("id", match.id).select("*").maybeSingle();
               if (!linkError && linked) match = linked;
             }
@@ -603,7 +606,7 @@ export default function DashboardPage() {
                     action_plan_id: ap.id,
                     title: ap.title,
                     category: ap.area_category || ap.category || "Spiritual Growth",
-                    frequency: ap.frequency || "Harian",
+                    frequency: normalizeHabitFrequency(ap.frequency),
                     target: ap.quantity || ap.target || 1,
                     quantity: ap.quantity || ap.target || 1,
                     area_category: ap.area_category || ap.category || "Spiritual Growth",
@@ -624,6 +627,7 @@ export default function DashboardPage() {
               action_plan_id: ap.id,
               title: ap.title,
               quantity: ap.quantity || ap.target || (match ? (match.quantity || match.target) : 1) || 1,
+              frequency: canonicalFrequency,
               area_category: ap.area_category || ap.category || (match ? (match.area_category || match.category) : null) || "Spiritual Growth",
               effective_from: match?.effective_from || null,
               effective_until: match?.effective_until || null,
@@ -639,6 +643,7 @@ export default function DashboardPage() {
               action_plan_id: h.action_plan_id || null,
               title: h.title,
               quantity: h.quantity || h.target || 1,
+              frequency: normalizeHabitFrequency(h.frequency),
               area_category: h.area_category || h.category || "Spiritual Growth",
               effective_from: h.effective_from || null,
               effective_until: h.effective_until || null,
@@ -647,6 +652,9 @@ export default function DashboardPage() {
         });
 
         userHabits = Object.values(habitMap);
+
+        const { data: settings } = await supabase.from("settings").select("journal_privacy_default").eq("user_id", user.id).maybeSingle();
+        setJournalIsPrivate(settings?.journal_privacy_default ?? true);
 
 
         // Filter habits active today
@@ -682,31 +690,32 @@ export default function DashboardPage() {
         };
 
         // Load today's completed status from tracker tables
+        const weeklyOccurrenceKey = getHabitOccurrenceKey("weekly", new Date(), profileTimeZone);
         const [prayerLogsRes, quranLogsRes, hadithLogsRes] = await Promise.all([
-          supabase.from("prayer_logs").select("prayer_name, is_completed").eq("user_id", user.id).eq("date", todayStr).eq("is_completed", true),
-          supabase.from("quran_logs").select("id").eq("user_id", user.id).eq("date", todayStr).limit(1),
-          supabase.from("hadith_logs").select("is_read").eq("user_id", user.id).eq("date", todayStr).maybeSingle(),
+          supabase.from("prayer_logs").select("date, prayer_name, is_completed").eq("user_id", user.id).gte("date", weeklyOccurrenceKey).lte("date", todayStr).eq("is_completed", true),
+          supabase.from("quran_logs").select("id, date").eq("user_id", user.id).gte("date", weeklyOccurrenceKey).lte("date", todayStr),
+          supabase.from("hadith_logs").select("date, is_read").eq("user_id", user.id).gte("date", weeklyOccurrenceKey).lte("date", todayStr).eq("is_read", true),
         ]);
 
-        const completedPrayerKeys = new Set((prayerLogsRes.data || []).map((r: any) => r.prayer_name));
-        const hasQuranToday = (quranLogsRes.data || []).length > 0;
-        const hasHadithToday = hadithLogsRes.data?.is_read === true;
+        const completedPrayerKeys = new Set((prayerLogsRes.data || []).filter((r: any) => r.date === todayStr).map((r: any) => r.prayer_name));
+        const hasQuranToday = (quranLogsRes.data || []).some((r: any) => r.date === todayStr);
+        const hasHadithToday = (hadithLogsRes.data || []).some((r: any) => r.date === todayStr && r.is_read === true);
 
         // Build initial prayerLogsMap for today
         const pMap: Record<string, boolean> = {};
         (prayerLogsRes.data || []).forEach((r: any) => {
-          pMap[`${todayStr}_${r.prayer_name}`] = true;
+          pMap[`${r.date}_${r.prayer_name}`] = true;
         });
         setPrayerLogsMap(pMap);
 
-        let habitList: { id: string; title: string; completedToday: boolean; completedCount: number; quantity: number; category: string; areaCategory: string }[] = [];
+        let habitList: { id: string; title: string; completedToday: boolean; completedCount: number; quantity: number; category: string; areaCategory: string; frequency: "daily" | "weekly" }[] = [];
 
-        // Load completed_count from habit_logs for today (for quantity > 1 support)
+        // Weekly habits have one occurrence, keyed by the participant's local Monday.
         const { data: habitLogsToday } = await supabase
           .from("habit_logs")
           .select("habit_id, completed, completed_count")
           .eq("user_id", user.id)
-          .eq("date", todayStr);
+          .in("date", [todayStr, weeklyOccurrenceKey]);
 
         const habitLogCountMap: Record<string, number> = {};
         (habitLogsToday || []).forEach((hl: any) => {
@@ -720,7 +729,18 @@ export default function DashboardPage() {
             let completedCount = habitLogCountMap[h.id] || 0;
             let completedToday = false;
 
-            if (cat === "prayer") {
+            if (h.frequency === "weekly") {
+              if (cat === "prayer") {
+                const key = getPrayerKey(h.title);
+                if (key) completedCount = Math.max(completedCount, (prayerLogsRes.data || []).filter((row: any) => row.prayer_name === key).length);
+              } else if (cat === "quran") {
+                completedCount = Math.max(completedCount, (quranLogsRes.data || []).length);
+              } else if (cat === "hadith") {
+                completedCount = Math.max(completedCount, (hadithLogsRes.data || []).length);
+              }
+              completedCount = Math.min(qty, completedCount);
+              completedToday = completedCount >= qty;
+            } else if (cat === "prayer") {
               const key = getPrayerKey(h.title);
               const done = key ? completedPrayerKeys.has(key) : false;
               completedToday = done;
@@ -743,6 +763,7 @@ export default function DashboardPage() {
               quantity: qty,
               category: cat,
               areaCategory: h.area_category || 'Spiritual Growth',
+              frequency: h.frequency,
             };
           });
         }
@@ -839,7 +860,7 @@ export default function DashboardPage() {
         // 4. Load All Journals & Last Journal
         const { data: journalsData, error: journalsError } = await supabase
           .from("journals")
-          .select("id, date, content")
+          .select("id, date, content, is_private")
           .eq("user_id", user.id)
           .not("content", "is", null)
           .order("created_at", { ascending: false });
@@ -847,11 +868,17 @@ export default function DashboardPage() {
 
         if (journalsData && journalsData.length > 0) {
           setUserJournals(
-            journalsData.map((j) => ({
-              id: j.id || j.date,
-              date: j.date,
-              reflection: j.content || "",
-            }))
+            journalsData.map((j) => {
+              const parsed = parseJournalContent(j.content);
+              return {
+                id: j.id || j.date,
+                date: getCanonicalJournalDate(j.date),
+                reflection: parsed.reflection,
+                lesson: parsed.lesson,
+                improvement: parsed.improvement,
+                isPrivate: j.is_private ?? true,
+              };
+            })
           );
           setJournalLast(journalsData[0].content || "");
           setJournalLastDate(
@@ -943,6 +970,38 @@ export default function DashboardPage() {
     return null;
   };
 
+  const updateHabitSummary = (updated: typeof habits) => {
+    const totalScore = updated.reduce((sum, habit) => sum + Math.min(1, habit.completedCount / habit.quantity), 0);
+    setCompletedTodayCount(updated.filter((habit) => habit.completedToday).length);
+    setHabitPercentage(updated.length > 0 ? Math.round((totalScore / updated.length) * 100) : 0);
+  };
+
+  const syncWeeklyTrackerHabit = async (category: "prayer" | "quran", prayerName?: string, delta = 1) => {
+    const candidates = habits.filter((habit) => {
+      if (habit.frequency !== "weekly" || habit.category !== category) return false;
+      return category !== "prayer" || getPrayerKeyFromTitle(habit.title) === prayerName;
+    });
+    if (candidates.length !== 1) return;
+
+    const target = candidates[0];
+    const occurrenceKey = getHabitOccurrenceKey("weekly", new Date(), userTimeZone);
+    const nextCount = Math.max(0, Math.min(target.quantity, target.completedCount + delta));
+    const nextCompleted = nextCount >= target.quantity;
+    const { data: existing } = await supabase.from("habit_logs").select("id").eq("user_id", userId).eq("habit_id", target.id).eq("date", occurrenceKey).maybeSingle();
+    const result = existing
+      ? await supabase.from("habit_logs").update({ completed: nextCompleted, completed_count: nextCount }).eq("id", existing.id)
+      : nextCount > 0
+        ? await supabase.from("habit_logs").insert({ user_id: userId, habit_id: target.id, date: occurrenceKey, completed: nextCompleted, completed_count: nextCount })
+        : { error: null };
+    if (result.error) throw result.error;
+
+    setHabits((current) => {
+      const updated = current.map((habit) => habit.id === target.id ? { ...habit, completedCount: nextCount, completedToday: nextCompleted } : habit);
+      updateHabitSummary(updated);
+      return updated;
+    });
+  };
+
   // Realtime handler when prayer is toggled in PrayerTracker
   const handlePrayerToggleFromTracker = (dateStr: string, prayerName: string, isCompleted: boolean) => {
     setPrayerLogsMap((prev) => ({ ...prev, [`${dateStr}_${prayerName}`]: isCompleted }));
@@ -953,21 +1012,21 @@ export default function DashboardPage() {
     setHabits((prevHabits) => {
       const updated = prevHabits.map((h) => {
         const cat = detectHabitCategory(h.title);
-        if (cat === "prayer") {
+         if (cat === "prayer" && h.frequency === "daily") {
           const pKey = getPrayerKeyFromTitle(h.title);
           if (pKey === prayerName) {
-            return { ...h, completedToday: isCompleted };
+             return { ...h, completedToday: isCompleted, completedCount: isCompleted ? h.quantity : 0 };
           }
         }
         return h;
       });
 
-      const doneCount = updated.filter((h) => h.completedToday).length;
-      setCompletedTodayCount(doneCount);
-      setHabitPercentage(
-        updated.length > 0 ? Math.round((doneCount / updated.length) * 100) : 0
-      );
-      return updated;
+       updateHabitSummary(updated);
+       return updated;
+     });
+    void syncWeeklyTrackerHabit("prayer", prayerName, isCompleted ? 1 : -1).catch((error) => {
+      console.error("Gagal menyinkronkan tracker ke habit mingguan:", error);
+      setHabitSaveError("Progress habit mingguan belum tersimpan.");
     });
   };
 
@@ -976,18 +1035,18 @@ export default function DashboardPage() {
     setHabits((prevHabits) => {
       const updated = prevHabits.map((h) => {
         const cat = detectHabitCategory(h.title);
-        if (cat === "quran") {
-          return { ...h, completedToday: true };
+         if (cat === "quran" && h.frequency === "daily") {
+           return { ...h, completedToday: true, completedCount: h.quantity };
         }
         return h;
       });
 
-      const doneCount = updated.filter((h) => h.completedToday).length;
-      setCompletedTodayCount(doneCount);
-      setHabitPercentage(
-        updated.length > 0 ? Math.round((doneCount / updated.length) * 100) : 0
-      );
-      return updated;
+       updateHabitSummary(updated);
+       return updated;
+     });
+    void syncWeeklyTrackerHabit("quran", undefined, 1).catch((error) => {
+      console.error("Gagal menyinkronkan tracker ke habit mingguan:", error);
+      setHabitSaveError("Progress habit mingguan belum tersimpan.");
     });
   };
 
@@ -996,25 +1055,22 @@ export default function DashboardPage() {
     const todayStr = getLocalDateString(new Date(), userTimeZone);
     const target = habits.find((h) => h.id === habitId);
     if (!target) return;
+    const occurrenceKey = getHabitOccurrenceKey(target.frequency, new Date(), userTimeZone);
     setHabitSaveError(null);
 
     const newCompleted = !target.completedToday;
     const updated = habits.map((h) =>
-      h.id === habitId ? { ...h, completedToday: newCompleted } : h
+      h.id === habitId ? { ...h, completedToday: newCompleted, completedCount: newCompleted ? h.quantity : 0 } : h
     );
     setHabits(updated);
 
-    const doneCount = updated.filter((h) => h.completedToday).length;
-    setCompletedTodayCount(doneCount);
-    setHabitPercentage(
-      updated.length > 0 ? Math.round((doneCount / updated.length) * 100) : 0
-    );
+    updateHabitSummary(updated);
 
     try {
       const cat = target.category;
 
       // Record to specific tracker tables for specialized widgets
-      if (cat === "prayer") {
+      if (target.frequency === "daily" && cat === "prayer") {
         const prayerKey = getPrayerKeyFromTitle(target.title);
         if (prayerKey) {
           setPrayerLogsMap((prev) => ({ ...prev, [`${todayStr}_${prayerKey}`]: newCompleted }));
@@ -1033,7 +1089,7 @@ export default function DashboardPage() {
             if (error) throw error;
           }
         }
-      } else if (cat === "quran") {
+      } else if (target.frequency === "daily" && cat === "quran") {
         if (newCompleted) {
           const { data: existing } = await supabase.from("quran_logs")
             .select("id").eq("user_id", userId).eq("date", todayStr).limit(1);
@@ -1056,7 +1112,7 @@ export default function DashboardPage() {
             .eq("surah_name", "(Dari Habit PTP)");
           if (error) throw error;
         }
-      } else if (cat === "hadith") {
+      } else if (target.frequency === "daily" && cat === "hadith") {
         const { error } = await supabase.from("hadith_logs").upsert(
           { user_id: userId, date: todayStr, is_read: newCompleted },
           { onConflict: "user_id,date" }
@@ -1071,7 +1127,7 @@ export default function DashboardPage() {
         .select("id")
         .eq("user_id", userId)
         .eq("habit_id", habitId)
-        .eq("date", todayStr)
+         .eq("date", occurrenceKey)
         .maybeSingle();
 
       if (existingHL) {
@@ -1086,7 +1142,7 @@ export default function DashboardPage() {
         const { error } = await supabase.from("habit_logs").insert({
           user_id: userId,
           habit_id: habitId,
-          date: todayStr,
+           date: occurrenceKey,
           completed: newCompleted,
           completed_count: newCount,
         });
@@ -1104,9 +1160,9 @@ export default function DashboardPage() {
 
   // Increment one sub-step for habits with quantity > 1
   const incrementHabitCount = async (habitId: string) => {
-    const todayStr = getLocalDateString(new Date(), userTimeZone);
     const target = habits.find((h) => h.id === habitId);
     if (!target || target.category !== 'general') return;
+    const occurrenceKey = getHabitOccurrenceKey(target.frequency, new Date(), userTimeZone);
     setHabitSaveError(null);
 
     const newCount = Math.min(target.quantity, (target.completedCount || 0) + 1);
@@ -1128,7 +1184,7 @@ export default function DashboardPage() {
         .select("id")
         .eq("user_id", userId)
         .eq("habit_id", habitId)
-        .eq("date", todayStr)
+         .eq("date", occurrenceKey)
         .maybeSingle();
 
       if (existingHL) {
@@ -1138,7 +1194,7 @@ export default function DashboardPage() {
         const { error } = await supabase.from("habit_logs").insert({
           user_id: userId,
           habit_id: habitId,
-          date: todayStr,
+           date: occurrenceKey,
           completed: newCompleted,
           completed_count: newCount,
         });
@@ -1166,6 +1222,14 @@ export default function DashboardPage() {
     if (userId) {
       localStorage.setItem(`slj_pinned_${userId}`, JSON.stringify(nextPinned));
     }
+  };
+
+  const openQuickJournal = () => {
+    const todayStr = getLocalDateString(new Date(), userTimeZone);
+    const existing = userJournals.find((journal) => getCanonicalJournalDate(journal.date) === todayStr);
+    setJournalContent(existing?.reflection || "");
+    if (existing) setJournalIsPrivate(existing.isPrivate);
+    setWriteJournalOpen(true);
   };
 
   const handleRemindSafar = async () => {
@@ -1196,8 +1260,11 @@ export default function DashboardPage() {
     setJournalSaveError(null);
 
     try {
-      const existingJournal = userJournals.find(journal => journal.date === todayStr);
-      const journalPayload = { content: journalContent.trim(), is_private: true };
+      const existingJournal = userJournals.find(journal => getCanonicalJournalDate(journal.date) === todayStr);
+      const journalPayload = {
+        content: composeJournalContent(journalContent, existingJournal?.lesson || "", existingJournal?.improvement || ""),
+        is_private: existingJournal ? existingJournal.isPrivate : journalIsPrivate,
+      };
       const saveQuery = existingJournal
         ? supabase.from("journals").update(journalPayload).eq("id", existingJournal.id)
         : supabase.from("journals").insert({ user_id: userId, date: todayStr, ...journalPayload });
@@ -1218,6 +1285,9 @@ export default function DashboardPage() {
           id: savedJournal?.id || todayStr,
         date: todayStr,
           reflection: journalContent.trim(),
+          lesson: existingJournal?.lesson || "",
+          improvement: existingJournal?.improvement || "",
+          isPrivate: journalPayload.is_private,
       };
       setUserJournals((prev) => [
         newItem,
@@ -1536,7 +1606,7 @@ export default function DashboardPage() {
                               : "bg-warm-bg text-slate-700 border border-warm-border/60"
                           }`}
                         >
-                          <span className="truncate flex-1">{h.title}</span>
+                          <span className="truncate flex-1">{h.title}{h.frequency === "weekly" ? " (minggu ini)" : ""}</span>
                           {isMultiStep ? (
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1728,7 +1798,7 @@ export default function DashboardPage() {
                 </div>
                 <Button
                   size="sm"
-                  onClick={() => setWriteJournalOpen(true)}
+                   onClick={openQuickJournal}
                   className="shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-amber-300 shadow-sm transition-transform hover:bg-slate-800 active:scale-[.98]"
                 >
                   Tulis
@@ -1761,7 +1831,7 @@ export default function DashboardPage() {
                   </div>
                   <p className="text-xs font-semibold text-slate-600">Belum ada catatan refleksi</p>
                   <p className="mx-auto max-w-[220px] text-[11px] leading-relaxed text-slate-400">Mulai dari satu kalimat. Tidak perlu menunggu hari yang sempurna.</p>
-                  <button type="button" onClick={() => setWriteJournalOpen(true)} className="pt-1 text-[11px] font-bold text-amber-700 hover:text-amber-800">
+                   <button type="button" onClick={openQuickJournal} className="pt-1 text-[11px] font-bold text-amber-700 hover:text-amber-800">
                     Tulis refleksi pertama
                   </button>
                 </div>
@@ -1830,7 +1900,7 @@ export default function DashboardPage() {
             <Button
               onClick={() => {
                 setAllJournalsModalOpen(false);
-                setWriteJournalOpen(true);
+                 openQuickJournal();
               }}
               className="bg-navy-900 text-amber-300 font-bold text-xs rounded-xl"
             >
@@ -1910,7 +1980,7 @@ export default function DashboardPage() {
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-amber-600" />
-              Detail Habits Hari Ini
+              Detail Habits Aktif
             </DialogTitle>
           </DialogHeader>
 
@@ -1936,7 +2006,7 @@ export default function DashboardPage() {
                         : "bg-warm-bg text-slate-700 border border-warm-border hover:bg-slate-100"
                     }`}
                   >
-                    <span className="flex-1 min-w-0">{h.title}</span>
+                    <span className="flex-1 min-w-0">{h.title}{h.frequency === "weekly" ? " (minggu ini)" : ""}</span>
                     {isMultiStep && !h.completedToday ? (
                       <span className="shrink-0 rounded-full bg-slate-200 px-2 py-1 text-[10px] text-slate-700">{h.completedCount}/{h.quantity} +</span>
                     ) : (
@@ -2032,7 +2102,11 @@ export default function DashboardPage() {
               className="min-h-[180px] resize-none rounded-xl border-slate-200 p-4 font-serif text-sm leading-6 focus:border-amber-500"
             />
             <div className="flex items-center justify-between text-[10px] text-slate-400">
-              <span className="flex items-center gap-1.5"><Lock className="h-3 w-3" /> Hanya Anda yang dapat membaca</span>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={journalIsPrivate} onChange={(e) => setJournalIsPrivate(e.target.checked)} />
+                <Lock className="h-3 w-3" />
+                {journalIsPrivate ? "Privat, hanya Anda yang dapat membaca" : "Bagikan dengan coach/tim berwenang"}
+              </label>
               <span className="font-mono tabular-nums">{journalContent.length}/1000</span>
             </div>
             {journalSaveError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{journalSaveError}</p>}

@@ -4,16 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, ChevronRight, LayoutDashboard, Menu, PanelLeftClose, Users, X } from "lucide-react";
-import { coachProfile } from "@/lib/coach-mock-data";
 
 const navItems = [
   { href: "/coach", label: "Command Center", icon: LayoutDashboard },
   { href: "/coach#participants", label: "Peserta Bimbingan", icon: Users },
 ];
 
-export function CoachLayout({ children, pageTitle, backHref }: { children: React.ReactNode; pageTitle: string; backHref?: string }) {
+export function CoachLayout({ children, pageTitle, backHref, viewerName = "Coach", mode = "live" }: { children: React.ReactNode; pageTitle: string; backHref?: string; viewerName?: string; mode?: "live" | "preview" }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const viewerInitials = viewerName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
   return (
     <div className="min-h-[100dvh] bg-[#FAF8F4] text-[#111827] md:flex">
@@ -42,15 +42,15 @@ export function CoachLayout({ children, pageTitle, backHref }: { children: React
 
           <div className="mt-auto border-t border-white/10 pt-4">
             <div className="flex items-center gap-3 rounded-xl bg-white/[0.06] p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#C79A3C] text-xs font-black text-[#0F1E3D]">{coachProfile.initials}</div>
+               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#C79A3C] text-xs font-black text-[#0F1E3D]">{viewerInitials}</div>
               <div className="min-w-0">
-                <p className="truncate text-xs font-bold">{coachProfile.name}</p>
-                <p className="truncate text-[10px] text-slate-400">{coachProfile.role}</p>
+                 <p className="truncate text-xs font-bold">{viewerName}</p>
+                 <p className="truncate text-[10px] text-slate-400">Coach Portal</p>
               </div>
             </div>
             <div className="mt-3 flex items-center gap-2 px-1 text-[10px] text-slate-500">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-              MVP Preview · Mock Data
+               {mode === "preview" ? "PREVIEW MOCK · RPC unavailable" : "LIVE · Assigned data"}
             </div>
           </div>
         </div>
@@ -82,13 +82,13 @@ export function CoachLayout({ children, pageTitle, backHref }: { children: React
             {backHref && <Link href={backHref} className="hidden h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:flex" aria-label="Kembali"><PanelLeftClose className="h-4 w-4" /></Link>}
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-[#0F1E3D]">{pageTitle}</p>
-              <p className="hidden text-[10px] text-slate-500 sm:block">{coachProfile.cohort}</p>
+               <p className="hidden text-[10px] text-slate-500 sm:block">{mode === "preview" ? "Authenticated mock preview" : "Data peserta yang ditugaskan"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button className="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Notifikasi"><Bell className="h-4 w-4" /><span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#C79A3C] ring-2 ring-white" /></button>
             <div className="hidden items-center gap-2 pl-1 sm:flex">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0F1E3D] text-xs font-bold text-amber-300">{coachProfile.initials}</div>
+               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0F1E3D] text-xs font-bold text-amber-300">{viewerInitials}</div>
               <ChevronRight className="h-3.5 w-3.5 rotate-90 text-slate-400" />
             </div>
           </div>

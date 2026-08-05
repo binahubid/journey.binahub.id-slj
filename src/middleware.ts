@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    const protectedPrefixes = ["/admin", "/company", "/dashboard", "/onboarding", "/baseline", "/initial-process", "/journey", "/monitoring", "/journal", "/profile", "/settings", "/notifications"];
+    const protectedPrefixes = ["/admin", "/coach", "/company", "/dashboard", "/onboarding", "/baseline", "/initial-process", "/journey", "/monitoring", "/journal", "/profile", "/settings", "/notifications"];
     if (protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix))) {
       return new NextResponse("Service configuration unavailable", { status: 503 });
     }
@@ -48,11 +48,6 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // Public preview during the mock-data Coach Portal MVP phase.
-  if (path.startsWith("/coach")) {
-    return supabaseResponse;
-  }
-
   // Protected routes list
   const protectedRoutes = [
     "/dashboard",
@@ -63,6 +58,7 @@ export async function middleware(request: NextRequest) {
     "/monitoring",
     "/journal",
     "/admin",
+    "/coach",
     "/profile",
     "/settings",
     "/notifications",
@@ -95,6 +91,13 @@ export async function middleware(request: NextRequest) {
     if (path.startsWith("/admin") && role !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = role === "coach" ? "/coach" : "/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    // Coach data is restricted to assigned coaches; admins may inspect it.
+    if (path.startsWith("/coach") && role !== "coach" && role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
 

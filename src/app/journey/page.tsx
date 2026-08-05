@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { TRANSFORMATION_AREAS } from "@/lib/transformation-areas";
+import { indicatorTypes, validateAreaIndicators, type IndicatorDefinition, type IndicatorType } from "@/lib/assessment-methodology";
 import {
   CheckCircle2,
   Lock,
@@ -154,12 +155,37 @@ interface AreaTargetData {
   kuantitasBaseline?: string;
   waktu: string;
   biaya: string;
+  indicators?: IndicatorDefinition[];
 }
 
 interface BatchMate {
   userId: string;
   fullName: string;
 }
+
+const createIndicator = (index: number): IndicatorDefinition => ({
+  key: `indicator-${index + 1}`,
+  type: "quantity",
+  label: "",
+  active: true,
+  direction: "higher_is_better",
+  baseline: 0,
+  target: 0,
+  unit: "",
+});
+
+const legacyIndicators = (target: AreaTargetData): IndicatorDefinition[] =>
+  [target.kualitas, target.kuantitas, target.waktu, target.biaya]
+    .map((label, index) => ({
+      ...createIndicator(index),
+      type: (["quality", "quantity", "time", "cost"] as IndicatorType[])[index],
+      label,
+      baseline: index === 1 ? Number(target.kuantitasBaseline) || 0 : 0,
+    }))
+    .filter((indicator) => indicator.label.trim());
+
+const isUnavailableRelation = (error: { code?: string } | null) =>
+  error?.code === "42P01" || error?.code === "PGRST205";
 
   // ─── Ref mirrors for stale-closure-safe autosave ───────────────
   const muhasabahRef = useRef("");
@@ -299,6 +325,39 @@ interface BatchMate {
             });
           }
 
+
+          const { data: structuredIndicators, error: indicatorError } = await supabase
+            .from("ptp_indicators")
+            .select("area, indicator_key, indicator_type, label, active, direction, baseline_value, target_value, unit")
+            .eq("journey_id", journey.id)
+            .order("created_at", { ascending: true });
+          if (indicatorError && !isUnavailableRelation(indicatorError)) throw indicatorError;
+          if (structuredIndicators?.length) {
+            setAreaTargetsMap(current => {
+              const next = { ...current };
+              journeyAreas.forEach((area: string) => {
+                const currentTarget = next[area] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
+                next[area] = {
+                  ...currentTarget,
+                  indicators: structuredIndicators
+                    .filter((indicator: any) => indicator.area === area)
+                    .slice(0, 4)
+                    .map((indicator: any) => ({
+                      key: indicator.indicator_key,
+                      type: (indicator.indicator_type || "quantity") as IndicatorType,
+                      label: indicator.label,
+                      active: indicator.active,
+                      direction: indicator.direction,
+                      baseline: Number(indicator.baseline_value),
+                      target: Number(indicator.target_value),
+                      unit: indicator.unit || "",
+                    })),
+                };
+              });
+              return next;
+            });
+          }
+
           // Action Plans
           const { data: plans, error: plansError } = await supabase.from("action_plans").select("id, title, frequency, quantity, target, category, area_category").eq("journey_id", journey.id);
           if (plansError) throw plansError;
@@ -394,8 +453,19 @@ interface BatchMate {
         case 3: {
           // Save area selection + target indicators together (merged step)
           const targetsObj = areaTargetsMapRef.current;
+          for (const area of selectedAreasRef.current) {
+            const target = targetsObj[area];
+            if (!target?.mainTarget?.trim()) throw new Error(`${area}: Target Utama 90 Hari wajib diisi.`);
+            const definitions = target.indicators?.length ? target.indicators : legacyIndicators(target);
+            const validation = validateAreaIndicators(definitions, area);
+            if (!validation.valid) throw new Error(validation.errors[0].message);
+          }
           const jsonStr = JSON.stringify(targetsObj);
-          const allIndicators = Object.values(targetsObj).flatMap(t => [t.kualitas, t.kuantitas, t.waktu, t.biaya].filter(b => b && b.trim() !== ""));
+          const allIndicators = selectedAreasRef.current.flatMap(area => {
+            const target = targetsObj[area];
+            const definitions = target?.indicators?.length ? target.indicators : target ? legacyIndicators(target) : [];
+            return definitions.filter(indicator => indicator.active).map(indicator => indicator.label.trim());
+          });
           const { error } = await supabase.from("journeys").update({
             area_transformasi: selectedAreasRef.current,
             main_target: jsonStr,
@@ -403,6 +473,42 @@ interface BatchMate {
             updated_at: new Date().toISOString()
           }).eq("id", _journeyId);
           if (error) throw error;
+
+          const indicatorRows = selectedAreasRef.current.flatMap(area => {
+            const target = targetsObj[area];
+            const definitions = target?.indicators?.length ? target.indicators : target ? legacyIndicators(target) : [];
+            return definitions.slice(0, 4).filter(indicator => indicator.label.trim()).map(indicator => ({
+              participant_user_id: user.id,
+              journey_id: _journeyId,
+              area,
+              indicator_key: indicator.key,
+              indicator_type: indicator.type,
+              label: indicator.label.trim(),
+              active: indicator.active,
+              direction: indicator.direction,
+              baseline_value: indicator.baseline,
+              target_value: indicator.target,
+              unit: indicator.unit?.trim() || null,
+              updated_at: new Date().toISOString(),
+            }));
+          });
+          const { data: existingIndicators, error: existingIndicatorError } = await supabase
+            .from("ptp_indicators")
+            .select("id, area, indicator_key")
+            .eq("journey_id", _journeyId);
+          if (existingIndicatorError && !isUnavailableRelation(existingIndicatorError)) throw existingIndicatorError;
+          if (!existingIndicatorError) {
+            if (indicatorRows.length) {
+              const { error: upsertError } = await supabase.from("ptp_indicators").upsert(indicatorRows, { onConflict: "journey_id,area,indicator_key" });
+              if (upsertError) throw upsertError;
+            }
+            const currentKeys = new Set(indicatorRows.map(row => `${row.area}:${row.indicator_key}`));
+            const staleIds = (existingIndicators || []).filter((row: any) => !currentKeys.has(`${row.area}:${row.indicator_key}`)).map((row: any) => row.id);
+            if (staleIds.length) {
+              const { error: deleteError } = await supabase.from("ptp_indicators").delete().in("id", staleIds);
+              if (deleteError) throw deleteError;
+            }
+          }
           break;
         }
         case 4: {
@@ -480,7 +586,12 @@ interface BatchMate {
     switch (num) {
       case 1: return muhasabah.trim().length > 0;
       case 2: return niat.trim().length > 0;
-      case 3: return selectedAreas.length === 3 && selectedAreas.every(area => areaTargetsMap[area]?.mainTarget?.trim().length > 0);
+      case 3: return selectedAreas.length === 3 && selectedAreas.every(area => {
+        const target = areaTargetsMap[area];
+        if (!target?.mainTarget?.trim()) return false;
+        const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
+        return validateAreaIndicators(indicators, area).valid;
+      });
       case 4: return actionPlans.length > 0 && actionPlans.every(plan => selectedAreas.includes(plan.area_category));
       default: return false;
     }
@@ -701,6 +812,16 @@ interface BatchMate {
           scheduleAutosave(3);
         };
 
+        const updateIndicator = (areaId: string, index: number, patch: Partial<IndicatorDefinition>) => {
+          const prev = areaTargetsMap[areaId] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
+          const indicators = prev.indicators?.length ? prev.indicators : (legacyIndicators(prev).length ? legacyIndicators(prev) : [createIndicator(0)]);
+          const updatedIndicators = indicators.map((indicator, indicatorIndex) => indicatorIndex === index ? { ...indicator, ...patch } : indicator);
+          const updated = { ...areaTargetsMap, [areaId]: { ...prev, indicators: updatedIndicators } };
+          setAreaTargetsMap(updated);
+          areaTargetsMapRef.current = updated;
+          scheduleAutosave(3);
+        };
+
         const shortcutsByArea: Record<string, { kualitas: string[]; kuantitas: string[]; waktu: string[]; biaya: string[] }> = {
           "Spiritual Growth": {
             kualitas: ["Khusyu, tumakninah & dzikir sesudah salam", "Meresapi makna ayat Al-Qur'an yang dibaca", "Menjaga wudhu dan niat ikhlas karena Allah", "Menghindari perkataan sia-sia dan ghibah", "Hadir Hati saat berdoa & istighfar harian"],
@@ -870,90 +991,42 @@ interface BatchMate {
                           <Textarea disabled={locked} value={targetData.targetAlasan} onChange={e => updateField(area.id, "targetAlasan", e.target.value)} placeholder="Apa motivasi terdalam Anda?" className="min-h-[60px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:italic p-3" maxLength={300} />
                         </div>
 
-                        {/* 4 Dimension indicators (Flexible / Optional per relevance) */}
+                        {/* Structured indicators */}
                         <div className="space-y-3 pt-1">
                           <div className="border-t border-[#EAE5D9] pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                            <p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan</p>
-                            <p className="text-[11px] text-slate-500 italic">Isi dimensi yang paling relevan dengan sasaran Anda (opsional)</p>
+                            <div><p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">Tentukan apa yang diukur pada area ini, nilai awalnya, dan target angka yang ingin dicapai.</p></div>
+                            <p className="text-[11px] text-slate-500 italic">1-4 indikator terukur per area</p>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {/* 1. Kualitas */}
-                            <div className="bg-white p-3.5 rounded-xl border border-purple-100 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 w-full">
-                                  <span className="text-xs font-extrabold text-purple-800">1. Indikator Kualitas</span>
-                                  <div className="group relative cursor-pointer ml-auto">
-                                    <Info className="h-3.5 w-3.5 text-purple-400 hover:text-purple-600 transition-colors" />
-                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-purple-400/30 pointer-events-none">
-                                      <p className="font-bold text-purple-300 mb-0.5">Rumus Skor Kualitas:</p>
-                                      <p className="opacity-90 leading-tight">Diukur dengan Rating 1–5 Bintang pada Monitoring.<br/><span className="font-mono text-purple-200 block mt-1">Skor % = Bintang × 20%</span></p>
-                                    </div>
-                                  </div>
+                          {(targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)])).map((indicator, index) => (
+                            <div key={indicator.key} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3.5">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-xs font-extrabold text-navy-900">{index + 1}. Apa yang ingin diukur?</span>
+                                <div className="flex items-center gap-2">
+                                  <label className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><input type="checkbox" disabled={locked} checked={indicator.active} onChange={e => updateIndicator(area.id, index, { active: e.target.checked })} /> Aktif</label>
+                                  {!locked && index > 0 && <button type="button" onClick={() => {
+                                    const next = (targetData.indicators || []).filter((_, itemIndex) => itemIndex !== index);
+                                    const updated = { ...areaTargetsMap, [area.id]: { ...targetData, indicators: next } };
+                                    setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3);
+                                  }} className="text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                                 </div>
                               </div>
-                              <Textarea disabled={locked} value={targetData.kualitas} onChange={e => updateField(area.id, "kualitas", e.target.value)} placeholder="Contoh: Sholat khusyu, tumakninah & selesai dzikir..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-purple-400 rounded-lg p-2.5 resize-y placeholder:italic" />
+                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jenis indikator</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(area.id, index, { type, direction: preset.defaultDirection }); }} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key}>{type.label}</option>)}</select><span className="block text-[10px] leading-relaxed text-slate-400">{indicatorTypes.find(type => type.key === indicator.type)?.description} Contoh: {indicatorTypes.find(type => type.key === indicator.type)?.example}.</span></label>
+                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Nama indikator</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(area.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-9 text-xs" /></label>
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Kondisi saat ini</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(area.id, index, { baseline: Number(e.target.value) })} placeholder="Contoh: 2" className="h-9 text-xs" /></label>
+                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Target 90 hari</span><Input type="number" disabled={locked} value={indicator.target} onChange={e => updateIndicator(area.id, index, { target: Number(e.target.value) })} placeholder="Contoh: 7" className="h-9 text-xs" /></label>
+                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Arah keberhasilan</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(area.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
+                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(area.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-9 text-xs" /></label>
+                              </div>
+                              <p className="text-[10px] leading-relaxed text-slate-400">Contoh: kondisi saat ini 2 kali, target 7 kali, pilih “Naik lebih baik”, lalu isi satuan “kali”. Untuk durasi atau biaya yang ingin dikurangi, pilih “Turun lebih baik”.</p>
                             </div>
-
-                            {/* 2. Kuantitas */}
-                            <div className="bg-white p-3.5 rounded-xl border border-blue-100 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 w-full">
-                                  <span className="text-xs font-extrabold text-blue-800">2. Indikator Kuantitas</span>
-                                  <div className="group relative cursor-pointer ml-auto">
-                                    <Info className="h-3.5 w-3.5 text-blue-400 hover:text-blue-600 transition-colors" />
-                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-60 border border-blue-400/30 pointer-events-none">
-                                      <p className="font-bold text-blue-300 mb-0.5">Rumus Skor Kuantitas:</p>
-                                      <p className="opacity-90 leading-tight">Perbandingan progres dari posisi awal (Baseline) ke Target 90 hari.<br/><span className="font-mono text-blue-200 block mt-1">Skor % = |Realisasi - Baseline| ÷ |Target - Baseline| × 100%</span></p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                                <div>
-                                  <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Baseline (Awal)</label>
-                                  <Input disabled={locked} value={targetData.kuantitasBaseline || ""} onChange={e => updateField(area.id, "kuantitasBaseline", e.target.value)} placeholder="Contoh: 1 Juz / bln" className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-8 bg-slate-50/50 placeholder:italic w-full" />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-bold text-blue-600 block mb-0.5">Target 90 Hari</label>
-                                  <Input disabled={locked} value={targetData.kuantitas} onChange={e => updateField(area.id, "kuantitas", e.target.value)} placeholder="Contoh: 13 Juz (Khatam)" className="text-xs border-slate-200 focus:border-blue-400 rounded-lg h-8 placeholder:italic w-full" />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 3. Waktu */}
-                            <div className="bg-white p-3.5 rounded-xl border border-amber-100 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 w-full">
-                                  <span className="text-xs font-extrabold text-amber-800">3. Indikator Waktu</span>
-                                  <div className="group relative cursor-pointer ml-auto">
-                                    <Info className="h-3.5 w-3.5 text-amber-400 hover:text-amber-600 transition-colors" />
-                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-amber-400/30 pointer-events-none">
-                                      <p className="font-bold text-amber-300 mb-0.5">Rumus Skor Waktu:</p>
-                                      <p className="opacity-90 leading-tight">Persentase jumlah hari konsistensi jadwal tepat waktu dalam 30 hari.<br/><span className="font-mono text-amber-200 block mt-1">Skor % = Hari Tepat Waktu ÷ 30 × 100%</span></p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <Textarea disabled={locked} value={targetData.waktu} onChange={e => updateField(area.id, "waktu", e.target.value)} placeholder="Contoh: Hadir di masjid 10 menit sebelum adzan..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-amber-400 rounded-lg p-2.5 resize-y placeholder:italic" />
-                            </div>
-
-                            {/* 4. Biaya */}
-                            <div className="bg-white p-3.5 rounded-xl border border-emerald-100 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 w-full">
-                                  <span className="text-xs font-extrabold text-emerald-800">4. Indikator Biaya / Finansial</span>
-                                  <div className="group relative cursor-pointer ml-auto">
-                                    <Info className="h-3.5 w-3.5 text-emerald-400 hover:text-emerald-600 transition-colors" />
-                                    <div className="absolute right-0 bottom-6 hidden group-hover:block z-[9999] bg-navy-900 text-white text-[11px] rounded-xl p-2.5 shadow-xl w-56 border border-emerald-400/30 pointer-events-none">
-                                      <p className="font-bold text-emerald-300 mb-0.5">Rumus Skor Biaya:</p>
-                                      <p className="opacity-90 leading-tight">Capaian nominal realisasi dibanding nominal target.<br/><span className="font-mono text-emerald-200 block mt-1">Skor % = Realisasi ÷ Target × 100%</span></p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <Textarea disabled={locked} value={targetData.biaya} onChange={e => updateField(area.id, "biaya", e.target.value)} placeholder="Contoh: Budget Rp 20.000 / hari via transfer infak..." className="min-h-[56px] w-full text-xs border-slate-200 focus:border-emerald-400 rounded-lg p-2.5 resize-y placeholder:italic" />
-                            </div>
-                          </div>
+                          ))}
+                          {!locked && (targetData.indicators?.length || legacyIndicators(targetData).length || 1) < 4 && <Button type="button" variant="outline" onClick={() => {
+                            const current = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
+                            const next = [...current, createIndicator(current.length)];
+                            const updated = { ...areaTargetsMap, [area.id]: { ...targetData, indicators: next } };
+                            setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3);
+                          }} className="h-9 w-full border-dashed text-xs"><Plus className="mr-1 h-3.5 w-3.5" /> Tambah indikator</Button>}
                         </div>
 
                         {/* Deselect area */}

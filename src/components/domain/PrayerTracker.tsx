@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Sparkles, X, ExternalLink } from "lucide-react";
-import { DEFAULT_TIME_ZONE, getLocalDateRange, getLocalDateString } from "@/lib/local-date";
+import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateRange, getLocalDateString, normalizeHabitFrequency } from "@/lib/local-date";
 
 interface PrayerTrackerProps {
   userId: string;
@@ -131,17 +131,19 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
         if (targetHabitTitle) {
           const { data: habits, error: habitError } = await supabase
             .from("habits")
-            .select("id")
+            .select("id,frequency")
             .eq("user_id", userId)
             .eq("title", targetHabitTitle);
           if (habitError) throw habitError;
 
           for (const habit of habits || []) {
+            const occurrenceKey = getHabitOccurrenceKey(normalizeHabitFrequency(habit.frequency), new Date(), timeZone);
             if (nextVal) {
               const { error } = await supabase.from("habit_logs").upsert({
                 user_id: userId,
                 habit_id: habit.id,
-                date: todayStr,
+                date: occurrenceKey,
+                activity_date: todayStr,
                 completed: true,
                 completed_count: 1,
               }, { onConflict: "habit_id,date" });
@@ -152,7 +154,7 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
                 .delete()
                 .eq("user_id", userId)
                 .eq("habit_id", habit.id)
-                .eq("date", todayStr);
+                .eq("date", occurrenceKey);
               if (error) throw error;
             }
           }

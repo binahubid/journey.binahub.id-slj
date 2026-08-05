@@ -1,19 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, CalendarCheck, Search, Users } from "lucide-react";
 import { CoachLayout } from "@/components/coach/CoachLayout";
 import { ParticipantRow } from "@/components/coach/CoachUi";
-import { coachParticipants, getCoachAlert, journeyStatusLabels } from "@/lib/coach-mock-data";
+import { getCoachAlert, journeyStatusLabels } from "@/lib/coach-mock-data";
+import { loadCoachParticipants, type CoachPortalParticipant, type CoachDataMode } from "@/lib/coach-data";
 import { JourneyStatus } from "@/types/slj";
 
 export default function CoachDashboardPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ALL" | JourneyStatus>("ALL");
   const [flagOnly, setFlagOnly] = useState(false);
+  const [participants, setParticipants] = useState<CoachPortalParticipant[]>([]);
+  const [mode, setMode] = useState<CoachDataMode>("live");
+  const [viewerName, setViewerName] = useState("Coach");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const prioritized = useMemo(() => coachParticipants.map((participant) => ({ participant, alert: getCoachAlert(participant) })).sort((a, b) => Number(Boolean(b.alert)) - Number(Boolean(a.alert))), []);
+  useEffect(() => {
+    loadCoachParticipants().then((result) => { setParticipants(result.data); setMode(result.mode); setViewerName(result.viewer.name); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Data peserta gagal dimuat.")).finally(() => setLoading(false));
+  }, []);
+
+  const prioritized = useMemo(() => participants.map((participant) => ({ participant, alert: getCoachAlert(participant) })).sort((a, b) => Number(Boolean(b.alert)) - Number(Boolean(a.alert))), [participants]);
   const filtered = prioritized.filter(({ participant, alert }) => {
     const matchesSearch = `${participant.fullName} ${participant.batch}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = status === "ALL" || participant.journeyStatus === status;
@@ -21,10 +31,13 @@ export default function CoachDashboardPage() {
   });
   const alertCount = prioritized.filter((item) => item.alert).length;
   const supportCount = prioritized.filter((item) => item.alert?.type === "COACH_ACTION_NEEDED" || item.alert?.type === "INACTIVE").length;
-  const averageHabit = Math.round(coachParticipants.reduce((sum, item) => sum + item.habitCompletionPercent, 0) / coachParticipants.length);
+  const averageHabit = participants.length ? Math.round(participants.reduce((sum, item) => sum + item.habitCompletionPercent, 0) / participants.length) : 0;
 
   return (
-    <CoachLayout pageTitle="Coach Command Center">
+    <CoachLayout pageTitle="Coach Command Center" viewerName={viewerName} mode={mode}>
+      {mode === "preview" && <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">PREVIEW MOCK: RPC live belum tersedia. Data ini bukan data peserta nyata dan tidak dapat disimpan.</div>}
+      {loading && <div className="rounded-xl bg-white p-10 text-center text-sm text-slate-500 ring-1 ring-[#E5E7EB]">Memuat peserta yang ditugaskan...</div>}
+      {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">{error}</div>}
       <section className="border-b border-[#E5E7EB] pb-7">
         <div className="flex flex-col justify-between gap-6 xl:flex-row xl:items-end">
           <div className="max-w-2xl">
@@ -38,7 +51,7 @@ export default function CoachDashboardPage() {
 
       <section className="grid gap-px overflow-hidden rounded-xl bg-[#E5E7EB] ring-1 ring-[#E5E7EB] sm:grid-cols-2 xl:grid-cols-4 mt-6">
         {[
-          { label: "Peserta bimbingan", value: coachParticipants.length, detail: "3 batch aktif", icon: Users },
+           { label: "Peserta bimbingan", value: participants.length, detail: "Data yang ditugaskan", icon: Users },
           { label: "Flag aktif", value: alertCount, detail: "Perlu ditinjau", icon: AlertTriangle },
           { label: "Aksi prioritas", value: supportCount, detail: "Hari ini", icon: CalendarCheck },
           { label: "Rata-rata habit", value: `${averageHabit}%`, detail: "7 hari terakhir", icon: null },

@@ -55,6 +55,28 @@ export function addCalendarDays(dateString: string, amount: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+export type HabitFrequency = "daily" | "weekly";
+
+export function normalizeHabitFrequency(value?: string | null): HabitFrequency {
+  const normalized = value?.trim().toLowerCase() || "";
+  return normalized === "weekly" || normalized.includes("minggu") ? "weekly" : "daily";
+}
+
+export function getLocalWeekStart(date = new Date(), timeZone = DEFAULT_TIME_ZONE): string {
+  const localDate = getLocalDateString(date, timeZone);
+  const dayOfWeek = new Date(`${localDate}T12:00:00Z`).getUTCDay();
+  const daysSinceMonday = (dayOfWeek + 6) % 7;
+  return addCalendarDays(localDate, -daysSinceMonday);
+}
+
+export function getHabitOccurrenceKey(
+  frequency: HabitFrequency,
+  date = new Date(),
+  timeZone = DEFAULT_TIME_ZONE
+): string {
+  return frequency === "weekly" ? getLocalWeekStart(date, timeZone) : getLocalDateString(date, timeZone);
+}
+
 export function getLocalDateRange(days: number, timeZone = DEFAULT_TIME_ZONE, now = new Date()) {
   const today = getLocalDateString(now, timeZone);
   return Array.from({ length: days }, (_, index) => {

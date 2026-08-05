@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { createClient } from "@/lib/supabase/client";
 import { TRANSFORMATION_AREAS } from "@/lib/transformation-areas";
+import { indicatorTypes, type IndicatorDefinition, type IndicatorType } from "@/lib/assessment-methodology";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -34,6 +35,65 @@ import {
   Edit3,
 } from "lucide-react";
 
+type SetupIndicator = Omit<IndicatorDefinition, "baseline" | "target"> & {
+  baseline: string;
+  target: string;
+};
+
+type AreaTargetDraft = {
+  mainTarget: string;
+  reason: string;
+  indicators: SetupIndicator[];
+};
+
+const createIndicator = (area: string, type: IndicatorType, ordinal: number): SetupIndicator => {
+  const preset = indicatorTypes.find((item) => item.key === type)!;
+  return {
+    key: `${area.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-indicator-${ordinal}`,
+    type,
+    label: "",
+    active: true,
+    direction: preset.defaultDirection,
+    baseline: "",
+    target: "",
+    unit: "",
+  };
+};
+
+const createAreaTarget = (area: string): AreaTargetDraft => ({
+  mainTarget: "",
+  reason: "",
+  indicators: [createIndicator(area, "quantity", 1)],
+});
+
+const getAreaTargetError = (selectedAreas: string[], areaTargets: Record<string, AreaTargetDraft>) => {
+  if (selectedAreas.length !== 3) return "Pilih tepat 3 area transformasi sebelum melanjutkan.";
+
+  for (const area of selectedAreas) {
+    const draft = areaTargets[area];
+    if (!draft?.mainTarget.trim()) return `${area}: Target Utama 90 Hari wajib diisi.`;
+    if (draft.indicators.length < 1 || draft.indicators.length > 4) return `${area}: pilih 1-4 indikator keberhasilan.`;
+
+    const selectedTypes = new Set<IndicatorType>();
+    for (const indicator of draft.indicators) {
+      const typeLabel = indicatorTypes.find((item) => item.key === indicator.type)?.label || indicator.type;
+      const prefix = `${area} - ${typeLabel}`;
+      if (selectedTypes.has(indicator.type)) return `${prefix}: jenis indikator tidak boleh digunakan lebih dari satu kali dalam area yang sama.`;
+      selectedTypes.add(indicator.type);
+      if (!indicator.label.trim()) return `${prefix}: nama indikator wajib diisi.`;
+      if (!indicator.unit?.trim()) return `${prefix}: satuan wajib diisi.`;
+      if (!indicator.baseline.trim() || !indicator.target.trim()) return `${prefix}: kondisi saat ini dan target 90 hari wajib berupa angka.`;
+
+      const baseline = Number(indicator.baseline);
+      const target = Number(indicator.target);
+      if (![baseline, target].every(Number.isFinite) || baseline < 0 || target < 0) return `${prefix}: kondisi saat ini dan target 90 hari harus berupa angka valid yang tidak negatif.`;
+      if (baseline === target) return `${prefix}: kondisi saat ini dan target 90 hari tidak boleh sama.`;
+    }
+  }
+
+  return null;
+};
+
 export default function JourneySetupPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -46,12 +106,12 @@ export default function JourneySetupPage() {
   const [muhasabah, setMuhasabah] = useState("");
   const [niat, setNiat] = useState("");
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
-  const [mainTarget, setMainTarget] = useState("");
-  const [indicators, setIndicators] = useState<string[]>(["", "", ""]);
+  const [areaTargets, setAreaTargets] = useState<Record<string, AreaTargetDraft>>({});
   
-  const [actionPlans, setActionPlans] = useState<{ id: string; title: string; frequency: string; areaCategory: string }[]>([]);
+  const [actionPlans, setActionPlans] = useState<{ id: string; title: string; frequency: "daily" | "weekly"; quantity: number; areaCategory: string }[]>([]);
   const [newActionTitle, setNewActionTitle] = useState("");
-  const [newActionFreq, setNewActionFreq] = useState("Setiap hari");
+  const [newActionFreq, setNewActionFreq] = useState<"daily" | "weekly">("daily");
+  const [newActionQuantity, setNewActionQuantity] = useState(1);
   const [newActionArea, setNewActionArea] = useState("Spiritual Growth");
 
   const [sahabatSafar, setSahabatSafar] = useState("");
@@ -115,6 +175,20 @@ export default function JourneySetupPage() {
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    setAreaTargets((current) => {
+      const next = { ...current };
+      let changed = false;
+      selectedAreas.forEach((area) => {
+        if (!next[area]) {
+          next[area] = createAreaTarget(area);
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [selectedAreas]);
+
   const toggleArea = (areaId: string) => {
     if (selectedAreas.includes(areaId)) {
       setSelectedAreas(selectedAreas.filter((a) => a !== areaId));
@@ -127,18 +201,21 @@ export default function JourneySetupPage() {
     if (currentStep === 1) return muhasabah.trim().length > 0;
     if (currentStep === 2) return niat.trim().length > 0;
     if (currentStep === 3) return selectedAreas.length === 3;
-    if (currentStep === 4) return mainTarget.trim().length > 0;
+    if (currentStep === 4) return getAreaTargetError(selectedAreas, areaTargets) === null;
     if (currentStep === 5) return actionPlans.length > 0;
     return true;
   };
 
   const continueTo = (nextStep: number) => {
     if (!canContinue(step)) {
+      if (step === 4) {
+        setCommitError(getAreaTargetError(selectedAreas, areaTargets));
+        return;
+      }
       const messages: Record<number, string> = {
         1: "Isi Muhasabah sebelum melanjutkan.",
         2: "Isi Niat Perubahan sebelum melanjutkan.",
         3: "Pilih tepat 3 area transformasi sebelum melanjutkan.",
-        4: "Isi Target Utama 90 Hari sebelum melanjutkan.",
         5: "Tambahkan minimal satu Action Plan sebelum melanjutkan.",
       };
       setCommitError(messages[step] || "Lengkapi bagian ini sebelum melanjutkan.");
@@ -156,9 +233,10 @@ export default function JourneySetupPage() {
       }
       setActionPlans([
         ...actionPlans,
-        { id: String(Date.now()), title: newActionTitle.trim(), frequency: newActionFreq, areaCategory: newActionArea || selectedAreas[0] || "Spiritual Growth" },
+        { id: String(Date.now()), title: newActionTitle.trim(), frequency: newActionFreq, quantity: Math.max(1, newActionQuantity), areaCategory: newActionArea || selectedAreas[0] || "Spiritual Growth" },
       ]);
       setNewActionTitle("");
+      setNewActionQuantity(1);
       setCommitError(null);
     }
   };
@@ -184,14 +262,41 @@ export default function JourneySetupPage() {
         setCommitError("Pilih tepat 3 area transformasi sebelum memulai Journey.");
         return;
       }
-      if (!muhasabah.trim() || !niat.trim() || !mainTarget.trim()) {
-        setCommitError("Lengkapi Muhasabah, Niat Perubahan, dan Target Utama sebelum memulai Journey.");
+      if (!muhasabah.trim() || !niat.trim()) {
+        setCommitError("Lengkapi Muhasabah dan Niat Perubahan sebelum memulai Journey.");
+        return;
+      }
+      const areaTargetError = getAreaTargetError(selectedAreas, areaTargets);
+      if (areaTargetError) {
+        setCommitError(areaTargetError);
         return;
       }
       if (actionPlans.length === 0 || actionPlans.some(plan => !selectedAreas.includes(plan.areaCategory))) {
         setCommitError("Tambahkan minimal satu Action Plan dan pastikan setiap Action Plan menggunakan area yang dipilih.");
         return;
       }
+
+      const targetsByArea = Object.fromEntries(selectedAreas.map((area) => {
+        const draft = areaTargets[area];
+        const areaIndicators: IndicatorDefinition[] = draft.indicators.map((indicator) => ({
+          ...indicator,
+          label: indicator.label.trim(),
+          baseline: Number(indicator.baseline),
+          target: Number(indicator.target),
+          unit: indicator.unit?.trim(),
+        }));
+        const indicatorLabel = (type: IndicatorType) => areaIndicators.find((indicator) => indicator.type === type)?.label || "";
+        return [area, {
+          mainTarget: draft.mainTarget.trim(),
+          reason: draft.reason.trim(),
+          kualitas: indicatorLabel("quality"),
+          kuantitas: indicatorLabel("quantity"),
+          waktu: indicatorLabel("time"),
+          biaya: indicatorLabel("cost"),
+          indicators: areaIndicators,
+        }];
+      }));
+      const flattenedSuccessIndicators = selectedAreas.flatMap((area) => targetsByArea[area].indicators.map((indicator) => indicator.label));
 
       const { data: existingProfile, error: existingProfileError } = await supabase
         .from("profiles")
@@ -222,14 +327,8 @@ export default function JourneySetupPage() {
         muhasabah,
         niat,
         area_transformasi: selectedAreas,
-        main_target: JSON.stringify(Object.fromEntries(selectedAreas.map((area) => [area, {
-          mainTarget,
-          kualitas: indicators[0] || "",
-          kuantitas: indicators[1] || "",
-          waktu: indicators[2] || "",
-          biaya: "",
-        }]))),
-        success_indicators: indicators.filter((i) => i.trim() !== ""),
+        main_target: JSON.stringify(targetsByArea),
+        success_indicators: flattenedSuccessIndicators,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" }).select().maybeSingle();
 
@@ -244,6 +343,25 @@ export default function JourneySetupPage() {
       if (journey) {
         const errors: string[] = [];
 
+        const indicatorRows = selectedAreas.flatMap(area => targetsByArea[area].indicators.map(indicator => ({
+          participant_user_id: currentUserId,
+          journey_id: journey.id,
+          area,
+          indicator_key: indicator.key,
+          indicator_type: indicator.type,
+          label: indicator.label.trim(),
+          active: indicator.active,
+          direction: indicator.direction,
+          baseline_value: indicator.baseline,
+          target_value: indicator.target,
+          unit: indicator.unit?.trim(),
+          updated_at: new Date().toISOString(),
+        })));
+        const { error: indicatorError } = await supabase.from("ptp_indicators").upsert(indicatorRows, { onConflict: "journey_id,area,indicator_key" });
+        if (indicatorError && indicatorError.code !== "42P01" && indicatorError.code !== "PGRST205") {
+          errors.push(`Indikator PTP: ${indicatorError.message}`);
+        }
+
         const { error: clearPlansError } = await supabase.from("action_plans").delete().eq("journey_id", journey.id);
         if (clearPlansError) throw clearPlansError;
 
@@ -255,8 +373,8 @@ export default function JourneySetupPage() {
             category: ap.areaCategory,
             area_category: ap.areaCategory,
             frequency: ap.frequency,
-            quantity: 1,
-            target: 1,
+            quantity: ap.quantity,
+            target: ap.quantity,
           }).select().maybeSingle();
 
           if (apErr) {
@@ -272,8 +390,9 @@ export default function JourneySetupPage() {
             category: ap.areaCategory,
             area_category: ap.areaCategory,
             frequency: ap.frequency,
-            quantity: 1,
-            target: 1,
+            quantity: ap.quantity,
+            target: ap.quantity,
+            source: "action_plan",
           });
 
           if (habitErr) {
@@ -292,14 +411,8 @@ export default function JourneySetupPage() {
             muhasabah,
             niat,
             area_transformasi: selectedAreas,
-            main_target: JSON.stringify(Object.fromEntries(selectedAreas.map((area) => [area, {
-              mainTarget,
-              kualitas: indicators[0] || "",
-              kuantitas: indicators[1] || "",
-              waktu: indicators[2] || "",
-              biaya: "",
-            }]))),
-            success_indicators: indicators.filter((i) => i.trim() !== ""),
+            main_target: JSON.stringify(targetsByArea),
+            success_indicators: flattenedSuccessIndicators,
             action_plans: actionPlans,
           },
         });
@@ -606,7 +719,7 @@ export default function JourneySetupPage() {
             <div className="space-y-6 py-2">
               <div className="space-y-2">
                 <h2 className="text-3xl font-serif font-bold text-navy-900">4. Target 90 Hari & Indikator</h2>
-                <p className="text-xs text-gray-600">Tentukan 1 target utama dan 3 indikator keberhasilan terukur.</p>
+                <p className="text-xs text-gray-600">Tentukan target utama dan 1-4 indikator keberhasilan terukur.</p>
               </div>
 
               {/* Panduan 4 Dimensi Indikator */}
@@ -638,37 +751,95 @@ export default function JourneySetupPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-navy-900 block">Target Utama 90 Hari:</label>
-                  <Input
-                    value={mainTarget}
-                    onChange={(e) => setMainTarget(e.target.value)}
-                    placeholder="Tulis target utama Anda..."
-                    className="text-xs"
-                  />
-                </div>
+              <div className="space-y-5">
+                {selectedAreas.map((area, areaIndex) => {
+                  const draft = areaTargets[area] || createAreaTarget(area);
+                  const areaLabel = areaOptions.find((option) => option.id === area)?.label || area;
+                  const usedTypes = new Set(draft.indicators.map((indicator) => indicator.type));
 
-                <div className="space-y-3 pt-2 border-t border-warm-border/60">
-                  <label className="text-xs font-bold text-navy-900 block">3 Indikator Keberhasilan:</label>
-                  {indicators.map((ind, i) => (
-                    <div key={i} className="flex items-center space-x-3">
-                      <span className="h-6 w-6 rounded-full bg-amber-100 text-amber-800 text-xs flex items-center justify-center font-bold shrink-0">
-                        {i + 1}
-                      </span>
-                      <Input
-                        value={ind}
-                        onChange={(e) => {
-                          const newInds = [...indicators];
-                          newInds[i] = e.target.value;
-                          setIndicators(newInds);
-                        }}
-                        placeholder={`Indikator keberhasilan ke-${i + 1}...`}
-                        className="text-xs"
-                      />
-                    </div>
-                  ))}
-                </div>
+                  const updateDraft = (update: (current: AreaTargetDraft) => AreaTargetDraft) => {
+                    setAreaTargets((current) => ({ ...current, [area]: update(current[area] || createAreaTarget(area)) }));
+                    setCommitError(null);
+                  };
+
+                  return (
+                    <section key={area} className="overflow-hidden rounded-2xl border border-warm-border bg-white">
+                      <div className="flex items-center gap-3 border-b border-warm-border bg-slate-50/80 px-4 py-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-bold text-white">{areaIndex + 1}</span>
+                        <div>
+                          <h3 className="text-sm font-bold text-navy-900">{areaLabel}</h3>
+                          <p className="text-[10px] text-slate-500">Satu target dan 1-4 jenis indikator khusus untuk area ini.</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 p-4">
+                        <label className="block space-y-1.5">
+                          <span className="text-xs font-bold text-navy-900">Target Utama 90 Hari</span>
+                          <Input value={draft.mainTarget} onChange={(event) => updateDraft((current) => ({ ...current, mainTarget: event.target.value }))} placeholder={`Target utama untuk ${areaLabel}...`} className="text-xs" />
+                        </label>
+                        <label className="block space-y-1.5">
+                          <span className="text-xs font-bold text-navy-900">Mengapa target ini penting? <span className="font-normal text-slate-400">(opsional)</span></span>
+                          <Textarea value={draft.reason} onChange={(event) => updateDraft((current) => ({ ...current, reason: event.target.value }))} placeholder="Jelaskan alasan dan dampak yang ingin Anda capai..." className="min-h-[72px] text-xs" />
+                        </label>
+
+                        <div className="space-y-3 border-t border-warm-border/60 pt-4">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                              <h4 className="text-xs font-bold text-navy-900">Indikator keberhasilan</h4>
+                              <p className="text-[10px] leading-relaxed text-slate-500">Pilih hanya jenis yang relevan. Setiap jenis hanya dapat digunakan sekali dalam area ini.</p>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-500">{draft.indicators.length}/4 indikator</span>
+                          </div>
+
+                          {draft.indicators.map((indicator, indicatorIndex) => {
+                            const preset = indicatorTypes.find((type) => type.key === indicator.type)!;
+                            return (
+                              <div key={indicator.key} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/40 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-xs font-bold text-navy-900">Indikator {indicatorIndex + 1}</p>
+                                  {draft.indicators.length > 1 && (
+                                    <button type="button" onClick={() => updateDraft((current) => ({ ...current, indicators: current.indicators.filter((item) => item.key !== indicator.key) }))} className="rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" aria-label={`Hapus indikator ${indicatorIndex + 1} pada ${areaLabel}`}>
+                                      <X className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                <label className="block space-y-1">
+                                  <span className="text-[10px] font-bold text-slate-600">1. Jenis indikator</span>
+                                  <select value={indicator.type} onChange={(event) => { const type = event.target.value as IndicatorType; const nextPreset = indicatorTypes.find((item) => item.key === type)!; updateDraft((current) => ({ ...current, indicators: current.indicators.map((item) => item.key === indicator.key ? { ...item, type, direction: nextPreset.defaultDirection } : item) })); }} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                    {indicatorTypes.map((type) => <option key={type.key} value={type.key} disabled={type.key !== indicator.type && usedTypes.has(type.key)}>{type.label}{type.key !== indicator.type && usedTypes.has(type.key) ? " (sudah digunakan)" : ""}</option>)}
+                                  </select>
+                                </label>
+
+                                <div className="rounded-lg border border-amber-200/70 bg-amber-50/70 p-2.5 text-[10px] leading-relaxed text-slate-600">
+                                  <span className="font-bold text-amber-900">{preset.label}:</span> {preset.description} Contoh nama: <span className="font-semibold">{preset.example}</span>. Contoh satuan: <span className="font-semibold">{preset.unitExample}</span>. Arah default: <span className="font-semibold">{preset.defaultDirection === "higher_is_better" ? "Naik lebih baik" : "Turun lebih baik"}</span>.
+                                </div>
+
+                                <label className="block space-y-1">
+                                  <span className="text-[10px] font-bold text-slate-600">2. Nama indikator: apa yang diukur?</span>
+                                  <Input value={indicator.label} onChange={(event) => updateDraft((current) => ({ ...current, indicators: current.indicators.map((item) => item.key === indicator.key ? { ...item, label: event.target.value } : item) }))} placeholder={preset.example} className="bg-white text-xs" />
+                                </label>
+
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                  <label className="space-y-1"><span className="text-[10px] font-bold text-slate-600">3. Kondisi saat ini</span><Input type="number" min="0" step="any" value={indicator.baseline} onChange={(event) => updateDraft((current) => ({ ...current, indicators: current.indicators.map((item) => item.key === indicator.key ? { ...item, baseline: event.target.value } : item) }))} placeholder="Contoh: 2" className="bg-white text-xs tabular-nums" /></label>
+                                  <label className="space-y-1"><span className="text-[10px] font-bold text-slate-600">4. Target 90 hari</span><Input type="number" min="0" step="any" value={indicator.target} onChange={(event) => updateDraft((current) => ({ ...current, indicators: current.indicators.map((item) => item.key === indicator.key ? { ...item, target: event.target.value } : item) }))} placeholder="Contoh: 7" className="bg-white text-xs tabular-nums" /></label>
+                                  <label className="space-y-1"><span className="text-[10px] font-bold text-slate-600">5. Arah keberhasilan</span><select value={indicator.direction} onChange={(event) => updateDraft((current) => ({ ...current, indicators: current.indicators.map((item) => item.key === indicator.key ? { ...item, direction: event.target.value as IndicatorDefinition["direction"] } : item) }))} className="h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
+                                  <label className="space-y-1"><span className="text-[10px] font-bold text-slate-600">6. Satuan</span><Input value={indicator.unit || ""} onChange={(event) => updateDraft((current) => ({ ...current, indicators: current.indicators.map((item) => item.key === indicator.key ? { ...item, unit: event.target.value } : item) }))} placeholder={preset.unitExample} className="bg-white text-xs" /></label>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {draft.indicators.length < 4 && (
+                            <Button type="button" variant="outline" onClick={() => { const nextType = indicatorTypes.find((type) => !usedTypes.has(type.key))?.key; if (nextType) updateDraft((current) => ({ ...current, indicators: [...current.indicators, createIndicator(area, nextType, Math.max(0, ...current.indicators.map((item) => Number(item.key.match(/(\d+)$/)?.[1]) || 0)) + 1)] })); }} className="w-full border-dashed text-xs">
+                              <Plus className="mr-1 h-3.5 w-3.5" /> Tambah jenis indikator
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
 
               <div className="flex justify-between items-center pt-4 border-t border-warm-border/60">
@@ -696,7 +867,7 @@ export default function JourneySetupPage() {
               </div>
 
               <div className="space-y-3">
-                <span className="text-xs font-bold text-navy-900 block">Kebiasaan Harian</span>
+                <span className="text-xs font-bold text-navy-900 block">Kebiasaan Harian & Pekanan</span>
 
                 {actionPlans.map((ap) => (
                   <div key={ap.id} className="flex items-center justify-between bg-warm-bg/40 p-3 rounded-xl border border-warm-border text-xs">
@@ -707,7 +878,7 @@ export default function JourneySetupPage() {
 
                     <div className="flex items-center space-x-3">
                       <span className="text-xs font-medium text-gray-500 bg-white px-2.5 py-1 rounded-md border border-warm-border">
-                        {ap.frequency}
+                          {ap.quantity}x / {ap.frequency === "weekly" ? "minggu" : "hari"}
                       </span>
                       <button
                         onClick={() => removeActionPlan(ap.id)}
@@ -719,13 +890,19 @@ export default function JourneySetupPage() {
                   </div>
                 ))}
 
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_auto] gap-2 pt-2">
+                <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_170px_120px_110px_auto]">
                   <Input
                     value={newActionTitle}
                     onChange={(e) => setNewActionTitle(e.target.value)}
                     placeholder="Tambah kebiasaan baru..."
                     className="text-xs"
                   />
+                  <select value={newActionFreq} onChange={(event) => setNewActionFreq(event.target.value as "daily" | "weekly")} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-navy-900" aria-label="Frekuensi Action Plan">
+                    <option value="daily">Harian</option>
+                    <option value="weekly">Pekanan</option>
+                  </select>
+                  <Input type="number" min={1} value={newActionQuantity} onChange={(event) => setNewActionQuantity(Math.max(1, Number(event.target.value) || 1))} className="text-xs" aria-label="Target jumlah Action Plan" />
+                  <div className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-[10px] font-semibold text-slate-500">kali/{newActionFreq === "weekly" ? "minggu" : "hari"}</div>
                   <select
                     value={selectedAreas.includes(newActionArea) ? newActionArea : selectedAreas[0] || "Spiritual Growth"}
                     onChange={(event) => setNewActionArea(event.target.value)}
@@ -852,9 +1029,14 @@ export default function JourneySetupPage() {
                 <div className="flex justify-between items-start py-3 border-b border-warm-border/60">
                   <div className="flex items-start space-x-3">
                     <Target className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
+                    <div className="space-y-2">
                       <span className="font-bold text-navy-900 block">Target & Indikator</span>
-                      <p className="text-gray-600 font-semibold">{mainTarget || "Belum diisi"}</p>
+                      {selectedAreas.map((area) => (
+                        <div key={area}>
+                          <p className="font-semibold text-gray-700">{areaOptions.find((option) => option.id === area)?.label || area}: {areaTargets[area]?.mainTarget || "Belum diisi"}</p>
+                          <p className="text-[10px] text-gray-500">{areaTargets[area]?.indicators.length || 0} indikator</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <button onClick={() => setStep(4)} className="text-gray-400 hover:text-navy-900"><Edit3 className="h-3.5 w-3.5" /></button>

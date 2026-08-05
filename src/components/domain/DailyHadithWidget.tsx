@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BookMarked, Quote, CheckCircle2 } from "lucide-react";
-import { DEFAULT_TIME_ZONE, getLocalDateString } from "@/lib/local-date";
+import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalizeHabitFrequency } from "@/lib/local-date";
 
 interface DailyHadithWidgetProps {
   userId: string;
@@ -88,7 +88,7 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
     try {
       const { data: habits, error: habitError } = await supabase
         .from("habits")
-        .select("id")
+        .select("id,frequency")
         .eq("user_id", userId)
         .ilike("title", habitTitle);
       if (habitError) throw habitError;
@@ -96,14 +96,15 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
       if (!habits?.length) return;
 
       for (const habit of habits) {
+        const occurrenceKey = getHabitOccurrenceKey(normalizeHabitFrequency(habit.frequency), new Date(), timeZone);
         if (completed) {
           const { error } = await supabase.from("habit_logs").upsert(
-            { habit_id: habit.id, user_id: userId, date: todayStr, completed: true, completed_count: 1 },
+            { habit_id: habit.id, user_id: userId, date: occurrenceKey, activity_date: todayStr, completed: true, completed_count: 1 },
             { onConflict: "habit_id,date" }
           );
           if (error) throw error;
         } else {
-          const { error } = await supabase.from("habit_logs").delete().eq("habit_id", habit.id).eq("user_id", userId).eq("date", todayStr);
+          const { error } = await supabase.from("habit_logs").delete().eq("habit_id", habit.id).eq("user_id", userId).eq("date", occurrenceKey);
           if (error) throw error;
         }
       }

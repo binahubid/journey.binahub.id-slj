@@ -37,7 +37,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_TIME_ZONE, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
-import { getJournalStreak, getJourneyDayForDate, parseJournalContent, composeJournalContent } from "@/lib/journal";
+import { getCanonicalJournalDate, getJournalStreak, getJourneyDayForDate, parseJournalContent, composeJournalContent } from "@/lib/journal";
 
 // ── DAILY PROMPTS MAPPING (DAY 1 TO 90) ─────────────────────────────────────
 
@@ -88,6 +88,7 @@ interface JournalPost {
   id: string;
   dayNumber: number;
   dateStr: string;
+  canonicalDate: string;
   timeStr: string;
   location: string;
   userFullName: string;
@@ -98,6 +99,7 @@ interface JournalPost {
   mood: string;
   isLiked: boolean;
   likeCount: number;
+  isPrivate: boolean;
 }
 
 export default function RefactoredJournalPage() {
@@ -117,6 +119,7 @@ export default function RefactoredJournalPage() {
   const [selectedMood, setSelectedMood] = useState("Bersyukur");
   const [pelajaran, setPelajaran] = useState("");
   const [perbaikanBesok, setPerbaikanBesok] = useState("");
+  const [journalIsPrivate, setJournalIsPrivate] = useState(true);
 
   // Live Digital Clock & Adaptive Background
   const [heroClockHH, setHeroClockHH] = useState<string>("18");
@@ -194,6 +197,10 @@ export default function RefactoredJournalPage() {
         }
       }
 
+      const { data: settings } = await supabase.from("settings").select("journal_privacy_default").eq("user_id", user.id).maybeSingle();
+      const privacyDefault = settings?.journal_privacy_default ?? true;
+      const resolvedTimeZone = resolveParticipantTimeZone(profile?.timezone || DEFAULT_TIME_ZONE, profile?.timezone_mode || "AUTO");
+
       setDayCount(currentDay);
       setDailyPrompt(getPromptForDay(currentDay));
 
@@ -210,6 +217,8 @@ export default function RefactoredJournalPage() {
         .order("created_at", { ascending: false });
 
       if (journals && journals.length > 0) {
+        const todayJournal = journals.find((journal: any) => getCanonicalJournalDate(journal.date || journal.created_at) === getLocalDateString(new Date(), resolvedTimeZone));
+        setJournalIsPrivate(todayJournal ? todayJournal.is_private ?? true : privacyDefault);
         setStreakCount(getJournalStreak(journals.map((journal: any) => journal.date || journal.created_at)));
         setPosts(
           journals.map((j: any) => {
@@ -220,6 +229,7 @@ export default function RefactoredJournalPage() {
 
             return {
               id: j.id,
+              canonicalDate: getCanonicalJournalDate(j.date || j.created_at),
               dayNumber: getJourneyDayForDate(j.date || j.created_at, profile?.start_date),
               dateStr,
               timeStr,
@@ -232,10 +242,12 @@ export default function RefactoredJournalPage() {
               mood: j.mood || "Bersyukur",
               isLiked: j.is_favorite || false,
               likeCount: j.is_favorite ? 1 : 0,
+              isPrivate: j.is_private ?? true,
             };
           })
         );
       } else {
+        setJournalIsPrivate(privacyDefault);
         // Empty state — tidak ada data jurnal (jangan tampilkan data palsu)
         setPosts([]);
         setStreakCount(0);
@@ -275,11 +287,11 @@ export default function RefactoredJournalPage() {
 
       const combinedContent = composeJournalContent(mainReflection, pelajaran, perbaikanBesok);
 
-      const existingToday = posts.find(post => post.dateStr === now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }));
+      const existingToday = posts.find(post => post.canonicalDate === todayStr);
       const journalPayload = {
         content: combinedContent,
         mood: selectedMood,
-        is_private: true,
+        is_private: existingToday ? existingToday.isPrivate : journalIsPrivate,
         location: userLocation,
       };
       const saveQuery = existingToday
@@ -296,6 +308,7 @@ export default function RefactoredJournalPage() {
       if (data) {
         const newPost: JournalPost = {
           id: data.id,
+          canonicalDate: todayStr,
           dayNumber: getJourneyDayForDate(todayStr, journeyStartDate) || dayCount,
           dateStr: now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
           timeStr,
@@ -308,9 +321,10 @@ export default function RefactoredJournalPage() {
           mood: selectedMood,
           isLiked: false,
           likeCount: 1,
+          isPrivate: data.is_private ?? journalPayload.is_private,
         };
 
-        setPosts(prev => [newPost, ...prev.filter(post => post.dateStr !== newPost.dateStr)]);
+        setPosts(prev => [newPost, ...prev.filter(post => post.canonicalDate !== todayStr)]);
         setMainReflection("");
         setPelajaran("");
         setPerbaikanBesok("");
@@ -638,11 +652,12 @@ export default function RefactoredJournalPage() {
 
                 {/* FOOTER BAR */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-4 sm:pt-5">
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-medium">
-                    <span className="flex items-center gap-1.5">
-                      <Lock className="h-3.5 w-3.5 text-slate-400" />
-                      Jurnal ini bersifat privat dan terenkripsi.
-                    </span>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" checked={journalIsPrivate} onChange={(event) => setJournalIsPrivate(event.target.checked)} />
+                      <Lock className="h-3.5 w-3.5" />
+                      {journalIsPrivate ? "Privat, hanya Anda yang dapat membaca" : "Bagikan dengan coach/tim berwenang"}
+                    </label>
                     <span className="hidden sm:inline">•</span>
                     <span className="text-slate-500 font-semibold flex items-center gap-1">
                       📍 {userLocation}
