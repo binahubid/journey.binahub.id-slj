@@ -1756,7 +1756,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           <DialogHeader>
             <DialogTitle className="pr-6 text-base font-black text-navy-900">Hapus Area dan Target?</DialogTitle>
             <DialogDescription>
-              Target 90 hari serta indikator pada area <strong>{areaPendingRemoval}</strong> akan dihapus dari draft Anda. Perubahan ini belum memengaruhi Impact Report sampai Anda menekan Selanjutnya dan menerapkan PTP.
+              Target 90 hari dan indikator area <strong>{areaPendingRemoval}</strong> akan dihapus dari draft.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
