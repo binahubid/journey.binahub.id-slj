@@ -434,9 +434,9 @@ export default function MonitoringPage() {
       const [habitLogsRes] = await Promise.all([
         supabase
           .from("habit_logs")
-           .select("habit_id, date, completed, completed_count")
+           .select("habit_id, date, activity_date, completed, completed_count")
            .eq("user_id", user.id)
-           .gte("date", accumulationStartDate)
+           .gte("date", getMondayWeekStart(accumulationStartDate))
            .lte("date", accumulationEndDate),
       ]);
       if (habitLogsRes.error) throw habitLogsRes.error;
@@ -456,7 +456,7 @@ export default function MonitoringPage() {
             ? dObj.toLocaleDateString("id-ID", { weekday: "short", timeZone: "UTC" })
             : `${dObj.getUTCDate()}/${dObj.getUTCMonth() + 1}`;
 
-          const logsForDay = habitLogs.filter((l: any) => l.date === dateStr);
+           const logsForDay = habitLogs.filter((l: any) => (l.activity_date || l.date) === dateStr);
           habitsWithArea.forEach(habit => {
             if (
               habit.frequency === "unsupported" ||
@@ -538,7 +538,10 @@ export default function MonitoringPage() {
       for (let i = 89; i >= 0; i--) dates90.push(addCalendarDays(todayStr, -i));
 
       const { data: logs90 } = await supabase.from("habit_logs")
-        .select("habit_id, date, completed, completed_count").eq("user_id", user.id).in("date", dates90);
+        .select("habit_id, date, activity_date, completed, completed_count")
+        .eq("user_id", user.id)
+        .gte("date", addCalendarDays(todayStr, -95))
+        .lte("date", todayStr);
 
       const heatmap = dates90.map(dateStr => {
         const activeHabits = habitsWithArea.filter(h =>
@@ -546,7 +549,7 @@ export default function MonitoringPage() {
           (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
           (!h.effectiveUntil || h.effectiveUntil >= dateStr)
         );
-        const dayLogs = (logs90 || []).filter((l: any) => l.date === dateStr);
+        const dayLogs = (logs90 || []).filter((l: any) => (l.activity_date || l.date) === dateStr);
         const completedCount = activeHabits.reduce((sum, h) => {
           const log = h.id.startsWith("missing:") ? null : dayLogs.find((l: any) => l.habit_id === h.id);
           return sum + getCompletedUnits(log, h.qty);

@@ -143,7 +143,11 @@ CREATE TABLE IF NOT EXISTS public.habit_logs (
   habit_id UUID NOT NULL REFERENCES public.habits(id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
   date TEXT NOT NULL, -- YYYY-MM-DD
+  activity_date DATE,
+  occurrence_start DATE,
+  is_canonical_occurrence BOOLEAN NOT NULL DEFAULT TRUE,
   completed BOOLEAN NOT NULL DEFAULT FALSE,
+  completed_count INTEGER NOT NULL DEFAULT 0,
   note TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   CONSTRAINT habit_logs_habit_id_date_unique UNIQUE (habit_id, date)

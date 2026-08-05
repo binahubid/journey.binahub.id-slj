@@ -888,7 +888,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         return (
           <div className="space-y-4">
             {/* Collapsible Reflection Guide (Solid Background) */}
-            <div className="bg-[#071A33] border-l-4 border-amber-400 rounded-xl overflow-hidden shadow-xs">
+            <div className="bg-[#071A33] rounded-xl overflow-hidden shadow-xs">
               <button
                 type="button"
                 onClick={() => setGuideOpen(v => !v)}
@@ -901,7 +901,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <ChevronRight className={`h-4 w-4 text-amber-400 transition-transform duration-200 ${guideOpen ? "rotate-90" : ""}`} />
               </button>
               {guideOpen && (
-                <div className="px-4 pb-4 pt-1 border-t border-slate-700/60 bg-[#071A33]">
+                <div className="px-4 pb-4 pt-1 bg-[#071A33]">
                   <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
                     <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Apa bagian dari hati dan kehidupan saya yang paling membutuhkan pertolongan Allah?</li>
                     <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Apa yang paling ingin saya perbaiki melalui program ini?</li>
@@ -915,7 +915,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               <Textarea disabled={locked} value={muhasabah} onChange={e => { setMuhasabah(e.target.value); scheduleAutosave(1); }} placeholder="Tulis di sini..." className="min-h-[180px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={2000} />
               <div className="text-right text-xs text-slate-400 mt-1">{muhasabah.length} / 2000</div>
             </div>
-            <div className="border border-slate-100 rounded-xl p-3.5 bg-slate-50">
+            <div className="rounded-xl p-3.5 bg-slate-50">
               <div className="flex items-center gap-2 mb-1">
                 <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
                 <span className="text-xs font-bold text-slate-500">Catatan untuk Coach (opsional)</span>
@@ -929,7 +929,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         return (
           <div className="space-y-4">
             {/* Collapsible Reflection Guide */}
-            <div className="bg-[#071A33] border-l-4 border-amber-400 rounded-xl overflow-hidden shadow-xs">
+            <div className="bg-[#071A33] rounded-xl overflow-hidden shadow-xs">
               <button
                 type="button"
                 onClick={() => setHadithOpen(v => !v)}
@@ -942,7 +942,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <ChevronRight className={`h-4 w-4 text-amber-400 transition-transform duration-200 ${hadithOpen ? "rotate-90" : ""}`} />
               </button>
               {hadithOpen && (
-                <div className="px-4 pb-4 pt-1 border-t border-slate-700/60 bg-[#071A33]">
+                <div className="px-4 pb-4 pt-1 bg-[#071A33]">
                   <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
                     <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Mengapa saya ingin berangkat Umrah, dan apakah niat saya benar-benar karena Allah? Bagaimana saya meluruskan niat ini?</li>
                     <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Pribadi seperti apa yang ingin saya bentuk setelah kembali dari Tanah Suci?</li>
@@ -1036,10 +1036,10 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 const shortcuts = shortcutsByArea[area.id] || shortcutsByArea["Spiritual Growth"];
 
                 return (
-                  <div key={area.id} className={`rounded-2xl border-2 overflow-hidden transition-all duration-200 ${
-                    isOpen ? "border-amber-300 shadow-sm" :
-                    isSelected ? "border-slate-200" :
-                    "border-slate-100"
+                  <div key={area.id} className={`rounded-2xl overflow-hidden transition-all duration-200 ${
+                    isOpen ? "bg-amber-50 shadow-sm" :
+                    isSelected ? "bg-slate-100" :
+                    "bg-slate-50"
                   }`}>
                     {/* Area row — click row to open editor, click checkbox to select/unselect */}
                     <div
@@ -1074,8 +1074,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                         }
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0">
-                        {isSelected && hasTarget && <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">✓ Target</span>}
-                        {isSelected && !hasTarget && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Isi target</span>}
+                        {isSelected && hasTarget && <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">✓ Target</span>}
+                        {isSelected && !hasTarget && <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Isi target</span>}
                         
                         {/* Interactive Checkbox Toggle (Click to uncheck when selected) */}
                         {isSelected ? (
@@ -1116,8 +1116,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
                     {/* Inline target editor — only for selected + open area */}
                     {isOpen && (
-                      <div className="border-t border-amber-100 bg-[#FAF8F4] px-4 py-4 space-y-4">
-                        <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                      <div className="bg-[#FAF8F4] px-4 py-4 space-y-4">
+                        <div className="flex items-center justify-between pb-2">
                           <p className="text-xs font-extrabold text-[#0B2C6B] uppercase tracking-wider">Target & Indikator: {area.label}</p>
                           {!locked && (
                             <button
@@ -1155,7 +1155,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
                         {/* Structured indicators */}
                         <div className="space-y-3 pt-1">
-                          <div className="border-t border-[#EAE5D9] pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                             <div><p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">Tentukan apa yang diukur pada area ini, nilai awalnya, dan target angka yang ingin dicapai.</p></div>
                             <p className="text-[11px] text-slate-500 italic">1-4 indikator terukur per area</p>
                           </div>
@@ -1163,7 +1163,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                             const areaIndicators = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
                             const usedTypes = new Set(areaIndicators.filter(item => item.active && item.key !== indicator.key).map(item => item.type));
                             return (
-                            <div key={indicator.key} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3.5">
+                            <div key={indicator.key} className="space-y-2 rounded-xl bg-white p-3.5 shadow-xs">
                               <div className="flex items-center justify-between gap-3">
                                 <span className="text-xs font-extrabold text-navy-900">{index + 1}. Apa yang ingin diukur?</span>
                                 <div className="flex items-center gap-2">
@@ -1220,8 +1220,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         if (selectedAreas.length === 0) {
           return (
             <div className="space-y-4">
-              <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-6 text-center space-y-3 shadow-2xs">
-                <div className="h-12 w-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-2xs border border-amber-200/60">
+              <div className="bg-amber-50/70 rounded-2xl p-6 text-center space-y-3">
+                <div className="h-12 w-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
                   <Lock className="h-6 w-6" />
                 </div>
                 <div className="space-y-1.5">
@@ -1275,7 +1275,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
         return (
           <div className="space-y-5">
-            <div className="bg-[#071A33] border border-amber-400/40 rounded-2xl p-4 sm:p-5 shadow-xs space-y-1.5">
+            <div className="bg-[#071A33] rounded-2xl p-4 sm:p-5 shadow-xs space-y-1.5">
               <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
                 <Zap className="h-4 w-4 text-amber-400 fill-amber-400" />
                 Action Plan & Habit Engine
@@ -1303,8 +1303,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                     <span>Buat Action Plan Custom Baru</span>
                   </button>
                 ) : (
-                  <div className="border border-amber-200/80 bg-[#FAF8F4] rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                  <div className="bg-[#FAF8F4] rounded-2xl p-4 sm:p-5 space-y-4">
+                    <div className="flex items-center justify-between pb-2">
                       <p className="text-xs font-extrabold text-[#0B2C6B] uppercase tracking-wider">Form Action Plan Custom</p>
                       <button
                         type="button"
@@ -1456,8 +1456,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               </div>
 
               {actionPlans.length === 0 && (
-                <div className="text-center py-10 px-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl space-y-2">
-                  <div className="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-2xs border border-amber-200/60">
+                <div className="text-center py-10 px-4 bg-slate-50 rounded-2xl space-y-2">
+                  <div className="h-10 w-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
                     <Zap className="h-5 w-5 text-amber-500 fill-amber-400" />
                   </div>
                   <p className="text-sm font-bold text-navy-900">Belum ada action plan yang ditambahkan</p>
@@ -1473,7 +1473,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 return (
                   <div
                     key={idx}
-                    className="flex items-center gap-3.5 p-3.5 bg-white border border-warm-border rounded-2xl shadow-2xs hover:border-amber-300 transition-all group"
+                    className="flex items-center gap-3.5 p-3.5 bg-white rounded-2xl shadow-xs hover:bg-amber-50/60 transition-all group"
                   >
                     <div className={`h-10 w-10 rounded-xl ${bg} ${iconColor} flex items-center justify-center shrink-0 shadow-2xs`}>
                       <Icon className="h-5 w-5" />

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Sparkles, X, ExternalLink } from "lucide-react";
-import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateRange, getLocalDateString, normalizeHabitFrequency } from "@/lib/local-date";
+import { DEFAULT_TIME_ZONE, getLocalDateRange } from "@/lib/local-date";
 
 interface PrayerTrackerProps {
   userId: string;
@@ -35,17 +35,6 @@ const AVAILABLE_SUNNAH_PRAYERS = [
   { key: "istikharah", label: "Sholat Istikharah" },
   { key: "taubat", label: "Sholat Taubat" },
 ];
-
-const PRAYER_TO_HABIT_TITLE: Record<string, string> = {
-  subuh: "Sholat Subuh",
-  dzuhur: "Sholat Dzuhur",
-  ashar: "Sholat Ashar",
-  maghrib: "Sholat Maghrib",
-  isya: "Sholat Isya",
-  tahajud: "Sholat Tahajud",
-  dhuha: "Sholat Dhuha",
-  rawatib: "Sholat Rawatib",
-};
 
 const DAY_INITIALS: Record<number, string> = {
   0: "M", 1: "S", 2: "S", 3: "R", 4: "K", 5: "J", 6: "S",
@@ -125,41 +114,6 @@ export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, exte
         if (error) throw error;
       }
 
-      const todayStr = getLocalDateString(new Date(), timeZone);
-      if (dateStr === todayStr) {
-        const targetHabitTitle = PRAYER_TO_HABIT_TITLE[prayerName];
-        if (targetHabitTitle) {
-          const { data: habits, error: habitError } = await supabase
-            .from("habits")
-            .select("id,frequency")
-            .eq("user_id", userId)
-            .eq("title", targetHabitTitle);
-          if (habitError) throw habitError;
-
-          for (const habit of habits || []) {
-            const occurrenceKey = getHabitOccurrenceKey(normalizeHabitFrequency(habit.frequency), new Date(), timeZone);
-            if (nextVal) {
-              const { error } = await supabase.from("habit_logs").upsert({
-                user_id: userId,
-                habit_id: habit.id,
-                date: occurrenceKey,
-                activity_date: todayStr,
-                completed: true,
-                completed_count: 1,
-              }, { onConflict: "habit_id,date" });
-              if (error) throw error;
-            } else {
-              const { error } = await supabase
-                .from("habit_logs")
-                .delete()
-                .eq("user_id", userId)
-                .eq("habit_id", habit.id)
-                .eq("date", occurrenceKey);
-              if (error) throw error;
-            }
-          }
-        }
-      }
     } catch (err) {
       console.error("Save prayer log error:", err);
       setLogs((prev) => ({ ...prev, [`${dateStr}_${prayerName}`]: current }));

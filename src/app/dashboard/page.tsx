@@ -26,6 +26,7 @@ import AreaProgressGraph from "@/components/AreaProgressGraph";
 import { composeJournalContent, getCanonicalJournalDate, parseJournalContent } from "@/lib/journal";
 import { getActiveProgramMonth, getProgramDay } from "@/lib/program-timeline";
 import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalizeHabitFrequency, resolveParticipantTimeZone } from "@/lib/local-date";
+import { detectHabitCategory, getPrayerKeyFromHabitTitle } from "@/lib/habit-tracking";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import {
   Compass,
@@ -665,30 +666,6 @@ export default function DashboardPage() {
           return true;
         });
 
-        // Helper: normalize habit title for category detection
-        const detectCategory = (title: string): "prayer" | "quran" | "hadith" | "general" => {
-          const t = title.toLowerCase();
-          if (t.includes("sholat") || t.includes("salat") || t.includes("prayer") || t.includes("subuh") || t.includes("dzuhur") || t.includes("ashar") || t.includes("maghrib") || t.includes("isya") || t.includes("tahajud") || t.includes("dhuha") || t.includes("witir") || t.includes("tarawih")) return "prayer";
-          if (t.includes("quran") || t.includes("qur'an") || t.includes("tilawah") || t.includes("tahsin") || t.includes("tadarus")) return "quran";
-          if (t.includes("hadist") || t.includes("hadith") || t.includes("hadis") || t.includes("baca hadis")) return "hadith";
-          return "general";
-        };
-
-        // Helper: normalize prayer name from title
-        const getPrayerKey = (title: string): string | null => {
-          const t = title.toLowerCase();
-          if (t.includes("subuh")) return "subuh";
-          if (t.includes("dzuhur") || t.includes("zuhur")) return "dzuhur";
-          if (t.includes("ashar")) return "ashar";
-          if (t.includes("maghrib")) return "maghrib";
-          if (t.includes("isya")) return "isya";
-          if (t.includes("tahajud")) return "tahajud";
-          if (t.includes("dhuha")) return "dhuha";
-          if (t.includes("witir")) return "witir";
-          if (t.includes("tarawih")) return "tarawih";
-          return null;
-        };
-
         // Load today's completed status from tracker tables
         const weeklyOccurrenceKey = getHabitOccurrenceKey("weekly", new Date(), profileTimeZone);
         const [prayerLogsRes, quranLogsRes, hadithLogsRes] = await Promise.all([
@@ -724,14 +701,14 @@ export default function DashboardPage() {
 
         if (activeTodayHabits.length > 0) {
           habitList = activeTodayHabits.map((h: any) => {
-            const cat = h.area_category === "Spiritual Growth" ? detectCategory(h.title) : "general";
+            const cat = detectHabitCategory(h.title);
             const qty = h.quantity || 1;
             let completedCount = habitLogCountMap[h.id] || 0;
             let completedToday = false;
 
             if (h.frequency === "weekly") {
               if (cat === "prayer") {
-                const key = getPrayerKey(h.title);
+                const key = getPrayerKeyFromHabitTitle(h.title);
                 if (key) completedCount = Math.max(completedCount, (prayerLogsRes.data || []).filter((row: any) => row.prayer_name === key).length);
               } else if (cat === "quran") {
                 completedCount = Math.max(completedCount, (quranLogsRes.data || []).length);
@@ -741,7 +718,7 @@ export default function DashboardPage() {
               completedCount = Math.min(qty, completedCount);
               completedToday = completedCount >= qty;
             } else if (cat === "prayer") {
-              const key = getPrayerKey(h.title);
+              const key = getPrayerKeyFromHabitTitle(h.title);
               const done = key ? completedPrayerKeys.has(key) : false;
               completedToday = done;
               completedCount = done ? qty : 0;
@@ -770,11 +747,12 @@ export default function DashboardPage() {
 
         setHabits(habitList);
         // Proportional scoring: each habit contributes completedCount/quantity
-        const totalScore = habitList.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
-        const done = habitList.filter((h) => h.completedToday).length;
+        const dailyHabits = habitList.filter(habit => habit.frequency === "daily");
+        const totalScore = dailyHabits.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
+        const done = dailyHabits.filter((h) => h.completedToday).length;
         setCompletedTodayCount(done);
         setHabitPercentage(
-          habitList.length > 0 ? Math.round((totalScore / habitList.length) * 100) : 0
+          dailyHabits.length > 0 ? Math.round((totalScore / dailyHabits.length) * 100) : 0
         );
 
         // 3b. Area Progress Chart — cumulative average score from transformation areas
@@ -806,6 +784,7 @@ export default function DashboardPage() {
               id: h.id,
               area: h.area_category ? normalizeTransformationArea(h.area_category) : (apAreaMap[h.action_plan_id] || "Spiritual Growth"),
               qty: h.quantity || 1,
+              frequency: normalizeHabitFrequency(h.frequency),
               effectiveFrom: h.effective_from || null,
               effectiveUntil: h.effective_until || null,
             }));
@@ -816,7 +795,10 @@ export default function DashboardPage() {
 
             const calcScore = (area: string, dateStr: string, logsForDay: any[]) => {
               const areaHabits = habitsWithArea.filter(h =>
-                h.area === area && (!h.effectiveFrom || h.effectiveFrom <= dateStr) && (!h.effectiveUntil || h.effectiveUntil >= dateStr)
+                h.area === area &&
+                (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
+                (!h.effectiveUntil || h.effectiveUntil >= dateStr) &&
+                (h.frequency === "daily" || getHabitOccurrenceKey("weekly", new Date(`${dateStr}T12:00:00Z`), profileTimeZone) === dateStr)
               );
               if (areaHabits.length === 0) return 0;
               const w = areaHabits.reduce((t, h) => {
@@ -839,7 +821,9 @@ export default function DashboardPage() {
                   h.area === area && (!h.effectiveFrom || h.effectiveFrom <= dateStr) && (!h.effectiveUntil || h.effectiveUntil >= dateStr)
                 );
                 if (activeH.length === 0) { sum += running[area]; return; }
-                const done = logsForDay.some((l: any) => activeH.some(h => h.id === l.habit_id) && (l.completed || (l.completed_count || 0) > 0));
+                const scheduledToday = activeH.filter(h => h.frequency === "daily" || getHabitOccurrenceKey("weekly", new Date(`${dateStr}T12:00:00Z`), profileTimeZone) === dateStr);
+                if (scheduledToday.length === 0) { sum += running[area]; return; }
+                const done = logsForDay.some((l: any) => scheduledToday.some(h => h.id === l.habit_id) && (l.completed || (l.completed_count || 0) > 0));
                 if (done) started[area] = true;
                 const change = done ? calcScore(area, dateStr, logsForDay) : started[area] ? -1 : 0;
                 running[area] = Number((running[area] + change).toFixed(2));
@@ -929,15 +913,6 @@ export default function DashboardPage() {
     return () => clearTimeout(timeout);
   }, [userId, supabase]);
 
-  // Helper functions for habit category detection (same as in loadDashboard)
-  const detectHabitCategory = (title: string): "prayer" | "quran" | "hadith" | "general" => {
-    const t = title.toLowerCase();
-    if (t.includes("sholat") || t.includes("salat") || t.includes("prayer") || t.includes("subuh") || t.includes("dzuhur") || t.includes("ashar") || t.includes("maghrib") || t.includes("isya") || t.includes("tahajud") || t.includes("dhuha") || t.includes("witir") || t.includes("tarawih")) return "prayer";
-    if (t.includes("quran") || t.includes("qur'an") || t.includes("tilawah") || t.includes("tahsin") || t.includes("tadarus")) return "quran";
-    if (t.includes("hadist") || t.includes("hadith") || t.includes("hadis") || t.includes("baca hadis")) return "hadith";
-    return "general";
-  };
-
   // Welcome modal handlers
   const handleDismissWelcome = async () => {
     if (welcomeNotificationId) {
@@ -956,50 +931,50 @@ export default function DashboardPage() {
     router.push("/initial-process");
   };
 
-  const getPrayerKeyFromTitle = (title: string): string | null => {
-    const t = title.toLowerCase();
-    if (t.includes("subuh")) return "subuh";
-    if (t.includes("dzuhur") || t.includes("zuhur")) return "dzuhur";
-    if (t.includes("ashar")) return "ashar";
-    if (t.includes("maghrib")) return "maghrib";
-    if (t.includes("isya")) return "isya";
-    if (t.includes("tahajud")) return "tahajud";
-    if (t.includes("dhuha")) return "dhuha";
-    if (t.includes("witir")) return "witir";
-    if (t.includes("tarawih")) return "tarawih";
-    return null;
-  };
-
   const updateHabitSummary = (updated: typeof habits) => {
-    const totalScore = updated.reduce((sum, habit) => sum + Math.min(1, habit.completedCount / habit.quantity), 0);
-    setCompletedTodayCount(updated.filter((habit) => habit.completedToday).length);
-    setHabitPercentage(updated.length > 0 ? Math.round((totalScore / updated.length) * 100) : 0);
+    const dailyHabits = updated.filter(habit => habit.frequency === "daily");
+    const totalScore = dailyHabits.reduce((sum, habit) => sum + Math.min(1, habit.completedCount / habit.quantity), 0);
+    setCompletedTodayCount(dailyHabits.filter((habit) => habit.completedToday).length);
+    setHabitPercentage(dailyHabits.length > 0 ? Math.round((totalScore / dailyHabits.length) * 100) : 0);
   };
 
-  const syncWeeklyTrackerHabit = async (category: "prayer" | "quran", prayerName?: string, delta = 1) => {
+  const syncTrackerHabits = async (category: "prayer" | "quran", prayerName?: string, delta = 1, activityDate = getLocalDateString(new Date(), userTimeZone)) => {
     const candidates = habits.filter((habit) => {
-      if (habit.frequency !== "weekly" || habit.category !== category) return false;
-      return category !== "prayer" || getPrayerKeyFromTitle(habit.title) === prayerName;
+      if (habit.category !== category) return false;
+      return category !== "prayer" || getPrayerKeyFromHabitTitle(habit.title) === prayerName;
     });
-    if (candidates.length !== 1) return;
+    const progress = new Map<string, { completedCount: number; completedToday: boolean }>();
+    for (const target of candidates) {
+      const frequency = normalizeHabitFrequency(target.frequency);
+      const occurrenceDate = new Date(`${activityDate}T12:00:00Z`);
+      const occurrenceKey = getHabitOccurrenceKey(frequency, occurrenceDate, userTimeZone);
+      const { data: existing } = await supabase.from("habit_logs").select("id,completed_count").eq("user_id", userId).eq("habit_id", target.id).eq("date", occurrenceKey).maybeSingle();
+      const storedCount = Number(existing?.completed_count) || 0;
+      const nextCount = frequency === "weekly"
+        ? Math.max(0, Math.min(target.quantity, storedCount + delta))
+        : delta > 0 ? target.quantity : 0;
+      const nextCompleted = nextCount >= target.quantity;
+      const result = existing
+        ? nextCount > 0
+          ? await supabase.from("habit_logs").update({ completed: nextCompleted, completed_count: nextCount, activity_date: activityDate }).eq("id", existing.id)
+          : await supabase.from("habit_logs").delete().eq("id", existing.id)
+        : nextCount > 0
+          ? await supabase.from("habit_logs").insert({ user_id: userId, habit_id: target.id, date: occurrenceKey, activity_date: activityDate, completed: nextCompleted, completed_count: nextCount })
+          : { error: null };
+      if (result.error) throw result.error;
+      const currentOccurrenceKey = getHabitOccurrenceKey(frequency, new Date(), userTimeZone);
+      if (occurrenceKey === currentOccurrenceKey) {
+        progress.set(target.id, { completedCount: nextCount, completedToday: nextCompleted });
+      }
+    }
 
-    const target = candidates[0];
-    const occurrenceKey = getHabitOccurrenceKey("weekly", new Date(), userTimeZone);
-    const nextCount = Math.max(0, Math.min(target.quantity, target.completedCount + delta));
-    const nextCompleted = nextCount >= target.quantity;
-    const { data: existing } = await supabase.from("habit_logs").select("id").eq("user_id", userId).eq("habit_id", target.id).eq("date", occurrenceKey).maybeSingle();
-    const result = existing
-      ? await supabase.from("habit_logs").update({ completed: nextCompleted, completed_count: nextCount }).eq("id", existing.id)
-      : nextCount > 0
-        ? await supabase.from("habit_logs").insert({ user_id: userId, habit_id: target.id, date: occurrenceKey, completed: nextCompleted, completed_count: nextCount })
-        : { error: null };
-    if (result.error) throw result.error;
-
-    setHabits((current) => {
-      const updated = current.map((habit) => habit.id === target.id ? { ...habit, completedCount: nextCount, completedToday: nextCompleted } : habit);
-      updateHabitSummary(updated);
-      return updated;
-    });
+    if (progress.size > 0) {
+      setHabits((current) => {
+        const updated = current.map((habit) => progress.has(habit.id) ? { ...habit, ...progress.get(habit.id)! } : habit);
+        updateHabitSummary(updated);
+        return updated;
+      });
+    }
   };
 
   // Realtime handler when prayer is toggled in PrayerTracker
@@ -1007,24 +982,24 @@ export default function DashboardPage() {
     setPrayerLogsMap((prev) => ({ ...prev, [`${dateStr}_${prayerName}`]: isCompleted }));
 
     const todayStr = getLocalDateString(new Date(), userTimeZone);
-    if (dateStr !== todayStr) return;
-
-    setHabits((prevHabits) => {
-      const updated = prevHabits.map((h) => {
-        const cat = detectHabitCategory(h.title);
-         if (cat === "prayer" && h.frequency === "daily") {
-          const pKey = getPrayerKeyFromTitle(h.title);
-          if (pKey === prayerName) {
-             return { ...h, completedToday: isCompleted, completedCount: isCompleted ? h.quantity : 0 };
+    if (dateStr === todayStr) {
+      setHabits((prevHabits) => {
+        const updated = prevHabits.map((h) => {
+          const cat = detectHabitCategory(h.title);
+          if (cat === "prayer" && h.frequency === "daily") {
+            const pKey = getPrayerKeyFromHabitTitle(h.title);
+            if (pKey === prayerName) {
+              return { ...h, completedToday: isCompleted, completedCount: isCompleted ? h.quantity : 0 };
+            }
           }
-        }
-        return h;
-      });
+          return h;
+        });
 
-       updateHabitSummary(updated);
-       return updated;
-     });
-    void syncWeeklyTrackerHabit("prayer", prayerName, isCompleted ? 1 : -1).catch((error) => {
+        updateHabitSummary(updated);
+        return updated;
+      });
+    }
+    void syncTrackerHabits("prayer", prayerName, isCompleted ? 1 : -1, dateStr).catch((error) => {
       console.error("Gagal menyinkronkan tracker ke habit mingguan:", error);
       setHabitSaveError("Progress habit mingguan belum tersimpan.");
     });
@@ -1044,7 +1019,7 @@ export default function DashboardPage() {
        updateHabitSummary(updated);
        return updated;
      });
-    void syncWeeklyTrackerHabit("quran", undefined, 1).catch((error) => {
+    void syncTrackerHabits("quran", undefined, 1).catch((error) => {
       console.error("Gagal menyinkronkan tracker ke habit mingguan:", error);
       setHabitSaveError("Progress habit mingguan belum tersimpan.");
     });
@@ -1058,9 +1033,14 @@ export default function DashboardPage() {
     const occurrenceKey = getHabitOccurrenceKey(target.frequency, new Date(), userTimeZone);
     setHabitSaveError(null);
 
-    const newCompleted = !target.completedToday;
+    const prayerKey = target.category === "prayer" ? getPrayerKeyFromHabitTitle(target.title) : null;
+    const prayerDoneToday = prayerKey ? Boolean(prayerLogsMap[`${todayStr}_${prayerKey}`]) : false;
+    const newCount = target.frequency === "weekly"
+      ? Math.max(0, Math.min(target.quantity, target.completedCount + (prayerKey ? (prayerDoneToday ? -1 : 1) : target.completedToday ? -target.quantity : target.quantity)))
+      : target.completedToday ? 0 : target.quantity;
+    const newCompleted = newCount >= target.quantity;
     const updated = habits.map((h) =>
-      h.id === habitId ? { ...h, completedToday: newCompleted, completedCount: newCompleted ? h.quantity : 0 } : h
+      h.id === habitId ? { ...h, completedToday: newCompleted, completedCount: newCount } : h
     );
     setHabits(updated);
 
@@ -1070,11 +1050,11 @@ export default function DashboardPage() {
       const cat = target.category;
 
       // Record to specific tracker tables for specialized widgets
-      if (target.frequency === "daily" && cat === "prayer") {
-        const prayerKey = getPrayerKeyFromTitle(target.title);
+      if (cat === "prayer") {
         if (prayerKey) {
-          setPrayerLogsMap((prev) => ({ ...prev, [`${todayStr}_${prayerKey}`]: newCompleted }));
-          if (newCompleted) {
+          const nextPrayerDone = target.frequency === "weekly" ? !prayerDoneToday : newCompleted;
+          setPrayerLogsMap((prev) => ({ ...prev, [`${todayStr}_${prayerKey}`]: nextPrayerDone }));
+          if (nextPrayerDone) {
             const { error } = await supabase.from("prayer_logs").upsert(
               { user_id: userId, date: todayStr, prayer_name: prayerKey, is_completed: true },
               { onConflict: "user_id,date,prayer_name" }
@@ -1121,7 +1101,6 @@ export default function DashboardPage() {
       }
 
       // Record to habit_logs using select + insert/update/delete pattern (compatible with or without UNIQUE constraint)
-      const newCount = newCompleted ? target.quantity : 0;
       const { data: existingHL } = await supabase
         .from("habit_logs")
         .select("id")
@@ -1132,7 +1111,7 @@ export default function DashboardPage() {
 
       if (existingHL) {
         if (newCompleted || newCount > 0) {
-          const { error } = await supabase.from("habit_logs").update({ completed: newCompleted, completed_count: newCount }).eq("id", existingHL.id);
+          const { error } = await supabase.from("habit_logs").update({ completed: newCompleted, completed_count: newCount, activity_date: todayStr }).eq("id", existingHL.id);
           if (error) throw error;
         } else {
           const { error } = await supabase.from("habit_logs").delete().eq("id", existingHL.id);
@@ -1143,6 +1122,7 @@ export default function DashboardPage() {
           user_id: userId,
           habit_id: habitId,
            date: occurrenceKey,
+          activity_date: todayStr,
           completed: newCompleted,
           completed_count: newCount,
         });
@@ -1163,6 +1143,7 @@ export default function DashboardPage() {
     const target = habits.find((h) => h.id === habitId);
     if (!target || target.category !== 'general') return;
     const occurrenceKey = getHabitOccurrenceKey(target.frequency, new Date(), userTimeZone);
+    const activityDate = getLocalDateString(new Date(), userTimeZone);
     setHabitSaveError(null);
 
     const newCount = Math.min(target.quantity, (target.completedCount || 0) + 1);
@@ -1188,13 +1169,14 @@ export default function DashboardPage() {
         .maybeSingle();
 
       if (existingHL) {
-        const { error } = await supabase.from("habit_logs").update({ completed: newCompleted, completed_count: newCount }).eq("id", existingHL.id);
+        const { error } = await supabase.from("habit_logs").update({ completed: newCompleted, completed_count: newCount, activity_date: activityDate }).eq("id", existingHL.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("habit_logs").insert({
           user_id: userId,
           habit_id: habitId,
            date: occurrenceKey,
+          activity_date: activityDate,
           completed: newCompleted,
           completed_count: newCount,
         });
@@ -1323,6 +1305,9 @@ export default function DashboardPage() {
     j.reflection.toLowerCase().includes(journalSearch.toLowerCase())
   );
   const journalPreview = parseJournalContent(journalLast).reflection;
+  const dailyHabits = habits.filter(habit => habit.frequency === "daily");
+  const weeklyHabits = habits.filter(habit => habit.frequency === "weekly");
+  const completedWeeklyCount = weeklyHabits.filter(habit => habit.completedToday).length;
 
   return (
     <ParticipantLayout activePath="/dashboard">
@@ -1489,7 +1474,7 @@ export default function DashboardPage() {
                     {completedTodayCount}
                   </span>
                   <span className="text-[10px] sm:text-sm text-slate-300 font-bold">
-                    / {habits.length} selesai
+                    / {dailyHabits.length} harian
                   </span>
                 </div>
                 <button
@@ -1522,10 +1507,10 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
                 <h3 className="font-extrabold text-navy-900 text-xs tracking-wider uppercase flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4 text-amber-600" />
-                  Habits Hari Ini
+                  Habit Harian
                 </h3>
                 <span className="text-[11px] font-bold text-gray-500 bg-warm-bg px-2.5 py-1 rounded-full border border-warm-border">
-                  {habits.length} kebiasaan
+                  {dailyHabits.length} hari ini · {weeklyHabits.length} pekanan
                 </span>
               </div>
 
@@ -1577,9 +1562,9 @@ export default function DashboardPage() {
 
                     <div className="space-y-1">
                       <span className="text-xs font-bold text-navy-900 block">
-                        {completedTodayCount === habits.length
+                        {completedTodayCount === dailyHabits.length
                           ? "MasyaAllah! Semua Habit Selesai"
-                          : `${habits.length - completedTodayCount} Habit Belum Selesai`}
+                          : `${dailyHabits.length - completedTodayCount} Habit Harian Belum Selesai`}
                       </span>
                       <p className="text-[11px] text-slate-500 leading-tight">
                         Habit yang Anda tentukan di PTP.
@@ -1595,7 +1580,7 @@ export default function DashboardPage() {
 
                   {/* Habit Checklist Preview — supports quantity sub-step counter */}
                   <div className="space-y-1.5 pt-1">
-                    {habits.slice(0, 4).map((h) => {
+                    {[...dailyHabits, ...weeklyHabits].slice(0, 4).map((h) => {
                       const isMultiStep = h.category === 'general' && h.quantity > 1;
                       return (
                         <div
@@ -1748,7 +1733,7 @@ export default function DashboardPage() {
                 </div>
                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-lg font-black text-navy-900 block">
-                    {completedTodayCount}/{habits.length}
+                     {completedTodayCount}/{dailyHabits.length}
                   </span>
                   <span className="text-[10px] text-slate-500 font-bold block leading-tight">
                     Checklist Selesai Hari Ini
@@ -1988,10 +1973,16 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between text-xs font-bold text-navy-900">
               <span>Status Penyelesaian:</span>
               <span className="text-amber-800 font-black">
-                {completedTodayCount} dari {habits.length} ({habitPercentage}%)
+                {completedTodayCount} dari {dailyHabits.length} habit harian ({habitPercentage}%)
               </span>
             </div>
             <Progress value={habitPercentage} className="h-2.5 bg-warm-bg" />
+
+            {weeklyHabits.length > 0 && (
+              <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                Pekanan: {completedWeeklyCount} dari {weeklyHabits.length} target minggu ini selesai. Dapat dikerjakan kapan saja sebelum minggu berakhir.
+              </div>
+            )}
 
             <div className="space-y-2 pt-2 max-h-[300px] overflow-y-auto pr-1">
               {habits.map((h) => {
