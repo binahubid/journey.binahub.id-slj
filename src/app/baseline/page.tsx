@@ -807,7 +807,7 @@ export default function BaselinePage() {
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-xs text-amber-900 space-y-1">
               <span className="font-bold block">💡 Langkah Selanjutnya:</span>
               <p className="leading-relaxed">
-                Skor awal ini akan tersimpan sebagai acuan Journey Health Score di Monitoring. Gunakan gambaran kondisi diri ini saat merumuskan Niat & Target 90 Hari di PTP.
+                Skor awal ini tersimpan sebagai data kondisi diri Anda dan akan ditampilkan sebagai rekomendasi saat merumuskan Niat & Target 90 Hari di PTP.
               </p>
             </div>
 

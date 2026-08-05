@@ -29,3 +29,5 @@ yarn-error.log*
 *.md
 !CHANGELOG.md
 
+# Vercel CLI local link
+.vercel
