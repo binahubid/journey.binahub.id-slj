@@ -183,7 +183,7 @@ const legacyIndicators = (target: AreaTargetData): IndicatorDefinition[] =>
     .map((label, index) => ({
       ...createIndicator(index),
       type: (["quality", "quantity", "time", "cost"] as IndicatorType[])[index],
-      label,
+      label: typeof label === "string" ? label : "",
       baseline: index === 1 ? Number(target.kuantitasBaseline) || 0 : 0,
     }))
     .filter((indicator) => indicator.label.trim());
@@ -517,7 +517,9 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       void operation.catch(error => {
         console.error("Autosave error:", error);
         setSaveStatus("idle");
-        setSaveError(error instanceof Error ? error.message : (error as { message?: string })?.message || "Draft belum dapat disimpan.");
+        setSaveError(error instanceof TypeError
+          ? "Draft belum dapat disimpan. Muat ulang halaman lalu coba lagi."
+          : error instanceof Error ? error.message : (error as { message?: string })?.message || "Draft belum dapat disimpan.");
       });
     }, 1500);
   };
@@ -555,7 +557,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           const allIndicators = selectedAreasRef.current.flatMap(area => {
             const target = targetsObj[area];
             const definitions = target?.indicators?.length ? target.indicators : target ? legacyIndicators(target) : [];
-            return definitions.filter(indicator => indicator.active).map(indicator => indicator.label.trim());
+            return definitions.filter(indicator => indicator.active).map(indicator => indicator.label?.trim() || "");
           });
           const { error } = await supabase.from("journeys").update({
             area_transformasi: selectedAreasRef.current,
@@ -568,13 +570,13 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           const indicatorRows = selectedAreasRef.current.flatMap(area => {
             const target = targetsObj[area];
             const definitions = target?.indicators?.length ? target.indicators : target ? legacyIndicators(target) : [];
-            return definitions.slice(0, 4).filter(indicator => indicator.label.trim()).map(indicator => ({
+            return definitions.slice(0, 4).filter(indicator => indicator.label?.trim()).map(indicator => ({
               participant_user_id: user.id,
               journey_id: _journeyId,
               area,
               indicator_key: indicator.key,
               indicator_type: indicator.type,
-              label: indicator.label.trim(),
+              label: indicator.label?.trim() || "",
               active: indicator.active,
               direction: indicator.direction,
               baseline_value: indicator.baseline,
@@ -723,7 +725,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         return;
       }
       const target = areaTargetsMap[id];
-      const hasContent = Boolean(target?.mainTarget?.trim() || target?.targetAlasan?.trim() || target?.indicators?.some(indicator => indicator.label.trim() || indicator.unit?.trim() || indicator.baseline !== 0 || indicator.target !== 0));
+      const hasContent = Boolean(target?.mainTarget?.trim() || target?.targetAlasan?.trim() || target?.indicators?.some(indicator => indicator.label?.trim() || indicator.unit?.trim() || indicator.baseline !== 0 || indicator.target !== 0));
       if (hasContent) {
         setAreaPendingRemoval(id);
         return;

@@ -89,13 +89,14 @@ export function validateAreaIndicators(indicators: IndicatorDefinition[], area =
 
   const usedTypes = new Set<IndicatorType>();
   activeIndicators.forEach((indicator) => {
-    const context = `${area} - ${indicator.label.trim() || indicator.type}`;
+    const label = typeof indicator.label === "string" ? indicator.label.trim() : "";
+    const context = `${area} - ${label || indicator.type}`;
     if (usedTypes.has(indicator.type)) {
       errors.push({ code: "duplicate_type", area, indicatorKey: indicator.key, message: `${context}: jenis indikator tidak boleh duplikat dalam area yang sama.` });
     }
     usedTypes.add(indicator.type);
 
-    if (!indicator.label.trim()) {
+    if (!label) {
       errors.push({ code: "required_label", area, indicatorKey: indicator.key, message: `${area} - ${indicator.type}: nama indikator wajib diisi.` });
     }
     if (!indicator.unit?.trim()) {

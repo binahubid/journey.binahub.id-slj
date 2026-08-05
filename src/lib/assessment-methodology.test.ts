@@ -108,6 +108,21 @@ describe("assessment methodology v1.0", () => {
     expect(validateAreaIndicators(indicators).errors.map((error) => error.code)).toContain("indicator_count");
   });
 
+  it("handles an incomplete indicator loaded from an older draft", () => {
+    const incompleteIndicator = {
+      key: "legacy",
+      type: "quantity",
+      active: true,
+      direction: "higher_is_better",
+      baseline: 0,
+      target: 1,
+      unit: "kali",
+    } as IndicatorDefinition;
+
+    expect(() => validateAreaIndicators([incompleteIndicator], "Spiritual Growth")).not.toThrow();
+    expect(validateAreaIndicators([incompleteIndicator], "Spiritual Growth").errors.map((error) => error.code)).toContain("required_label");
+  });
+
   it("calculates all four coach rubric weights", () => {
     expect(calculateCoachAssessment([5, 4, 3, 2])).toBe(75);
   });
