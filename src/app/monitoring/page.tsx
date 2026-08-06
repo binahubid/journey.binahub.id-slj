@@ -37,7 +37,7 @@ import { getTransformationAreaColor, normalizeTransformationArea } from "@/lib/t
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getActiveProgramMonth, getMonthEditState, getProgramDay } from "@/lib/program-timeline";
 import Link from "next/link";
-import { calculateAreaOutcome, calculateIndicatorCoverage, calculateIndicatorOutcomes, calculateScheduledHabitCompletion, type IndicatorDefinition } from "@/lib/assessment-methodology";
+import { calculateAreaOutcome, calculateExecutionMomentumDelta, calculateIndicatorCoverage, calculateIndicatorOutcomes, calculateScheduledHabitCompletion, type IndicatorDefinition } from "@/lib/assessment-methodology";
 import { addCalendarDays, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
 
 type HabitFrequency = "daily" | "weekly" | "unsupported";
@@ -94,7 +94,7 @@ interface AreaIndicatorTargets {
 interface AreaReport {
   area: string;
   targets: AreaIndicatorTargets;
-  kualitasRating: number;
+  kualitasRating: number | null;
   kuantitasBaseline: string;
   kuantitasActual: string;
   waktuActualDays: string;
@@ -326,7 +326,7 @@ export default function MonitoringPage() {
             ? {
                 area,
                 targets: targetsMap[area] || { mainTarget: "", kualitas: "", kuantitas: "", waktu: "", biaya: "" },
-                kualitasRating: saved.kualitas_actual_rating || 4,
+                kualitasRating: saved.kualitas_actual_rating ?? null,
                 kuantitasBaseline: saved.kuantitas_baseline?.toString() || ptpBaseline,
                 kuantitasActual: saved.kuantitas_actual?.toString() || "",
                 waktuActualDays: saved.waktu_actual_days?.toString() || "",
@@ -458,6 +458,7 @@ export default function MonitoringPage() {
           currentWeek: "",
           currentWeekCompleted: 0,
         }]));
+        const momentumByArea: Record<string, number> = Object.fromEntries(areas.map(area => [area, 0]));
         const formatChartLabel = (dateStr: string) => {
           const dObj = new Date(`${dateStr}T12:00:00Z`);
           return numDays <= 7
@@ -480,8 +481,10 @@ export default function MonitoringPage() {
               const execution = habitExecution[habit.id];
               const log = habit.id.startsWith("missing:") ? null : logsForDay.find((item: any) => item.habit_id === habit.id);
               if (habit.frequency === "daily") {
+                const completedUnits = Math.min(habit.qty, getCompletedUnits(log, habit.qty));
                 execution.scheduled += habit.qty;
-                execution.completed += Math.min(habit.qty, getCompletedUnits(log, habit.qty));
+                execution.completed += completedUnits;
+                momentumByArea[habit.area] += calculateExecutionMomentumDelta({ scheduledUnits: habit.qty, completedUnits });
                 return;
               }
 
@@ -495,6 +498,12 @@ export default function MonitoringPage() {
               const completed = Math.min(available, getCompletedUnits(log, habit.qty));
               execution.currentWeekCompleted += completed;
               execution.completed += completed;
+              momentumByArea[habit.area] += completed;
+
+              const dayOfWeek = new Date(`${dateStr}T12:00:00Z`).getUTCDay();
+              if (dayOfWeek === 0) {
+                momentumByArea[habit.area] -= Math.max(0, habit.qty - execution.currentWeekCompleted);
+              }
             });
           }
 
@@ -504,15 +513,7 @@ export default function MonitoringPage() {
               scores[area] = 0;
               return;
             }
-            const habitScores = habitsWithArea
-              .filter(habit => habit.area === area && habit.frequency !== "unsupported" && habitExecution[habit.id].scheduled > 0)
-              .map(habit => calculateScheduledHabitCompletion({
-                scheduledOccurrences: habitExecution[habit.id].scheduled,
-                completedOccurrences: habitExecution[habit.id].completed,
-              }).score || 0);
-            scores[area] = habitScores.length
-              ? Math.round(habitScores.reduce((sum, score) => sum + score, 0) / habitScores.length)
-              : 0;
+            scores[area] = momentumByArea[area];
           });
           return { date: dateStr, day: formatChartLabel(dateStr), programDay: programIndex, scores };
         });
@@ -594,7 +595,7 @@ export default function MonitoringPage() {
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   const buildEmptyReport = (area: string, targets: AreaIndicatorTargets, baselineScore?: number): AreaReport => ({
-    area, targets, kualitasRating: 4,
+    area, targets, kualitasRating: null,
     kuantitasBaseline: "", kuantitasActual: "", waktuActualDays: "", biayaActual: "",
     isSaved: false, baselineScore,
   });
@@ -649,6 +650,12 @@ export default function MonitoringPage() {
     const invalidActual = (rep.indicators || []).some((indicator) => indicator.active && rep.indicatorActuals?.[indicator.key] !== undefined && (!Number.isFinite(rep.indicatorActuals[indicator.key]) || (rep.indicatorActuals[indicator.key] as number) < 0));
     if (invalidActual) {
       setSaveError(`${area}: actual indikator harus berupa angka valid dan tidak boleh negatif.`);
+      return;
+    }
+    const usesLegacyRating = !rep.indicators?.length && (!rep.targets.kualitas && !rep.targets.kuantitas && !rep.targets.waktu && !rep.targets.biaya || Boolean(rep.targets.kualitas));
+    if (usesLegacyRating && rep.kualitasRating === null) {
+      setSaveError(`${area}: rating evaluasi mandiri belum diisi.`);
+      setSavingArea(null);
       return;
     }
     const overallPct = calcAreaScore(rep);
@@ -765,6 +772,20 @@ export default function MonitoringPage() {
   const finalReflectionUnlocked = dayCount >= 89;
 
   const visibleChartAreas = chartArea === "all" || !selectedAreas.includes(chartArea) ? selectedAreas : [chartArea];
+  const chartMomentumValues = chartData.flatMap(point => visibleChartAreas.flatMap(area => {
+    const value = point.scores[area];
+    return value === null || value === undefined ? [] : [value];
+  }));
+  const chartMomentumMin = Math.min(0, ...chartMomentumValues);
+  const chartMomentumMax = Math.max(0, ...chartMomentumValues);
+  const chartMomentumSpan = Math.max(4, chartMomentumMax - chartMomentumMin);
+  const chartMomentumPadding = Math.max(2, Math.ceil(chartMomentumSpan * 0.15));
+  const chartScaleMin = chartMomentumMin - chartMomentumPadding;
+  const chartScaleMax = chartMomentumMax + chartMomentumPadding;
+  const chartScaleRange = chartScaleMax - chartScaleMin;
+  const chartY = (value: number) => 160 - ((value - chartScaleMin) / chartScaleRange) * 144;
+  const chartZeroY = chartY(0);
+  const chartAxisValues = Array.from({ length: 5 }, (_, index) => Math.round(chartScaleMax - index * (chartScaleRange / 4)));
   const chartLabelInterval = Math.max(1, Math.ceil(chartData.length / 7));
   const visibleChartLabels = chartData
     .map((row, index) => ({ ...row, index }))
@@ -970,9 +991,9 @@ export default function MonitoringPage() {
                       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
                         <TrendingUp className="h-3.5 w-3.5" />
                       </span>
-                      Grafik Progress Action Plan
+                       Momentum Action Plan
                     </h3>
-                    <p className="ml-10 mt-0.5 text-[11px] leading-relaxed text-slate-500">Akumulasi penyelesaian habit pada setiap area</p>
+                    <p className="ml-10 mt-0.5 text-[11px] leading-relaxed text-slate-500">Naik saat habit dikerjakan, turun saat occurrence terlewat</p>
                   </div>
 
                   {/* Timeframe Filter Toggle */}
@@ -1015,17 +1036,17 @@ export default function MonitoringPage() {
                   <div className="px-3 pb-2 pt-5 sm:px-5">
                     <div className="relative h-[220px] w-full px-2 pb-7 pt-2 sm:h-[250px]">
                     <svg className="h-full w-full overflow-visible" viewBox="0 0 720 180" preserveAspectRatio="none" role="img" aria-label="Grafik progres Action Plan per area transformasi">
-                      {[0, 1, 2, 3, 4].map(step => {
+                      {chartAxisValues.map((value, step) => {
                         const y = 16 + step * 36;
-                        const value = 100 - step * 25;
                         return (
-                          <g key={step}>
+                          <g key={`${value}-${step}`}>
                             <line x1="42" y1={y} x2="708" y2={y} stroke="#E2E8F0" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                             <text x="34" y={y + 3} fill="#94A3B8" fontSize="8" fontWeight="600" textAnchor="end">{value}</text>
                           </g>
                         );
                       })}
                       <line x1="42" y1="16" x2="42" y2="160" stroke="#CBD5E1" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      <line x1="42" y1={chartZeroY} x2="708" y2={chartZeroY} stroke="#94A3B8" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
                       {chartDayZeroIndex >= 0 && (
                         <g>
                           <line x1={42 + chartDayZeroIndex * (666 / Math.max(1, chartData.length - 1))} y1="16" x2={42 + chartDayZeroIndex * (666 / Math.max(1, chartData.length - 1))} y2="160" stroke="#D97706" strokeWidth="1" opacity="0.45" vectorEffect="non-scaling-stroke" />
@@ -1037,7 +1058,7 @@ export default function MonitoringPage() {
                           const score = row.scores[area];
                           return score === null || score === undefined ? null : {
                             x: chartData.length === 1 ? 375 : 42 + i * (666 / (chartData.length - 1)),
-                            y: 160 - (Math.max(0, Math.min(100, score)) / 100) * 144,
+                            y: chartY(score),
                             score,
                             index: i,
                           };
@@ -1060,7 +1081,7 @@ export default function MonitoringPage() {
                             />
                             {pts.map(point => point && (
                               <circle key={point.index} cx={point.x} cy={point.y} r={2.5} fill="white" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke">
-                                <title>{`${area} · ${chartData[point.index].programDay === null ? "Belum dimulai" : `Hari ${chartData[point.index].programDay}`} · ${chartData[point.index].day}: ${point.score}%`}</title>
+                                <title>{`${area} · ${chartData[point.index].programDay === null ? "Belum dimulai" : `Hari ${chartData[point.index].programDay}`} · ${chartData[point.index].day}: ${point.score} poin momentum`}</title>
                               </circle>
                             ))}
                           </g>
@@ -1264,7 +1285,7 @@ export default function MonitoringPage() {
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className="text-slate-500">Rating Evaluasi Mandiri</span>
                                 <span className="font-bold text-amber-600 flex items-center gap-1">
-                                  {rep?.kualitasRating || 4}/5 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                  {rep?.kualitasRating ? <>{rep.kualitasRating}/5 <Star className="h-3 w-3 fill-amber-400 text-amber-400" /></> : "Belum Diisi"}
                                 </span>
                               </div>
                             </div>
@@ -1646,7 +1667,7 @@ export default function MonitoringPage() {
 
                     <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
                       <span className="text-xs font-bold text-slate-600">Skor Capaian Area:</span>
-                      <span className="text-sm font-extrabold text-emerald-600">{overallPct}% Berhasil</span>
+                       <span className="text-sm font-extrabold text-emerald-600">{overallPct === null ? "Belum Ada Data" : `${overallPct}% Berhasil`}</span>
                     </div>
 
                      {rep.indicators?.length ? (
@@ -1669,7 +1690,7 @@ export default function MonitoringPage() {
                         <div className="flex items-center justify-between">
                           <label className="font-extrabold text-amber-900 text-xs block">Rating Capaian Bulanan (1 – 5 Bintang)</label>
                           <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
-                            {rep.kualitasRating}/5 ★ ({rep.kualitasRating * 20}% Capaian)
+                             {rep.kualitasRating ? `${rep.kualitasRating}/5 ★ (${rep.kualitasRating * 20}% Capaian)` : "Belum Diisi"}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-600 leading-relaxed">
@@ -1683,7 +1704,7 @@ export default function MonitoringPage() {
                               onClick={() => updateAreaReport(editingAreaModal, "kualitasRating", star)}
                               className="transition-transform hover:scale-125 cursor-pointer p-1"
                             >
-                              <Star className={`h-8 w-8 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
+                               <Star className={`h-8 w-8 ${star <= (rep.kualitasRating || 0) ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
                             </button>
                           ))}
                         </div>
@@ -1702,10 +1723,10 @@ export default function MonitoringPage() {
                                 onClick={() => updateAreaReport(editingAreaModal, "kualitasRating", star)}
                                 className="transition-transform hover:scale-125"
                               >
-                                <Star className={`h-5 w-5 ${star <= rep.kualitasRating ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
+                                 <Star className={`h-5 w-5 ${star <= (rep.kualitasRating || 0) ? "text-amber-400 fill-amber-400" : "text-slate-300"}`} />
                               </button>
                             ))}
-                            <span className="text-xs font-bold text-slate-600 ml-1 self-center">{rep.kualitasRating}/5 ★</span>
+                             <span className="text-xs font-bold text-slate-600 ml-1 self-center">{rep.kualitasRating ? `${rep.kualitasRating}/5 ★` : "Belum Diisi"}</span>
                           </div>
                         </div>}
 

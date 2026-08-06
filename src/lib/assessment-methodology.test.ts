@@ -3,6 +3,7 @@ import {
   calculateAreaExecution,
   calculateAreaOutcome,
   calculateCoachAssessment,
+  calculateExecutionMomentumDelta,
   calculateIndicatorCoverage,
   calculateIndicatorOutcome,
   calculateMeasurementCoverage,
@@ -58,6 +59,13 @@ describe("assessment methodology v1.0", () => {
   it("uses scheduled occurrences as the execution denominator", () => {
     expect(calculateScheduledHabitCompletion({ scheduledOccurrences: 10, completedOccurrences: 7 }).score).toBe(70);
     expect(calculateAreaExecution([{ score: 70, measuredCount: 10, excludedCount: 0, methodologyVersion: "1.0" }]).score).toBe(70);
+  });
+
+  it("calculates an unbounded execution momentum delta", () => {
+    expect(calculateExecutionMomentumDelta({ scheduledUnits: 3, completedUnits: 3 })).toBe(3);
+    expect(calculateExecutionMomentumDelta({ scheduledUnits: 3, completedUnits: 2 })).toBe(1);
+    expect(calculateExecutionMomentumDelta({ scheduledUnits: 3, completedUnits: 1 })).toBe(-1);
+    expect(calculateExecutionMomentumDelta({ scheduledUnits: 3, completedUnits: 0 })).toBe(-3);
   });
 
   it("leaves execution unmeasured when an area has no habits", () => {

@@ -166,6 +166,12 @@ export function calculateScheduledHabitCompletion(input: { scheduledOccurrences:
   return metric(numerator / denominator * 100, denominator, 0, { numerator, denominator });
 }
 
+export function calculateExecutionMomentumDelta(input: { scheduledUnits: number; completedUnits: number }) {
+  const scheduled = Number.isFinite(input.scheduledUnits) ? Math.max(0, input.scheduledUnits) : 0;
+  const completed = Number.isFinite(input.completedUnits) ? Math.max(0, Math.min(scheduled, input.completedUnits)) : 0;
+  return completed - (scheduled - completed);
+}
+
 export function calculateAreaExecution(habits: AssessmentMetric[]): AssessmentMetric {
   const measured = habits.filter((habit) => habit.score !== null);
   if (!measured.length) return metric(null, 0, habits.length);
