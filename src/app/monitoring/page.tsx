@@ -42,6 +42,12 @@ import { addCalendarDays, getLocalDateString, resolveParticipantTimeZone } from 
 
 type HabitFrequency = "daily" | "weekly" | "unsupported";
 type AreaExecutionStatus = "MEASURED" | "NOT_MEASURED" | "UNSUPPORTED";
+type ChartPoint = {
+  date: string;
+  day: string;
+  programDay: number | null;
+  scores: Record<string, number | null>;
+};
 
 function normalizeHabitFrequency(value?: string | null): HabitFrequency {
   const frequency = String(value || "").trim().toLowerCase();
@@ -153,7 +159,8 @@ export default function MonitoringPage() {
 
   // Timeframe filter state: '1d' | '7d' | '1m' | '3m'
   const [timeframe, setTimeframe] = useState<"7d" | "1m" | "3m">("7d");
-  const [chartData, setChartData] = useState<{ day: string; scores: Record<string, number> }[]>([]);
+  const [chartArea, setChartArea] = useState<string>("all");
+  const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [areaActionPlanCounts, setAreaActionPlanCounts] = useState<Record<string, number>>({});
   const [heatmapData, setHeatmapData] = useState<{ date: string; count: number; level: number }[]>([]);
   const [habitConsistencyPct, setHabitConsistencyPct] = useState<number>(0);
@@ -421,7 +428,8 @@ export default function MonitoringPage() {
         ? String(profile.start_date).slice(0, 10)
         : datesArr[0];
       const programEndDate = addCalendarDays(profileStartDate, 89);
-      const accumulationStartDate = profileStartDate;
+      // Day 0 is the calendar day immediately before the participant starts.
+      const accumulationStartDate = addCalendarDays(profileStartDate, -1);
       const accumulationEndDate = todayStr < programEndDate ? todayStr : programEndDate;
       const accumulationDates: string[] = [];
       if (accumulationStartDate <= accumulationEndDate) {
@@ -450,42 +458,52 @@ export default function MonitoringPage() {
           currentWeek: "",
           currentWeekCompleted: 0,
         }]));
-        const cumulativeChart = accumulationDates.map((dateStr) => {
+        const formatChartLabel = (dateStr: string) => {
           const dObj = new Date(`${dateStr}T12:00:00Z`);
-          const label = numDays <= 7
+          return numDays <= 7
             ? dObj.toLocaleDateString("id-ID", { weekday: "short", timeZone: "UTC" })
             : `${dObj.getUTCDate()}/${dObj.getUTCMonth() + 1}`;
+        };
 
-           const logsForDay = habitLogs.filter((l: any) => (l.activity_date || l.date) === dateStr);
-          habitsWithArea.forEach(habit => {
-            if (
-              habit.frequency === "unsupported" ||
-              (habit.effectiveFrom && habit.effectiveFrom > dateStr) ||
-              (habit.effectiveUntil && habit.effectiveUntil < dateStr)
-            ) return;
+        const cumulativeChart: ChartPoint[] = accumulationDates.map((dateStr, programIndex) => {
+          const isDayZero = dateStr === accumulationStartDate;
 
-            const execution = habitExecution[habit.id];
-            const log = habit.id.startsWith("missing:") ? null : logsForDay.find((item: any) => item.habit_id === habit.id);
-            if (habit.frequency === "daily") {
-              execution.scheduled += habit.qty;
-              execution.completed += Math.min(habit.qty, getCompletedUnits(log, habit.qty));
+          if (!isDayZero) {
+            const logsForDay = habitLogs.filter((l: any) => (l.activity_date || l.date) === dateStr);
+            habitsWithArea.forEach(habit => {
+              if (
+                habit.frequency === "unsupported" ||
+                (habit.effectiveFrom && habit.effectiveFrom > dateStr) ||
+                (habit.effectiveUntil && habit.effectiveUntil < dateStr)
+              ) return;
+
+              const execution = habitExecution[habit.id];
+              const log = habit.id.startsWith("missing:") ? null : logsForDay.find((item: any) => item.habit_id === habit.id);
+              if (habit.frequency === "daily") {
+                execution.scheduled += habit.qty;
+                execution.completed += Math.min(habit.qty, getCompletedUnits(log, habit.qty));
+                return;
+              }
+
+              const weekStart = getMondayWeekStart(dateStr);
+              if (execution.currentWeek !== weekStart) {
+                execution.currentWeek = weekStart;
+                execution.currentWeekCompleted = 0;
+                execution.scheduled += habit.qty;
+              }
+              const available = habit.qty - execution.currentWeekCompleted;
+              const completed = Math.min(available, getCompletedUnits(log, habit.qty));
+              execution.currentWeekCompleted += completed;
+              execution.completed += completed;
+            });
+          }
+
+          const scores: Record<string, number | null> = {};
+          areas.forEach(area => {
+            if (isDayZero) {
+              scores[area] = 0;
               return;
             }
-
-            const weekStart = getMondayWeekStart(dateStr);
-            if (execution.currentWeek !== weekStart) {
-              execution.currentWeek = weekStart;
-              execution.currentWeekCompleted = 0;
-              execution.scheduled += habit.qty;
-            }
-            const available = habit.qty - execution.currentWeekCompleted;
-            const completed = Math.min(available, getCompletedUnits(log, habit.qty));
-            execution.currentWeekCompleted += completed;
-            execution.completed += completed;
-          });
-
-          const scores: Record<string, number> = {};
-          areas.forEach(area => {
             const habitScores = habitsWithArea
               .filter(habit => habit.area === area && habit.frequency !== "unsupported" && habitExecution[habit.id].scheduled > 0)
               .map(habit => calculateScheduledHabitCompletion({
@@ -496,7 +514,7 @@ export default function MonitoringPage() {
               ? Math.round(habitScores.reduce((sum, score) => sum + score, 0) / habitScores.length)
               : 0;
           });
-          return { day: label, scores };
+          return { date: dateStr, day: formatChartLabel(dateStr), programDay: programIndex, scores };
         });
 
         const executionStatuses: Record<string, AreaExecutionStatus> = {};
@@ -522,15 +540,13 @@ export default function MonitoringPage() {
           ? Math.round(measuredAreaScores.reduce((sum, score) => sum + score, 0) / measuredAreaScores.length)
           : 0);
 
-        const visibleChart = cumulativeChart.filter((_, idx) => accumulationDates[idx] >= datesArr[0]);
-        const chart = visibleChart.filter((_, idx) =>
-          numDays > 30
-            ? idx % 3 === 0 || idx === visibleChart.length - 1
-            : numDays > 7
-            ? idx % 2 === 0 || idx === visibleChart.length - 1
-            : true
-        );
-        setChartData(chart);
+        const cumulativeByDate = new Map(cumulativeChart.map(point => [point.date, point]));
+        setChartData(datesArr.map(dateStr => cumulativeByDate.get(dateStr) || {
+          date: dateStr,
+          day: formatChartLabel(dateStr),
+          programDay: null,
+          scores: Object.fromEntries(areas.map(area => [area, null])),
+        }));
       }
 
       // Build 90-Day Heatmap Data & Calculate Real Habit Consistency %
@@ -748,19 +764,12 @@ export default function MonitoringPage() {
   const monthGraceEndDay = selectedMonth * 30 + 7;
   const finalReflectionUnlocked = dayCount >= 89;
 
-  const chartScores = chartData.flatMap(row => selectedAreas.map(area => row.scores[area] || 0));
-  const chartMinScore = Math.min(0, ...chartScores);
-  const chartMaxScore = Math.max(0, ...chartScores);
-  const chartScoreRange = chartMaxScore - chartMinScore;
-  const chartScalePadding = Math.max(1, chartScoreRange * 0.12);
-  const chartScaleMin = chartMinScore - chartScalePadding;
-  const chartScaleMax = chartMaxScore + chartScalePadding;
-  const chartScaleRange = chartScaleMax - chartScaleMin;
-  const chartZeroY = Math.max(18, Math.min(158, 160 - ((0 - chartScaleMin) / chartScaleRange) * 144));
+  const visibleChartAreas = chartArea === "all" || !selectedAreas.includes(chartArea) ? selectedAreas : [chartArea];
   const chartLabelInterval = Math.max(1, Math.ceil(chartData.length / 7));
   const visibleChartLabels = chartData
     .map((row, index) => ({ ...row, index }))
     .filter(({ index }) => index === 0 || index === chartData.length - 1 || index % chartLabelInterval === 0);
+  const chartDayZeroIndex = chartData.findIndex(point => point.programDay === 0);
   const activeIstiqamahDays = heatmapData.filter(item => item.count > 0).length;
   const totalIstiqamahExecutions = heatmapData.reduce((total, item) => total + item.count, 0);
 
@@ -954,7 +963,8 @@ export default function MonitoringPage() {
 
               {/* Dynamic Multi-Timeframe Chart (2 cols) */}
               <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2">
-                <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-4 border-b border-slate-100 px-5 py-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
                       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
@@ -981,6 +991,14 @@ export default function MonitoringPage() {
                       </button>
                     ))}
                   </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5" aria-label="Filter area transformasi">
+                    <button type="button" onClick={() => setChartArea("all")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-colors ${chartArea === "all" ? "bg-navy-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>Semua area</button>
+                    {selectedAreas.map(area => (
+                      <button key={area} type="button" onClick={() => setChartArea(area)} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-colors ${chartArea === area ? "text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`} style={chartArea === area ? { backgroundColor: getTransformationAreaColor(area) } : undefined}>{area}</button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Line Chart Render */}
@@ -999,29 +1017,35 @@ export default function MonitoringPage() {
                     <svg className="h-full w-full overflow-visible" viewBox="0 0 720 180" preserveAspectRatio="none" role="img" aria-label="Grafik progres Action Plan per area transformasi">
                       {[0, 1, 2, 3, 4].map(step => {
                         const y = 16 + step * 36;
+                        const value = 100 - step * 25;
                         return (
-                          <line key={step} x1="42" y1={y} x2="708" y2={y} stroke="#E2E8F0" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                          <g key={step}>
+                            <line x1="42" y1={y} x2="708" y2={y} stroke="#E2E8F0" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                            <text x="34" y={y + 3} fill="#94A3B8" fontSize="8" fontWeight="600" textAnchor="end">{value}</text>
+                          </g>
                         );
                       })}
                       <line x1="42" y1="16" x2="42" y2="160" stroke="#CBD5E1" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                      <line x1="42" y1={chartZeroY} x2="708" y2={chartZeroY} stroke="#94A3B8" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
-                      <text x="34" y={chartZeroY + 3} fill="#64748B" fontSize="9" fontWeight="700" textAnchor="end">
-                        0
-                      </text>
-                      {selectedAreas.map((area, areaIndex) => {
+                      {chartDayZeroIndex >= 0 && (
+                        <g>
+                          <line x1={42 + chartDayZeroIndex * (666 / Math.max(1, chartData.length - 1))} y1="16" x2={42 + chartDayZeroIndex * (666 / Math.max(1, chartData.length - 1))} y2="160" stroke="#D97706" strokeWidth="1" opacity="0.45" vectorEffect="non-scaling-stroke" />
+                          <text x={42 + chartDayZeroIndex * (666 / Math.max(1, chartData.length - 1))} y="11" fill="#B45309" fontSize="8" fontWeight="700" textAnchor="middle">Hari 0</text>
+                        </g>
+                      )}
+                      {visibleChartAreas.map((area) => {
                         const pts = chartData.map((row, i) => {
-                          const score = row.scores[area] || 0;
-                          const overlappingAreas = selectedAreas.filter(candidate => (row.scores[candidate] || 0) === score);
-                          const overlapRank = overlappingAreas.indexOf(area);
-                          const overlapOffset = overlappingAreas.length > 1
-                            ? (overlapRank - (overlappingAreas.length - 1) / 2) * 3
-                            : 0;
-                          return [
-                            chartData.length === 1 ? 375 : 42 + i * (666 / (chartData.length - 1)),
-                            Math.max(18, Math.min(158, 160 - ((score - chartScaleMin) / chartScaleRange) * 144 + overlapOffset)),
-                          ];
+                          const score = row.scores[area];
+                          return score === null || score === undefined ? null : {
+                            x: chartData.length === 1 ? 375 : 42 + i * (666 / (chartData.length - 1)),
+                            y: 160 - (Math.max(0, Math.min(100, score)) / 100) * 144,
+                            score,
+                            index: i,
+                          };
                         });
-                        const d = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
+                        const d = pts.reduce((path, point, index) => {
+                          if (!point) return path;
+                          return `${path}${!pts[index - 1] ? "M" : "L"} ${point.x} ${point.y} `;
+                        }, "");
                         const color = getTransformationAreaColor(area);
                         return (
                           <g key={area}>
@@ -1029,15 +1053,14 @@ export default function MonitoringPage() {
                               d={d}
                               fill="none"
                               stroke={color}
-                              strokeWidth={1.25}
-                              strokeDasharray={areaIndex === 0 ? undefined : areaIndex === 1 ? "6 3" : "2 3"}
+                              strokeWidth={2}
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               vectorEffect="non-scaling-stroke"
                             />
-                            {pts.map(([x, y], i) => (
-                              <circle key={i} cx={x} cy={y} r={2.75} fill="white" stroke={color} strokeWidth={1.25} vectorEffect="non-scaling-stroke">
-                                <title>{`${area} · ${chartData[i].day}: ${(chartData[i].scores[area] || 0).toFixed(2)}`}</title>
+                            {pts.map(point => point && (
+                              <circle key={point.index} cx={point.x} cy={point.y} r={2.5} fill="white" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke">
+                                <title>{`${area} · ${chartData[point.index].programDay === null ? "Belum dimulai" : `Hari ${chartData[point.index].programDay}`} · ${chartData[point.index].day}: ${point.score}%`}</title>
                               </circle>
                             ))}
                           </g>
@@ -1061,7 +1084,7 @@ export default function MonitoringPage() {
 
                 {/* Legend */}
                 <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
-                  {selectedAreas.map(area => (
+                  {visibleChartAreas.map(area => (
                     <div key={area} className="flex items-center gap-2 text-[11px] text-slate-600">
                       <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: getTransformationAreaColor(area), boxShadow: `0 0 0 1px ${getTransformationAreaColor(area)}33` }} />
                       <span className="font-bold">{area}</span>
