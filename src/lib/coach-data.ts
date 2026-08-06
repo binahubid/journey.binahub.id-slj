@@ -22,6 +22,10 @@ export type CoachIndicator = {
   target: number | null;
   direction: "higher_is_better" | "lower_is_better";
   unit: string;
+  active: boolean;
+  actualSource: "action_plan" | "self_report" | "external" | "coach";
+  qualityRubric: Record<number, string> | null;
+  linkedActionPlanIds: string[];
   actuals: { month: number; actual: number; evidenceNote: string }[];
 };
 
@@ -90,6 +94,9 @@ function normalizeIndicators(input: JsonRecord): CoachIndicator[] {
   if (!Array.isArray(rows)) return [];
   return rows.map((row: JsonRecord) => {
     const actualRows = row.actuals ?? row.monthly_actuals ?? row.indicator_actuals ?? [];
+    const source = row.actual_source ?? row.actualSource ?? "self_report";
+    const rubric = row.quality_rubric ?? row.qualityRubric;
+    const linked = row.linked_action_plan_ids ?? row.linkedActionPlanIds ?? [];
     return {
       key: text(row.key ?? row.indicator_key ?? row.id),
       area: text(row.area),
@@ -99,6 +106,10 @@ function normalizeIndicators(input: JsonRecord): CoachIndicator[] {
       target: nullableNumber(row.target ?? row.target_value),
       direction: text(row.direction, "higher_is_better") as CoachIndicator["direction"],
       unit: text(row.unit),
+      active: Boolean(row.active ?? true),
+      actualSource: ["action_plan", "self_report", "external", "coach"].includes(source) ? source : "self_report",
+      qualityRubric: rubric && typeof rubric === "object" ? rubric : null,
+      linkedActionPlanIds: Array.isArray(linked) ? linked.map(String) : [],
       actuals: Array.isArray(actualRows) ? actualRows.flatMap((actual: JsonRecord) => {
         const value = nullableNumber(actual.actual ?? actual.actual_value);
         return value !== null && value >= 0 ? [{ month: number(actual.month ?? actual.month_number), actual: value, evidenceNote: text(actual.evidence_note ?? actual.evidenceNote) }] : [];

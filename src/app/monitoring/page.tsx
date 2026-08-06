@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,7 @@ import { getTransformationAreaColor, normalizeTransformationArea } from "@/lib/t
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getActiveProgramMonth, getMonthEditState, getProgramDay } from "@/lib/program-timeline";
 import Link from "next/link";
-import { calculateAreaOutcome, calculateExecutionMomentumDelta, calculateIndicatorCoverage, calculateIndicatorOutcomes, calculateScheduledHabitCompletion, type IndicatorDefinition } from "@/lib/assessment-methodology";
+import { calculateAreaOutcome, calculateExecutionMomentumDelta, calculateIndicatorCoverage, calculateIndicatorOutcomes, calculateScheduledHabitCompletion, getQualityRubricDescription, indicatorActualSources, type IndicatorDefinition, type IndicatorActualSource } from "@/lib/assessment-methodology";
 import { addCalendarDays, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
 
 type HabitFrequency = "daily" | "weekly" | "unsupported";
@@ -170,6 +170,11 @@ export default function MonitoringPage() {
   // Modal Drawer for 4-Dimension Indicator Update
   const [editingAreaModal, setEditingAreaModal] = useState<string | null>(null);
 
+  // Ref data for auto-actual suggestion from linked action plans
+  const programStartDateRef = useRef<string>("");
+  const habitIdByActionPlanRef = useRef<Record<string, string>>({});
+  const habitLogsByHabitRef = useRef<Record<string, Array<{ activity_date?: string | null; date: string; completed: boolean; completed_count?: number | null }>>>({});
+
   // ── Load Data ─────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
@@ -187,6 +192,7 @@ export default function MonitoringPage() {
           initialMonth = getActiveProgramMonth(currentDay) ?? 1;
           setDayCount(currentDay);
           setSelectedMonth(initialMonth);
+          programStartDateRef.current = String(profile.start_date).slice(0, 10);
         }
       }
 
@@ -254,10 +260,25 @@ export default function MonitoringPage() {
       } catch {}
 
       const { data: indicatorRows, error: indicatorsError } = await supabase.from("ptp_indicators")
-        .select("id, area, indicator_key, indicator_type, label, active, direction, baseline_value, target_value, unit")
+        .select("id, area, indicator_key, indicator_type, label, active, direction, baseline_value, target_value, unit, actual_source, quality_rubric")
         .eq("journey_id", journey.id).order("created_at", { ascending: true });
       const structuredAvailable = !indicatorsError;
       if (indicatorsError && indicatorsError.code !== "42P01" && indicatorsError.code !== "PGRST205") throw indicatorsError;
+
+      let linkMap: Record<string, string[]> = {};
+      if (indicatorRows?.length) {
+        const { data: links, error: linksError } = await supabase.from("ptp_indicator_action_plans").select("indicator_id, action_plan_id");
+        if (linksError && linksError.code !== "42P01" && linksError.code !== "PGRST205") throw linksError;
+        if (links?.length) {
+          const idToKey = new Map(indicatorRows.map((item: any) => [item.id, `${item.area}:${item.indicator_key}`]));
+          links.forEach((link: any) => {
+            const key = idToKey.get(link.indicator_id);
+            if (!key) return;
+            linkMap[key] = [...(linkMap[key] || []), link.action_plan_id];
+          });
+        }
+      }
+
       const { data: actualRows, error: actualsError } = structuredAvailable
         ? await supabase.from("ptp_indicator_actuals").select("indicator_id, month_number, actual_value, evidence_note").eq("journey_id", journey.id)
         : { data: [], error: null };
@@ -310,6 +331,8 @@ export default function MonitoringPage() {
           const definitions = (indicatorRows || []).filter((row: any) => row.area === area).slice(0, 4).map((row: any) => ({
             key: row.indicator_key, type: row.indicator_type || "quantity", label: row.label, active: row.active, direction: row.direction,
             baseline: Number(row.baseline_value), target: Number(row.target_value), unit: row.unit || "",
+            actualSource: row.actual_source || "self_report", qualityRubric: row.quality_rubric || undefined,
+            linkedActionPlanIds: linkMap[`${area}:${row.indicator_key}`] || [],
           } as IndicatorDefinition));
           const monthActualRows = (actualRows || []).filter((row: any) => row.month_number === month);
           const actuals = Object.fromEntries(monthActualRows.flatMap((row: any) => {
@@ -363,6 +386,11 @@ export default function MonitoringPage() {
       const { data: habitsList, error: habitsError } = await supabase.from("habits")
         .select("*").eq("user_id", user.id);
       if (habitsError) throw habitsError;
+
+      habitIdByActionPlanRef.current = {};
+      (habitsList || []).forEach((h: any) => {
+        if (h.action_plan_id) habitIdByActionPlanRef.current[h.action_plan_id] = h.id;
+      });
 
       const apAreaMap: Record<string, string> = {};
       (actionPlans || []).forEach((ap: any) => {
@@ -451,6 +479,11 @@ export default function MonitoringPage() {
 
       const habitLogs = habitLogsRes.data || [];
 
+      habitLogsByHabitRef.current = {};
+      (habitLogs || []).forEach((l: any) => {
+        habitLogsByHabitRef.current[l.habit_id] = [...(habitLogsByHabitRef.current[l.habit_id] || []), l];
+      });
+
       if (areas.length > 0) {
         const habitExecution = Object.fromEntries(habitsWithArea.map(habit => [habit.id, {
           scheduled: 0,
@@ -459,6 +492,7 @@ export default function MonitoringPage() {
           currentWeekCompleted: 0,
         }]));
         const momentumByArea: Record<string, number> = Object.fromEntries(areas.map(area => [area, 0]));
+        const seenHabitsByArea: Record<string, Set<string>> = Object.fromEntries(areas.map(area => [area, new Set<string>()]));
         const formatChartLabel = (dateStr: string) => {
           const dObj = new Date(`${dateStr}T12:00:00Z`);
           return numDays <= 7
@@ -477,6 +511,8 @@ export default function MonitoringPage() {
                 (habit.effectiveFrom && habit.effectiveFrom > dateStr) ||
                 (habit.effectiveUntil && habit.effectiveUntil < dateStr)
               ) return;
+
+              seenHabitsByArea[habit.area].add(habit.id);
 
               const execution = habitExecution[habit.id];
               const log = habit.id.startsWith("missing:") ? null : logsForDay.find((item: any) => item.habit_id === habit.id);
@@ -513,7 +549,8 @@ export default function MonitoringPage() {
               scores[area] = 0;
               return;
             }
-            scores[area] = momentumByArea[area];
+            // Normalize by area size so a 4-habit area is comparable to a 12-habit one.
+            scores[area] = momentumByArea[area] / Math.max(1, seenHabitsByArea[area].size);
           });
           return { date: dateStr, day: formatChartLabel(dateStr), programDay: programIndex, scores };
         });
@@ -599,6 +636,31 @@ export default function MonitoringPage() {
     kuantitasBaseline: "", kuantitasActual: "", waktuActualDays: "", biayaActual: "",
     isSaved: false, baselineScore,
   });
+
+  // Suggested actual from linked action plan habit logs for the selected month.
+  const computeSuggestedActual = (indicator: IndicatorDefinition): number | null => {
+    if (indicator.actualSource !== "action_plan" || !indicator.linkedActionPlanIds?.length) return null;
+    const start = programStartDateRef.current;
+    if (!start) return null;
+    const monthStart = addCalendarDays(start, (selectedMonth - 1) * 30);
+    const monthEnd = addCalendarDays(start, selectedMonth * 30 - 1);
+    let total = 0;
+    indicator.linkedActionPlanIds.forEach(planId => {
+      const habitId = habitIdByActionPlanRef.current[planId];
+      if (!habitId) return;
+      (habitLogsByHabitRef.current[habitId] || []).forEach(log => {
+        const date = log.activity_date || log.date;
+        if (date >= monthStart && date <= monthEnd) {
+          const count = Number(log.completed_count);
+          total += Number.isFinite(count) && count > 0 ? count : (log.completed ? 1 : 0);
+        }
+      });
+    });
+    return total;
+  };
+
+  const sourceLabel = (source?: IndicatorActualSource) =>
+    indicatorActualSources.find(item => item.key === (source || "self_report"))?.label || "Laporan Mandiri";
 
   const handleSelectMonth = (month: 1 | 2 | 3) => {
     setEditingAreaModal(null);
@@ -993,7 +1055,7 @@ export default function MonitoringPage() {
                       </span>
                        Momentum Action Plan
                     </h3>
-                    <p className="ml-10 mt-0.5 text-[11px] leading-relaxed text-slate-500">Naik saat habit dikerjakan, turun saat occurrence terlewat</p>
+                    <p className="ml-10 mt-0.5 text-[11px] leading-relaxed text-slate-500">Naik saat habit dikerjakan, turun saat occurrence terlewat — dinormalkan agar adil antar jumlah Action Plan</p>
                   </div>
 
                   {/* Timeframe Filter Toggle */}
@@ -1670,22 +1732,35 @@ export default function MonitoringPage() {
                        <span className="text-sm font-extrabold text-emerald-600">{overallPct === null ? "Belum Ada Data" : `${overallPct}% Berhasil`}</span>
                     </div>
 
-                     {rep.indicators?.length ? (
-                       <div className="space-y-3">
-                         {rep.indicators.filter(indicator => indicator.active).map(indicator => (
-                           <div key={indicator.key} className="rounded-xl border border-slate-200 bg-white p-3">
-                             <div className="mb-2 flex items-center justify-between gap-2"><label className="text-xs font-bold text-slate-700">{indicator.label}</label><span className="text-[10px] text-slate-500">Target {indicator.target} {indicator.unit}</span></div>
-                             <Input type="number" value={rep.indicatorActuals?.[indicator.key] ?? ""} onChange={event => {
-                                const value = event.target.value === "" ? undefined : Number(event.target.value);
-                                if (value !== undefined && (!Number.isFinite(value) || value < 0)) return;
-                                setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorActuals: { ...current[selectedMonth][editingAreaModal].indicatorActuals, [indicator.key]: value } } } }));
-                              }} min={0} placeholder={`Aktual (${indicator.unit || "angka"})`} className="h-9 text-xs" />
-                              <p className="mt-2 text-[10px] text-slate-500">{indicator.type === "quality" ? "Kualitas" : indicator.type === "quantity" ? "Kuantitas" : indicator.type === "time" ? "Waktu" : "Efisiensi/Biaya"} · Kondisi saat ini {indicator.baseline} · Target 90 hari {indicator.target} · {indicator.direction === "higher_is_better" ? "Naik lebih baik" : "Turun lebih baik"} · {indicator.unit || "Satuan belum tersedia"}</p>
-                              <Input value={rep.indicatorEvidenceNotes?.[indicator.key] || ""} onChange={event => setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorEvidenceNotes: { ...current[selectedMonth][editingAreaModal].indicatorEvidenceNotes, [indicator.key]: event.target.value } } } }))} placeholder="Catatan bukti (opsional)" className="mt-2 h-9 text-xs" />
+                         {rep.indicators?.length ? (
+                           <div className="space-y-3">
+                             {rep.indicators.filter(indicator => indicator.active).map(indicator => {
+                               const suggested = computeSuggestedActual(indicator);
+                               const qualityDesc = indicator.type === "quality" ? getQualityRubricDescription(indicator.qualityRubric, typeof rep.indicatorActuals?.[indicator.key] === "number" ? (rep.indicatorActuals[indicator.key] as number) : null) : null;
+                               return (
+                               <div key={indicator.key} className="rounded-xl border border-slate-200 bg-white p-3">
+                                 <div className="mb-2 flex items-center justify-between gap-2"><label className="text-xs font-bold text-slate-700">{indicator.label}</label><div className="flex items-center gap-1.5"><Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[9px] font-bold">{sourceLabel(indicator.actualSource)}</Badge><span className="text-[10px] text-slate-500">Target {indicator.target} {indicator.unit}</span></div></div>
+                                 <Input type="number" value={rep.indicatorActuals?.[indicator.key] ?? ""} onChange={event => {
+                                    const value = event.target.value === "" ? undefined : Number(event.target.value);
+                                    if (value !== undefined && (!Number.isFinite(value) || value < 0)) return;
+                                    setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorActuals: { ...current[selectedMonth][editingAreaModal].indicatorActuals, [indicator.key]: value } } } }));
+                                  }} min={0} placeholder={`Aktual (${indicator.unit || "angka"})`} className="h-9 text-xs" />
+                                 <p className="mt-2 text-[10px] text-slate-500">{indicator.type === "quality" ? "Kualitas" : indicator.type === "quantity" ? "Kuantitas" : indicator.type === "time" ? "Waktu" : "Efisiensi/Biaya"} · Kondisi saat ini {indicator.baseline} · Target 90 hari {indicator.target} · {indicator.direction === "higher_is_better" ? "Naik lebih baik" : "Turun lebih baik"} · {indicator.unit || "Satuan belum tersedia"}</p>
+                                 {indicator.actualSource === "action_plan" && (
+                                   <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+                                     <span className="text-[10px] leading-snug text-slate-500">{indicator.linkedActionPlanIds?.length ? `Terhubung ke ${indicator.linkedActionPlanIds.length} Action Plan · nilai otomatis dari tracking habit` : "Belum ada Action Plan terhubung"}</span>
+                                     {suggested !== null && (
+                                       <button type="button" onClick={() => setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorActuals: { ...current[selectedMonth][editingAreaModal].indicatorActuals, [indicator.key]: suggested } } } }))} className="shrink-0 text-[10px] font-bold text-amber-700 hover:underline cursor-pointer">Pakai {suggested} dari habit</button>
+                                     )}
+                                   </div>
+                                 )}
+                                 {qualityDesc && <p className="mt-1 text-[10px] font-semibold text-slate-500">Rubrik kualitas: {qualityDesc}</p>}
+                                 <Input value={rep.indicatorEvidenceNotes?.[indicator.key] || ""} onChange={event => setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorEvidenceNotes: { ...current[selectedMonth][editingAreaModal].indicatorEvidenceNotes, [indicator.key]: event.target.value } } } }))} placeholder="Catatan bukti (opsional)" className="mt-2 h-9 text-xs" />
+                              </div>
+                               );
+                             })}
                            </div>
-                         ))}
-                       </div>
-                     ) : !rep.targets.kualitas && !rep.targets.kuantitas && !rep.targets.waktu && !rep.targets.biaya ? (
+                         ) : !rep.targets.kualitas && !rep.targets.kuantitas && !rep.targets.waktu && !rep.targets.biaya ? (
                       <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl space-y-3">
                         <div className="flex items-center justify-between">
                           <label className="font-extrabold text-amber-900 text-xs block">Rating Capaian Bulanan (1 – 5 Bintang)</label>

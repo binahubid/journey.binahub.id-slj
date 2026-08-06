@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { TRANSFORMATION_AREAS } from "@/lib/transformation-areas";
-import { indicatorTypes, validateAreaIndicators, type IndicatorDefinition, type IndicatorType } from "@/lib/assessment-methodology";
+import { indicatorTypes, validateAreaIndicators, indicatorActualSources, getDefaultQualityRubric, type IndicatorDefinition, type IndicatorType, type IndicatorActualSource } from "@/lib/assessment-methodology";
 import {
   CheckCircle2,
   Lock,
@@ -176,6 +176,9 @@ const createIndicator = (index: number, type: IndicatorType = "quantity"): Indic
   baseline: 0,
   target: 0,
   unit: "",
+  actualSource: "self_report",
+  qualityRubric: type === "quality" ? getDefaultQualityRubric() : undefined,
+  linkedActionPlanIds: [],
 });
 
 const legacyIndicators = (target: AreaTargetData): IndicatorDefinition[] =>
@@ -190,6 +193,32 @@ const legacyIndicators = (target: AreaTargetData): IndicatorDefinition[] =>
 
 const isUnavailableRelation = (error: { code?: string } | null) =>
   error?.code === "42P01" || error?.code === "PGRST205";
+
+  // ─── Persist indicator ↔ action plan links for a journey ────────────────
+  const syncIndicatorActionPlanLinks = async (journeyId: string, targetsObj: Record<string, AreaTargetData>, areas: string[]) => {
+    const { data: indicators, error } = await supabase.from("ptp_indicators").select("id, area, indicator_key").eq("journey_id", journeyId);
+    if (error && !isUnavailableRelation(error)) throw error;
+    if (!indicators?.length) return;
+    const allIds = indicators.map((indicator: any) => indicator.id);
+    const { error: deleteError } = await supabase.from("ptp_indicator_action_plans").delete().in("indicator_id", allIds);
+    if (deleteError && !isUnavailableRelation(deleteError)) throw deleteError;
+
+    const keyToId = new Map(indicators.map((indicator: any) => [`${indicator.area}:${indicator.indicator_key}`, indicator.id]));
+    const links = areas.flatMap(area => {
+      const target = targetsObj[area];
+      const definitions = target?.indicators?.length ? target.indicators : target ? legacyIndicators(target) : [];
+      return definitions
+        .filter(indicator => indicator.active && indicator.linkedActionPlanIds?.length)
+        .flatMap(indicator => {
+          const id = keyToId.get(`${area}:${indicator.key}`);
+          return id ? indicator.linkedActionPlanIds!.filter(Boolean).map(action_plan_id => ({ indicator_id: id, action_plan_id })) : [];
+        });
+    });
+    if (links.length) {
+      const { error: linkError } = await supabase.from("ptp_indicator_action_plans").upsert(links, { onConflict: "indicator_id,action_plan_id" });
+      if (linkError && !isUnavailableRelation(linkError)) throw linkError;
+    }
+  };
 
   // ─── Ref mirrors for stale-closure-safe autosave ───────────────
   const muhasabahRef = useRef("");
@@ -337,11 +366,26 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
           const { data: structuredIndicators, error: indicatorError } = await supabase
             .from("ptp_indicators")
-            .select("area, indicator_key, indicator_type, label, active, direction, baseline_value, target_value, unit")
+            .select("id, area, indicator_key, indicator_type, label, active, direction, baseline_value, target_value, unit, actual_source, quality_rubric")
             .eq("journey_id", journey.id)
             .eq("active", true)
             .order("created_at", { ascending: true });
           if (indicatorError && !isUnavailableRelation(indicatorError)) throw indicatorError;
+
+          let linkMap: Record<string, string[]> = {};
+          if (structuredIndicators?.length) {
+            const { data: links, error: linksError } = await supabase.from("ptp_indicator_action_plans").select("indicator_id, action_plan_id");
+            if (linksError && !isUnavailableRelation(linksError)) throw linksError;
+            if (links?.length) {
+              const idToKey = new Map(structuredIndicators.map((item: any) => [item.id, item.area + ":" + item.indicator_key]));
+              linkMap = {};
+              links.forEach((link: any) => {
+                const key = idToKey.get(link.indicator_id);
+                if (!key) return;
+                linkMap[key] = [...(linkMap[key] || []), link.action_plan_id];
+              });
+            }
+          }
           if (structuredIndicators?.length) {
             setAreaTargetsMap(current => {
               const next = { ...current };
@@ -361,6 +405,9 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       baseline: Number(indicator.baseline_value),
                       target: Number(indicator.target_value),
                       unit: indicator.unit || "",
+                      actualSource: (indicator.actual_source || "self_report") as IndicatorActualSource,
+                      qualityRubric: indicator.quality_rubric || undefined,
+                      linkedActionPlanIds: linkMap[`${area}:${indicator.indicator_key}`] || [],
                     })),
                 };
               });
@@ -582,6 +629,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               baseline_value: indicator.baseline,
               target_value: indicator.target,
               unit: indicator.unit?.trim() || null,
+              actual_source: indicator.actualSource || "self_report",
+              quality_rubric: indicator.type === "quality" && indicator.qualityRubric ? indicator.qualityRubric : null,
               updated_at: new Date().toISOString(),
             }));
           });
@@ -601,6 +650,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               const { error: deleteError } = await supabase.from("ptp_indicators").delete().in("id", staleIds);
               if (deleteError) throw deleteError;
             }
+            await syncIndicatorActionPlanLinks(_journeyId, targetsObj, selectedAreasRef.current);
           }
           break;
         }
@@ -1162,6 +1212,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                           {(targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)])).map((indicator, index) => {
                             const areaIndicators = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
                             const usedTypes = new Set(areaIndicators.filter(item => item.active && item.key !== indicator.key).map(item => item.type));
+                            const areaPlans = actionPlans.filter(plan => plan.area_category === area.id && Boolean(plan.id));
                             return (
                             <div key={indicator.key} className="space-y-2 rounded-xl bg-white p-3.5 shadow-xs">
                               <div className="flex items-center justify-between gap-3">
@@ -1175,7 +1226,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                                   }} className="text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                                 </div>
                               </div>
-                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jenis indikator</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(area.id, index, { type, direction: preset.defaultDirection }); }} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select>{usedTypes.has(indicator.type) && <span className="block text-[10px] font-semibold text-rose-600">Jenis ini sudah dipakai indikator aktif lain di area ini.</span>}<span className="block text-[10px] leading-relaxed text-slate-400">{indicatorTypes.find(type => type.key === indicator.type)?.description} Contoh: {indicatorTypes.find(type => type.key === indicator.type)?.example}.</span></label>
+                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jenis indikator</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(area.id, index, { type, direction: preset.defaultDirection, qualityRubric: type === "quality" ? (indicator.qualityRubric || getDefaultQualityRubric()) : undefined }); }} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select>{usedTypes.has(indicator.type) && <span className="block text-[10px] font-semibold text-rose-600">Jenis ini sudah dipakai indikator aktif lain di area ini.</span>}<span className="block text-[10px] leading-relaxed text-slate-400">{indicatorTypes.find(type => type.key === indicator.type)?.description} Contoh: {indicatorTypes.find(type => type.key === indicator.type)?.example}.</span></label>
                               <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Nama indikator</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(area.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-9 text-xs" /></label>
                               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                 <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Kondisi saat ini</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(area.id, index, { baseline: Number(e.target.value) })} placeholder="Contoh: 2" className="h-9 text-xs" /></label>
@@ -1183,6 +1234,50 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                                 <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Arah keberhasilan</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(area.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
                                 <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(area.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-9 text-xs" /></label>
                               </div>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <label className="block space-y-1">
+                                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Sumber data capaian</span>
+                                  <select disabled={locked} value={indicator.actualSource || "self_report"} onChange={e => updateIndicator(area.id, index, { actualSource: e.target.value as IndicatorActualSource })} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorActualSources.map(source => <option key={source.key} value={source.key}>{source.label}</option>)}</select>
+                                  <span className="block text-[10px] leading-relaxed text-slate-400">{indicatorActualSources.find(source => source.key === (indicator.actualSource || "self_report"))?.description}</span>
+                                </label>
+                                {indicator.actualSource === "action_plan" && (
+                                  <div className="space-y-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Action Plan terhubung</span>
+                                    {areaPlans.length === 0 ? (
+                                      <p className="text-[10px] leading-relaxed text-slate-400">Belum ada Action Plan di area ini. Tambahkan di bagian Action Plan agar capaian dapat dihitung dari tracking habit.</p>
+                                    ) : (
+                                      <div className="space-y-1 rounded-md border border-slate-200 bg-white p-2">
+                                        {areaPlans.map(plan => {
+                                          const checked = (indicator.linkedActionPlanIds || []).includes(plan.id as string);
+                                          return (
+                                            <label key={plan.id} className="flex items-start gap-2 text-[11px] text-slate-700 cursor-pointer">
+                                              <input type="checkbox" disabled={locked} checked={checked} onChange={e => {
+                                                const current = indicator.linkedActionPlanIds || [];
+                                                const next = e.target.checked ? [...current, plan.id as string] : current.filter(id => id !== plan.id);
+                                                updateIndicator(area.id, index, { linkedActionPlanIds: next });
+                                              }} className="mt-0.5" />
+                                              <span className="leading-snug">{plan.title}</span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              {indicator.type === "quality" && (
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Rubrik kualitas 1-5</span>
+                                  <div className="space-y-1.5 rounded-md border border-slate-200 bg-white p-2">
+                                    {[1, 2, 3, 4, 5].map(score => (
+                                      <label key={score} className="flex items-center gap-2">
+                                        <span className="w-4 shrink-0 text-[10px] font-extrabold text-slate-500">{score}</span>
+                                        <Input disabled={locked} value={(indicator.qualityRubric || {})[score] ?? ""} placeholder={getDefaultQualityRubric()[score]} onChange={e => updateIndicator(area.id, index, { qualityRubric: { ...getDefaultQualityRubric(), ...(indicator.qualityRubric || {}), [score]: e.target.value } })} className="h-8 text-xs" />
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                               <p className="text-[10px] leading-relaxed text-slate-400">Contoh: kondisi saat ini 2 kali, target 7 kali, pilih “Naik lebih baik”, lalu isi satuan “kali”. Untuk durasi atau biaya yang ingin dikurangi, pilih “Turun lebih baik”.</p>
                             </div>
                             );

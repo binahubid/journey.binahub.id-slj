@@ -2,6 +2,32 @@ export const METHODOLOGY_VERSION = "1.0";
 
 export type IndicatorDirection = "higher_is_better" | "lower_is_better";
 export type IndicatorType = "quality" | "quantity" | "time" | "cost";
+export type IndicatorActualSource = "action_plan" | "self_report" | "external" | "coach";
+
+export const indicatorActualSources: { key: IndicatorActualSource; label: string; description: string }[] = [
+  { key: "self_report", label: "Laporan Mandiri", description: "Nilai aktual diisi langsung oleh peserta pada monitoring." },
+  { key: "action_plan", label: "Tracking Action Plan", description: "Nilai aktual dihitung dari konsistensi action plan / habit yang terhubung." },
+  { key: "external", label: "Sumber Eksternal", description: "Bukti dari sistem eksternal (ERP, absensi, dll) yang direkam ke aplikasi." },
+  { key: "coach", label: "Validasi Coach", description: "Nilai aktual dikoreksi / disahkan oleh coach." },
+];
+
+export const DEFAULT_QUALITY_RUBRIC: Record<number, string> = {
+  1: "Masih sangat jauh dari harapan",
+  2: "Jarang terlihat, masih banyak kesenjangan",
+  3: "Kadang konsisten, hasil masih bertahap",
+  4: "Sering konsisten, hasil mulai jelas",
+  5: "Sangat konsisten, hasil terlihat nyata",
+};
+
+export function getDefaultQualityRubric(): Record<number, string> {
+  return { ...DEFAULT_QUALITY_RUBRIC };
+}
+
+export function getQualityRubricDescription(rubric: Record<number, string> | undefined, value: number | null): string | null {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  const label = rubric?.[value];
+  return label?.trim() ? label : DEFAULT_QUALITY_RUBRIC[value] ?? null;
+}
 
 export const indicatorTypes: { key: IndicatorType; label: string; description: string; example: string; defaultDirection: IndicatorDirection; unitExample: string }[] = [
   { key: "quality", label: "Kualitas", description: "Mutu atau tingkat kualitas hasil/perilaku.", example: "Skor kekhusyukan sholat", defaultDirection: "higher_is_better", unitExample: "skor 1-10" },
@@ -19,10 +45,13 @@ export type IndicatorDefinition = {
   baseline: number;
   target: number;
   unit?: string;
+  actualSource?: IndicatorActualSource;
+  linkedActionPlanIds?: string[];
+  qualityRubric?: Record<number, string>;
 };
 
 export type IndicatorValidationError = {
-  code: "indicator_count" | "duplicate_type" | "required_label" | "required_unit" | "invalid_baseline" | "invalid_target" | "equal_baseline_target";
+  code: "indicator_count" | "duplicate_type" | "required_label" | "required_unit" | "invalid_baseline" | "invalid_target" | "equal_baseline_target" | "invalid_actual_source" | "invalid_quality_rubric";
   area: string;
   indicatorKey?: string;
   message: string;
@@ -111,6 +140,16 @@ export function validateAreaIndicators(indicators: IndicatorDefinition[], area =
     if (Number.isFinite(indicator.baseline) && Number.isFinite(indicator.target) && indicator.baseline === indicator.target) {
       errors.push({ code: "equal_baseline_target", area, indicatorKey: indicator.key, message: `${context}: kondisi saat ini dan target 90 hari tidak boleh sama.` });
     }
+    if (indicator.actualSource && !["action_plan", "self_report", "external", "coach"].includes(indicator.actualSource)) {
+      errors.push({ code: "invalid_actual_source", area, indicatorKey: indicator.key, message: `${context}: sumber data capaian tidak valid.` });
+    }
+    if (indicator.type === "quality" && indicator.qualityRubric) {
+      const entries = Object.entries(indicator.qualityRubric);
+      const hasEmpty = entries.some(([score, label]) => !["1", "2", "3", "4", "5"].includes(score) || (typeof label !== "string" ? true : !label.trim()));
+      if (entries.length !== 5 || hasEmpty) {
+        errors.push({ code: "invalid_quality_rubric", area, indicatorKey: indicator.key, message: `${context}: rubrik kualitas harus berisi deskripsi untuk skor 1-5.` });
+      }
+    }
   });
 
   return { valid: errors.length === 0, errors };
@@ -170,6 +209,20 @@ export function calculateExecutionMomentumDelta(input: { scheduledUnits: number;
   const scheduled = Number.isFinite(input.scheduledUnits) ? Math.max(0, input.scheduledUnits) : 0;
   const completed = Number.isFinite(input.completedUnits) ? Math.max(0, Math.min(scheduled, input.completedUnits)) : 0;
   return completed - (scheduled - completed);
+}
+
+export function calculateNormalizedExecutionMomentum(input: { scheduledUnits: number; completedUnits: number }): number | null {
+  const scheduled = Number.isFinite(input.scheduledUnits) ? Math.max(0, input.scheduledUnits) : 0;
+  const completed = Number.isFinite(input.completedUnits) ? Math.max(0, Math.min(scheduled, input.completedUnits)) : 0;
+  if (scheduled === 0) return null;
+  return (2 * completed / scheduled) - 1;
+}
+
+export function calculateNormalizedMomentumByArea(areas: Record<string, number[]>) {
+  return Object.fromEntries(Object.entries(areas).map(([area, values]) => [
+    area,
+    values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0,
+  ]));
 }
 
 export function calculateAreaExecution(habits: AssessmentMetric[]): AssessmentMetric {

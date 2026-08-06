@@ -7,11 +7,15 @@ import {
   calculateIndicatorCoverage,
   calculateIndicatorOutcome,
   calculateMeasurementCoverage,
+  calculateNormalizedExecutionMomentum,
+  calculateNormalizedMomentumByArea,
   calculateParticipantOutcome,
   calculateProgramEngagement,
   calculateScheduledHabitCompletion,
   calculateValidatedOutcome,
   calculateWeeklyPeerSupport,
+  getDefaultQualityRubric,
+  getQualityRubricDescription,
   validateAreaIndicators,
   type IndicatorDefinition,
 } from "./assessment-methodology";
@@ -68,6 +72,20 @@ describe("assessment methodology v1.0", () => {
     expect(calculateExecutionMomentumDelta({ scheduledUnits: 3, completedUnits: 0 })).toBe(-3);
   });
 
+  it("normalizes momentum so habit quantity and area size are comparable", () => {
+    expect(calculateNormalizedExecutionMomentum({ scheduledUnits: 4, completedUnits: 4 })).toBe(1);
+    expect(calculateNormalizedExecutionMomentum({ scheduledUnits: 4, completedUnits: 2 })).toBe(0);
+    expect(calculateNormalizedExecutionMomentum({ scheduledUnits: 4, completedUnits: 0 })).toBe(-1);
+    expect(calculateNormalizedExecutionMomentum({ scheduledUnits: 5, completedUnits: 3 })).toBeCloseTo(0.2);
+    expect(calculateNormalizedExecutionMomentum({ scheduledUnits: 0, completedUnits: 0 })).toBeNull();
+    expect(calculateNormalizedExecutionMomentum({ scheduledUnits: 2, completedUnits: 9 })).toBe(1);
+  });
+
+  it("averages normalized momentum across habits in an area", () => {
+    expect(calculateNormalizedMomentumByArea({ "Spiritual Growth": [1, 0, -1] })).toEqual({ "Spiritual Growth": 0 });
+    expect(calculateNormalizedMomentumByArea({ A: [1, 1], B: [] })).toEqual({ A: 1, B: 0 });
+  });
+
   it("leaves execution unmeasured when an area has no habits", () => {
     expect(calculateAreaExecution([])).toMatchObject({ score: null, measuredCount: 0, excludedCount: 0 });
   });
@@ -114,6 +132,39 @@ describe("assessment methodology v1.0", () => {
       unit: "skor",
     }));
     expect(validateAreaIndicators(indicators).errors.map((error) => error.code)).toContain("indicator_count");
+  });
+
+  it("validates actual source and quality rubric on active indicators", () => {
+    const base: IndicatorDefinition = {
+      key: "quality",
+      type: "quality",
+      label: "Kualitas ibadah",
+      active: true,
+      direction: "higher_is_better",
+      baseline: 1,
+      target: 5,
+      unit: "skor 1-5",
+      actualSource: "self_report",
+      linkedActionPlanIds: ["plan-a"],
+      qualityRubric: getDefaultQualityRubric(),
+    };
+    expect(validateAreaIndicators([base], "Spiritual Growth").valid).toBe(true);
+
+    const invalidSource = validateAreaIndicators([{ ...base, actualSource: "sistem" as any }], "Spiritual Growth");
+    expect(invalidSource.errors.map((error) => error.code)).toContain("invalid_actual_source");
+
+    const invalidRubric = validateAreaIndicators([{ ...base, qualityRubric: { 1: "satu", 2: "dua" } }], "Spiritual Growth");
+    expect(invalidRubric.errors.map((error) => error.code)).toContain("invalid_quality_rubric");
+
+    const blankRubric = validateAreaIndicators([{ ...base, qualityRubric: { 1: "", 2: "dua", 3: "tiga", 4: "empat", 5: "lima" } }], "Spiritual Growth");
+    expect(blankRubric.errors.map((error) => error.code)).toContain("invalid_quality_rubric");
+  });
+
+  it("resolves a quality rubric description with default fallback", () => {
+    expect(getQualityRubricDescription(undefined, 4)).toBe("Sering konsisten, hasil mulai jelas");
+    expect(getQualityRubricDescription({ 4: "Sudah sangat baik" }, 4)).toBe("Sudah sangat baik");
+    expect(getQualityRubricDescription({ 4: "Sudah sangat baik" }, null)).toBeNull();
+    expect(getQualityRubricDescription(undefined, 6)).toBeNull();
   });
 
   it("handles an incomplete indicator loaded from an older draft", () => {

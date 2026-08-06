@@ -176,11 +176,24 @@ export const ptpIndicators = pgTable("ptp_indicators", {
   baselineValue: numeric("baseline_value"),
   targetValue: numeric("target_value"),
   unit: text("unit"),
+  actualSource: text("actual_source").default("self_report").notNull(), // action_plan | self_report | external | coach
+  qualityRubric: jsonb("quality_rubric").$type<Record<number, string>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   journeyAreaKeyUnique: uniqueIndex("ptp_indicators_journey_area_key_unique").on(table.journeyId, table.area, table.indicatorKey),
   activeAreaTypeIndex: index("ptp_indicators_active_area_type_idx").on(table.journeyId, table.area, table.indicatorType),
+}));
+
+export const ptpIndicatorActionPlans = pgTable("ptp_indicator_action_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  indicatorId: uuid("indicator_id").notNull().references(() => ptpIndicators.id, { onDelete: "cascade" }),
+  actionPlanId: uuid("action_plan_id").notNull().references(() => actionPlans.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  indicatorActionPlanUnique: uniqueIndex("ptp_indicator_action_plans_unique").on(table.indicatorId, table.actionPlanId),
+  indicatorActionPlanIndex: index("ptp_indicator_action_plans_indicator_idx").on(table.indicatorId),
+  actionPlanIndicatorIndex: index("ptp_indicator_action_plans_plan_idx").on(table.actionPlanId),
 }));
 
 export const ptpIndicatorActuals = pgTable("ptp_indicator_actuals", {

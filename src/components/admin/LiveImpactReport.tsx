@@ -124,7 +124,7 @@ export function LiveImpactReport() {
         </div>
       </section>
 
-      <div className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900"><Users className="h-4 w-4 shrink-0" /><p><strong>Interpretasi:</strong> Outcome memakai indikator PTP aktif dengan actual terbaru; Execution memasukkan jadwal tanpa log sebagai tidak selesai; Peer Support dihitung konsisten per minggu aktif. Nilai kosong tetap kosong, bukan nol.</p></div>
+      <div className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-900"><Users className="h-4 w-4 shrink-0" /><p><strong>Interpretasi:</strong> Outcome memakai indikator PTP aktif dengan actual terbaru; setiap indikator membawa sumber aktual (Laporan Mandiri, Tracking Action Plan, Eksternal, atau Coach) dan tautan ke action plan terkait. Execution memasukkan jadwal tanpa log sebagai tidak selesai; Peer Support dihitung konsisten per minggu aktif. Nilai kosong tetap kosong, bukan nol.</p></div>
     </div>
   );
 }
