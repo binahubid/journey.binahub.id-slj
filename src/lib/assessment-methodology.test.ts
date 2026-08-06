@@ -20,7 +20,7 @@ import {
   type IndicatorDefinition,
 } from "./assessment-methodology";
 
-describe("assessment methodology v1.0", () => {
+describe("assessment methodology v1.1", () => {
   it("calculates and clamps higher-is-better attainment", () => {
     expect(calculateIndicatorOutcome({ baseline: 10, target: 20, actual: 10, direction: "higher_is_better" }).score).toBe(0);
     expect(calculateIndicatorOutcome({ baseline: 10, target: 20, actual: 15, direction: "higher_is_better" }).score).toBe(50);
@@ -100,6 +100,7 @@ describe("assessment methodology v1.0", () => {
       baseline: 2,
       target: 4,
       unit: "skor 1-5",
+      qualityRubric: getDefaultQualityRubric(),
     };
     expect(validateAreaIndicators([validIndicator], "Relationship")).toEqual({ valid: true, errors: [] });
 

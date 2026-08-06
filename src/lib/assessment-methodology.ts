@@ -1,4 +1,4 @@
-export const METHODOLOGY_VERSION = "1.0";
+export const METHODOLOGY_VERSION = "1.1";
 
 export type IndicatorDirection = "higher_is_better" | "lower_is_better";
 export type IndicatorType = "quality" | "quantity" | "time" | "cost";
@@ -143,8 +143,8 @@ export function validateAreaIndicators(indicators: IndicatorDefinition[], area =
     if (indicator.actualSource && !["action_plan", "self_report", "external", "coach"].includes(indicator.actualSource)) {
       errors.push({ code: "invalid_actual_source", area, indicatorKey: indicator.key, message: `${context}: sumber data capaian tidak valid.` });
     }
-    if (indicator.type === "quality" && indicator.qualityRubric) {
-      const entries = Object.entries(indicator.qualityRubric);
+    if (indicator.type === "quality") {
+      const entries = Object.entries(indicator.qualityRubric || {});
       const hasEmpty = entries.some(([score, label]) => !["1", "2", "3", "4", "5"].includes(score) || (typeof label !== "string" ? true : !label.trim()));
       if (entries.length !== 5 || hasEmpty) {
         errors.push({ code: "invalid_quality_rubric", area, indicatorKey: indicator.key, message: `${context}: rubrik kualitas harus berisi deskripsi untuk skor 1-5.` });

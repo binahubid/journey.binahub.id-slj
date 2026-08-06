@@ -406,7 +406,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       target: Number(indicator.target_value),
                       unit: indicator.unit || "",
                       actualSource: (indicator.actual_source || "self_report") as IndicatorActualSource,
-                      qualityRubric: indicator.quality_rubric || undefined,
+                      qualityRubric: indicator.indicator_type === "quality" ? (indicator.quality_rubric || getDefaultQualityRubric()) : undefined,
                       linkedActionPlanIds: linkMap[`${area}:${indicator.indicator_key}`] || [],
                     })),
                 };
@@ -656,6 +656,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         }
         case 4: {
           const _plans = actionPlansRef.current;
+          const persistedPlans = [..._plans];
           // Fetch existing action_plans for this journey
           const { data: existingPlans, error: existingPlansError } = await supabase.from("action_plans").select("id, title").eq("journey_id", _journeyId);
           if (existingPlansError) throw existingPlansError;
@@ -700,6 +701,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             }
 
             if (!apId) throw new Error(`Action plan ${ap.title} tidak memiliki ID.`);
+            const planIndex = persistedPlans.findIndex((plan) => plan === ap);
+            if (planIndex >= 0) persistedPlans[planIndex] = { ...ap, id: apId };
             const { error: habitError } = await supabase.from("habits").upsert({
               user_id: user.id,
               action_plan_id: apId,
@@ -712,6 +715,9 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             }, { onConflict: "action_plan_id" });
             if (habitError) throw habitError;
           }
+          setActionPlans(persistedPlans);
+          actionPlansRef.current = persistedPlans;
+          await syncIndicatorActionPlanLinks(_journeyId, areaTargetsMapRef.current, selectedAreasRef.current);
           break;
         }
       }
@@ -834,6 +840,19 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     setActionPlans(next);
     actionPlansRef.current = next;
 
+    const nextTargets = Object.fromEntries(Object.entries(areaTargetsMapRef.current).map(([targetArea, target]) => [
+      targetArea,
+      !plan.id || targetArea === area || !target.indicators?.length ? target : {
+        ...target,
+        indicators: target.indicators.map(indicator => ({
+          ...indicator,
+          linkedActionPlanIds: indicator.linkedActionPlanIds?.filter(id => id !== plan.id),
+        })),
+      },
+    ]));
+    setAreaTargetsMap(nextTargets);
+    areaTargetsMapRef.current = nextTargets;
+
     if (!plan?.id) {
       scheduleAutosave(4);
       return;
@@ -852,6 +871,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         area_category: area,
       }).eq("action_plan_id", plan.id);
       if (habitError) throw habitError;
+
+      if (!await handleSaveSection(3)) throw new Error("Tautan indikator belum dapat disinkronkan setelah area Action Plan dipindahkan.");
 
       setSaveStatus("saved");
       setLastSaved(new Date());
