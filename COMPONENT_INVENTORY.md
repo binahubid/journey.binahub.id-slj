@@ -13,7 +13,7 @@ Basis komponen: Shadcn UI (lihat ADR-006), dikustomisasi memakai `design-tokens.
 | Card | `default`, `interactive` (hover state) | Dasar untuk semua "card" turunan di bawah |
 | Dialog | modal konfirmasi | Dipakai untuk aksi destruktif (mis. hapus habit) |
 | Sheet | panel geser dari sisi layar | Dipakai untuk form tambahan di mobile-width |
-| Tabs | navigasi antar sub-halaman | Dipakai di halaman Profile/Settings |
+| Tabs | navigasi antar sub-halaman atau kelompok data setara | Dipakai di Profile/Settings dan pemisah Habit Harian/Pekanan |
 | Progress | bar linear | Dipakai untuk progres 90 hari & indikator target |
 | Checkbox | single, grid mingguan | Basis untuk Habit checklist harian |
 | Badge | `success` (On Track), `warning` (Need Support) | Warna dari token semantic (`success`, `warning`) |

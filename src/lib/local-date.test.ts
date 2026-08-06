@@ -6,6 +6,8 @@ describe("habit occurrence dates", () => {
     expect(normalizeHabitFrequency("Daily")).toBe("daily");
     expect(normalizeHabitFrequency("Setiap hari")).toBe("daily");
     expect(normalizeHabitFrequency("Weekly")).toBe("weekly");
+    expect(normalizeHabitFrequency("Pekanan")).toBe("weekly");
+    expect(normalizeHabitFrequency("2 kali per pekan")).toBe("weekly");
     expect(normalizeHabitFrequency("3 kali/minggu")).toBe("weekly");
   });
 

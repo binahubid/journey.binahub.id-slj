@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import {
@@ -88,6 +89,7 @@ export default function DashboardPage() {
   const [habitPercentage, setHabitPercentage] = useState(0);
   const [prayerLogsMap, setPrayerLogsMap] = useState<Record<string, boolean>>({});
   const [habitSaveError, setHabitSaveError] = useState<string | null>(null);
+  const [habitTab, setHabitTab] = useState<"daily" | "weekly">("daily");
 
   // Modals
   const [todayTasksModalOpen, setTodayTasksModalOpen] = useState(false);
@@ -1307,7 +1309,9 @@ export default function DashboardPage() {
   const journalPreview = parseJournalContent(journalLast).reflection;
   const dailyHabits = habits.filter(habit => habit.frequency === "daily");
   const weeklyHabits = habits.filter(habit => habit.frequency === "weekly");
-  const completedWeeklyCount = weeklyHabits.filter(habit => habit.completedToday).length;
+  const completedWeeklyUnits = weeklyHabits.reduce((total, habit) => total + Math.min(habit.quantity, habit.completedCount), 0);
+  const totalWeeklyUnits = weeklyHabits.reduce((total, habit) => total + habit.quantity, 0);
+  const visibleHabits = habitTab === "daily" ? dailyHabits : weeklyHabits;
 
   return (
     <ParticipantLayout activePath="/dashboard">
@@ -1504,14 +1508,11 @@ export default function DashboardPage() {
           {/* Card 2: Habits Hari Ini (Participant PTP Habits) */}
           <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between h-full">
             <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
+              <div className="flex items-center justify-between pb-1">
                 <h3 className="font-extrabold text-navy-900 text-xs tracking-wider uppercase flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4 text-amber-600" />
-                  Habit Harian
+                  Habit PTP
                 </h3>
-                <span className="text-[11px] font-bold text-gray-500 bg-warm-bg px-2.5 py-1 rounded-full border border-warm-border">
-                  {dailyHabits.length} hari ini · {weeklyHabits.length} pekanan
-                </span>
               </div>
 
               {habits.length === 0 ? (
@@ -1531,46 +1532,25 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <>
-                  {/* Progress Ring & Counter */}
-                  <div className="flex items-center space-x-4 bg-amber-50/50 p-3 rounded-xl border border-amber-200/50">
-                    <div className="relative h-14 w-14 shrink-0 flex items-center justify-center">
-                      <svg className="h-full w-full transform -rotate-90" viewBox="0 0 36 36">
-                        <path
-                          className="text-amber-100"
-                          strokeWidth="3.5"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        <path
-                          className="text-amber-500"
-                          strokeDasharray={`${habitPercentage}, 100`}
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-sm font-black text-navy-900 leading-none">
-                          {completedTodayCount}
-                        </span>
-                        <span className="text-[9px] font-bold text-slate-500">Selesai</span>
+                  <Tabs value={habitTab} onValueChange={value => setHabitTab(value as "daily" | "weekly")}>
+                    <TabsList className="grid h-9 w-full grid-cols-2 border-0 bg-slate-100 p-1">
+                      <TabsTrigger value="daily" className="h-7 border-0 text-xs shadow-none data-[state=active]:border-0">Harian · {dailyHabits.length}</TabsTrigger>
+                      <TabsTrigger value="weekly" className="h-7 border-0 text-xs shadow-none data-[state=active]:border-0">Pekanan · {weeklyHabits.length}</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="daily" className="mt-3">
+                      <div className="rounded-xl bg-amber-50/70 p-3">
+                        <span className="text-xs font-bold text-navy-900">{completedTodayCount}/{dailyHabits.length} habit selesai hari ini</span>
+                        <Progress value={habitPercentage} className="mt-2 h-1.5 bg-amber-100" />
                       </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-xs font-bold text-navy-900 block">
-                        {completedTodayCount === dailyHabits.length
-                          ? "MasyaAllah! Semua Habit Selesai"
-                          : `${dailyHabits.length - completedTodayCount} Habit Harian Belum Selesai`}
-                      </span>
-                      <p className="text-[11px] text-slate-500 leading-tight">
-                        Habit yang Anda tentukan di PTP.
-                      </p>
-                    </div>
-                  </div>
+                    </TabsContent>
+                    <TabsContent value="weekly" className="mt-3">
+                      <div className="rounded-xl bg-amber-50/70 p-3">
+                        <span className="text-xs font-bold text-navy-900">{completedWeeklyUnits}/{totalWeeklyUnits} pelaksanaan minggu ini</span>
+                        <p className="mt-1 text-[10px] text-slate-500">Periode Senin-Minggu. Tidak wajib selesai pada hari tertentu.</p>
+                        <Progress value={totalWeeklyUnits > 0 ? Math.round(completedWeeklyUnits / totalWeeklyUnits * 100) : 0} className="mt-2 h-1.5 bg-amber-100" />
+                      </div>
+                    </TabsContent>
+                  </Tabs>
 
                   {habitSaveError && (
                     <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
@@ -1580,7 +1560,7 @@ export default function DashboardPage() {
 
                   {/* Habit Checklist Preview — supports quantity sub-step counter */}
                   <div className="space-y-1.5 pt-1">
-                    {[...dailyHabits, ...weeklyHabits].slice(0, 4).map((h) => {
+                    {visibleHabits.slice(0, 4).map((h) => {
                       const isMultiStep = h.category === 'general' && h.quantity > 1;
                       return (
                         <div
@@ -1591,8 +1571,15 @@ export default function DashboardPage() {
                               : "bg-warm-bg text-slate-700 border border-warm-border/60"
                           }`}
                         >
-                          <span className="truncate flex-1">{h.title}{h.frequency === "weekly" ? " (minggu ini)" : ""}</span>
-                          {isMultiStep ? (
+                          <span className="truncate flex-1">{h.title}</span>
+                          {h.frequency === "weekly" ? (
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.completedToday ? "bg-emerald-200 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{h.completedCount}/{h.quantity} kali</span>
+                              {!h.completedToday && (
+                                <button onClick={() => h.category === "general" ? incrementHabitCount(h.id) : toggleHabitToday(h.id)} className="h-5 w-5 rounded-full bg-amber-500 text-white font-bold" title={`Tambah pelaksanaan (${h.completedCount + 1}/${h.quantity})`}>+</button>
+                              )}
+                            </div>
+                          ) : isMultiStep ? (
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                 h.completedToday ? "bg-emerald-200 text-emerald-800" : "bg-slate-200 text-slate-600"
@@ -1970,35 +1957,44 @@ export default function DashboardPage() {
           </DialogHeader>
 
           <div className="py-3 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-navy-900">
-              <span>Status Penyelesaian:</span>
-              <span className="text-amber-800 font-black">
-                {completedTodayCount} dari {dailyHabits.length} habit harian ({habitPercentage}%)
-              </span>
-            </div>
-            <Progress value={habitPercentage} className="h-2.5 bg-warm-bg" />
-
-            {weeklyHabits.length > 0 && (
-              <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-                Pekanan: {completedWeeklyCount} dari {weeklyHabits.length} target minggu ini selesai. Dapat dikerjakan kapan saja sebelum minggu berakhir.
-              </div>
-            )}
+            <Tabs value={habitTab} onValueChange={value => setHabitTab(value as "daily" | "weekly")}>
+              <TabsList className="grid h-9 w-full grid-cols-2 border-0 bg-slate-100 p-1">
+                <TabsTrigger value="daily" className="h-7 border-0 text-xs shadow-none">Harian · {dailyHabits.length}</TabsTrigger>
+                <TabsTrigger value="weekly" className="h-7 border-0 text-xs shadow-none">Pekanan · {weeklyHabits.length}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="daily" className="mt-3">
+                <div className="flex items-center justify-between text-xs font-bold text-navy-900">
+                  <span>Status hari ini:</span>
+                  <span className="text-amber-800 font-black">{completedTodayCount} dari {dailyHabits.length} ({habitPercentage}%)</span>
+                </div>
+                <Progress value={habitPercentage} className="mt-2 h-2.5 bg-warm-bg" />
+              </TabsContent>
+              <TabsContent value="weekly" className="mt-3">
+                <div className="flex items-center justify-between text-xs font-bold text-navy-900">
+                  <span>Status minggu ini:</span>
+                  <span className="text-amber-800 font-black">{completedWeeklyUnits} dari {totalWeeklyUnits} kali</span>
+                </div>
+                <Progress value={totalWeeklyUnits > 0 ? Math.round(completedWeeklyUnits / totalWeeklyUnits * 100) : 0} className="mt-2 h-2.5 bg-warm-bg" />
+              </TabsContent>
+            </Tabs>
 
             <div className="space-y-2 pt-2 max-h-[300px] overflow-y-auto pr-1">
-              {habits.map((h) => {
+              {visibleHabits.map((h) => {
                 const isMultiStep = h.category === "general" && h.quantity > 1;
                 return (
                   <button
                     key={h.id}
-                    onClick={() => isMultiStep && !h.completedToday ? incrementHabitCount(h.id) : toggleHabitToday(h.id)}
+                    onClick={() => h.frequency === "weekly" ? (h.category === "general" && !h.completedToday ? incrementHabitCount(h.id) : toggleHabitToday(h.id)) : isMultiStep && !h.completedToday ? incrementHabitCount(h.id) : toggleHabitToday(h.id)}
                     className={`w-full flex items-center justify-between p-3 rounded-xl text-xs font-bold transition-all text-left ${
                       h.completedToday
                         ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
                         : "bg-warm-bg text-slate-700 border border-warm-border hover:bg-slate-100"
                     }`}
                   >
-                    <span className="flex-1 min-w-0">{h.title}{h.frequency === "weekly" ? " (minggu ini)" : ""}</span>
-                    {isMultiStep && !h.completedToday ? (
+                    <span className="flex-1 min-w-0">{h.title}</span>
+                    {h.frequency === "weekly" ? (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] text-amber-800">{h.completedCount}/{h.quantity} kali</span>
+                    ) : isMultiStep && !h.completedToday ? (
                       <span className="shrink-0 rounded-full bg-slate-200 px-2 py-1 text-[10px] text-slate-700">{h.completedCount}/{h.quantity} +</span>
                     ) : (
                       <div className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${h.completedToday ? "bg-emerald-600 text-white" : "border border-slate-300 bg-white"}`}>

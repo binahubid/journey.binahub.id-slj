@@ -59,7 +59,7 @@ export type HabitFrequency = "daily" | "weekly";
 
 export function normalizeHabitFrequency(value?: string | null): HabitFrequency {
   const normalized = value?.trim().toLowerCase() || "";
-  return normalized === "weekly" || normalized.includes("minggu") ? "weekly" : "daily";
+  return normalized === "weekly" || normalized === "pekanan" || normalized.includes("minggu") || normalized.includes("pekan") ? "weekly" : "daily";
 }
 
 export function getLocalWeekStart(date = new Date(), timeZone = DEFAULT_TIME_ZONE): string {
