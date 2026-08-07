@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
-import { TRANSFORMATION_AREAS } from "@/lib/transformation-areas";
+import { TRANSFORMATION_AREAS, getTransformationAreaStyle } from "@/lib/transformation-areas";
 import { indicatorTypes, validateAreaIndicators, indicatorActualSources, getDefaultQualityRubric, type IndicatorDefinition, type IndicatorType, type IndicatorActualSource } from "@/lib/assessment-methodology";
 import {
   CheckCircle2,
@@ -1054,6 +1054,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
         const editorAreaId = selectedAreas.includes(openAreaEditor) ? openAreaEditor : selectedAreas[0] || "";
         const editorArea = AREA_LIST.find(area => area.id === editorAreaId);
+        const areaStyle = editorArea ? getTransformationAreaStyle(editorArea.id) : null;
         const targetData = editorAreaId ? (areaTargetsMap[editorAreaId] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" }) : null;
         const areaIndicators = targetData ? (targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)])) : [];
 
@@ -1071,7 +1072,9 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 {AREA_LIST.map(area => {
                   const Icon = area.icon;
                   const selected = selectedAreas.includes(area.id);
+                  const isActive = selected && openAreaEditor === area.id;
                   const disabled = !selected && selectedAreas.length >= 3;
+                  const areaStyle = getTransformationAreaStyle(area.id);
                   return (
                     <button key={area.id} type="button" disabled={locked || disabled} onClick={() => {
                       if (selected) {
@@ -1080,10 +1083,11 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       }
                       toggleArea(area.id);
                       setOpenAreaEditor(area.id);
-                    }} className={`relative min-h-24 rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${selected ? "border-navy-900 bg-navy-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-amber-400 hover:bg-amber-50/40"} ${disabled ? "cursor-not-allowed opacity-35" : "active:scale-[0.98]"}`}>
-                      <span className={`mb-3 flex h-8 w-8 items-center justify-center rounded-lg ${selected ? "bg-white/10 text-amber-300" : "bg-slate-100 text-slate-500"}`}><Icon className="h-4 w-4" /></span>
-                      <span className="block text-xs font-bold leading-tight">{area.label}</span>
-                      {selected && <Check className="absolute right-2.5 top-2.5 h-4 w-4 text-amber-300" />}
+                    }} className={`relative min-h-24 rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${selected ? "border-transparent shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-amber-400 hover:bg-amber-50/40"} ${isActive ? "ring-2" : ""} ${disabled ? "cursor-not-allowed opacity-35" : "active:scale-[0.98]"}`}
+                      style={selected ? { backgroundColor: areaStyle.color, color: "#fff", borderColor: areaStyle.color } : undefined}>
+                      <span className={`mb-3 flex h-8 w-8 items-center justify-center rounded-lg ${selected ? "bg-white/16 text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-4 w-4" /></span>
+                      <span className={`block text-xs font-bold leading-tight ${selected ? "text-white" : ""}`}>{area.label}</span>
+                      {selected && <Check className="absolute right-2.5 top-2.5 h-4 w-4 text-white/90" />}
                     </button>
                   );
                 })}
@@ -1092,23 +1096,29 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             </section>
 
             {editorArea && targetData ? (
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white" style={{ boxShadow: `0 2px 10px -2px ${areaStyle?.color}14` }}>
                 <div className="border-b border-slate-200 bg-slate-50/80 px-3 pt-3 sm:px-5 sm:pt-4">
                   <div className="flex gap-1 overflow-x-auto pb-3">
                     {selectedAreas.map(areaId => {
                       const area = AREA_LIST.find(item => item.id === areaId);
                       if (!area) return null;
+                      const active = editorAreaId === areaId;
                       const complete = Boolean(areaTargetsMap[areaId]?.mainTarget?.trim()) && validateAreaIndicators(areaTargetsMap[areaId]?.indicators?.length ? areaTargetsMap[areaId].indicators! : legacyIndicators(areaTargetsMap[areaId] || {}), areaId).valid;
-                      return <button key={areaId} type="button" onClick={() => setOpenAreaEditor(areaId)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${editorAreaId === areaId ? "bg-white text-navy-900 shadow-xs ring-1 ring-slate-200" : "text-slate-500 hover:bg-white/70"}`}>{area.label}<span className={`ml-2 inline-block h-1.5 w-1.5 rounded-full ${complete ? "bg-emerald-500" : "bg-amber-400"}`} /></button>;
+                      const areaStyle = getTransformationAreaStyle(areaId);
+                      return <button key={areaId} type="button" onClick={() => setOpenAreaEditor(areaId)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-all ${active ? "shadow-sm" : "text-slate-500 hover:bg-white/70"}`}
+                        style={active ? { backgroundColor: areaStyle.softColor, color: areaStyle.color, boxShadow: `inset 0 0 0 1px ${areaStyle.borderColor}` } : undefined}>{area.label}<span className={`ml-2 inline-block h-1.5 w-1.5 rounded-full ${complete ? "bg-emerald-500" : "bg-amber-400"}`} /></button>;
                     })}
                   </div>
                 </div>
 
                 <div className="space-y-7 p-4 sm:p-6">
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700">Area aktif</p>
-                      <h3 className="mt-1 text-lg font-extrabold tracking-tight text-navy-900">{editorArea.label}</h3>
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 h-10 w-1 rounded-full shrink-0" style={{ background: `linear-gradient(180deg, ${areaStyle?.color}, ${areaStyle?.color}80)` }} />
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: areaStyle?.color }}>Area aktif</p>
+                        <h3 className="mt-1 text-lg font-extrabold tracking-tight text-navy-900">{editorArea.label}</h3>
+                      </div>
                     </div>
                     {!locked && <button type="button" onClick={() => { toggleArea(editorArea.id); setOpenAreaEditor(""); }} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600">Hapus area</button>}
                   </div>
@@ -1119,8 +1129,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-5">
-                      <div><h4 className="text-sm font-extrabold text-navy-900">Bagaimana keberhasilan diukur?</h4><p className="mt-1 text-xs text-slate-500">Cukup mulai dengan satu indikator. Tambahkan hanya jika memang perlu.</p></div>
+                          <div className="flex items-end justify-between gap-3 border-t pt-5" style={{ borderTopColor: areaStyle?.borderColor || "#E2E8F0" }}>
+                      <div><h4 className="text-sm font-extrabold" style={{ color: areaStyle?.color }}>Bagaimana keberhasilan diukur?</h4><p className="mt-1 text-xs text-slate-500">Cukup mulai dengan satu indikator. Tambahkan hanya jika memang perlu.</p></div>
                       <span className="shrink-0 text-[11px] font-semibold text-slate-400">{areaIndicators.length}/4</span>
                     </div>
                     {areaIndicators.map((indicator, index) => {
@@ -1129,7 +1139,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       return (
                         <article key={indicator.key} className="rounded-xl bg-[#FAF8F4] p-3 sm:p-4">
                           <div className="mb-3 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-white font-mono text-[11px] font-bold text-navy-900 shadow-xs">{index + 1}</span><span className="text-xs font-bold text-slate-700">Indikator</span></div>
+                            <div className="flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-white font-mono text-[11px] font-bold text-navy-900 shadow-xs" style={{ color: areaStyle?.color }}>{index + 1}</span><span className="text-xs font-bold text-slate-700">Indikator</span></div>
                             {!locked && index > 0 && <button type="button" aria-label="Hapus indikator" onClick={() => { const next = areaIndicators.filter((_, itemIndex) => itemIndex !== index); const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: next } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                           </div>
                           <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
@@ -1142,8 +1152,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                             <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(editorArea.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-10 bg-white text-xs" /></label>
                             <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Arah hasil</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(editorArea.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
                           </div>
-                          <details className="group mt-3 border-t border-slate-200/80 pt-3">
-                            <summary className="cursor-pointer list-none text-[11px] font-bold text-slate-500 transition-colors hover:text-navy-900">Sumber data & rubrik <ChevronRight className="ml-1 inline h-3 w-3 transition-transform group-open:rotate-90" /></summary>
+                          <details className="group mt-3 border-t pt-3" style={{ borderTopColor: areaStyle?.borderColor }}>
+                            <summary className="cursor-pointer list-none text-[11px] font-bold transition-colors" style={{ color: areaStyle?.color }}>Sumber data & rubrik <ChevronRight className="ml-1 inline h-3 w-3 transition-transform group-open:rotate-90" style={{ color: areaStyle?.color }} /></summary>
                             <div className="mt-3 space-y-3">
                               <label className="block max-w-sm space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Sumber capaian</span><select disabled={locked} value={indicator.actualSource || "self_report"} onChange={e => updateIndicator(editorArea.id, index, { actualSource: e.target.value as IndicatorActualSource })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorActualSources.map(source => <option key={source.key} value={source.key}>{source.label}</option>)}</select><span className="block text-[10px] leading-relaxed text-slate-400">{indicatorActualSources.find(source => source.key === (indicator.actualSource || "self_report"))?.description}</span></label>
                               {indicator.actualSource === "action_plan" && <div className="space-y-2"><span className="text-[11px] font-semibold text-slate-500">Action Plan terhubung</span>{areaPlans.length ? <div className="grid gap-2 sm:grid-cols-2">{areaPlans.map(plan => { const checked = (indicator.linkedActionPlanIds || []).includes(plan.id as string); return <label key={plan.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-xs text-slate-700"><input type="checkbox" disabled={locked} checked={checked} onChange={e => { const current = indicator.linkedActionPlanIds || []; updateIndicator(editorArea.id, index, { linkedActionPlanIds: e.target.checked ? [...current, plan.id as string] : current.filter(id => id !== plan.id) }); }} className="mt-0.5" /><span>{plan.title}</span></label>; })}</div> : <p className="text-[11px] text-slate-400">Action Plan area ini belum dibuat. Anda dapat menghubungkannya setelah Step 4.</p>}</div>}
@@ -1153,7 +1163,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                         </article>
                       );
                     })}
-                    {!locked && areaIndicators.length < 4 && <button type="button" onClick={() => { const usedTypes = new Set(areaIndicators.filter(indicator => indicator.active).map(indicator => indicator.type)); const nextType = indicatorTypes.find(type => !usedTypes.has(type.key))?.key || "quantity"; const usedKeys = new Set(areaIndicators.map(indicator => indicator.key)); let nextIndex = areaIndicators.length; while (usedKeys.has(`indicator-${nextIndex + 1}`)) nextIndex += 1; const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: [...areaIndicators, createIndicator(nextIndex, nextType)] } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:border-amber-400 hover:bg-amber-50/40 hover:text-amber-800"><Plus className="h-3.5 w-3.5" /> Tambah indikator</button>}
+                    {!locked && areaIndicators.length < 4 && <button type="button" onClick={() => { const usedTypes = new Set(areaIndicators.filter(indicator => indicator.active).map(indicator => indicator.type)); const nextType = indicatorTypes.find(type => !usedTypes.has(type.key))?.key || "quantity"; const usedKeys = new Set(areaIndicators.map(indicator => indicator.key)); let nextIndex = areaIndicators.length; while (usedKeys.has(`indicator-${nextIndex + 1}`)) nextIndex += 1; const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: [...areaIndicators, createIndicator(nextIndex, nextType)] } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:border-amber-400 hover:bg-amber-50/40 hover:text-amber-800" style={{ borderColor: areaStyle?.borderColor, color: areaStyle?.color }}><Plus className="h-3.5 w-3.5" /> Tambah indikator</button>}
                   </div>
                 </div>
               </section>
