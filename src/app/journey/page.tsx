@@ -245,9 +245,6 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   const [activeAreaTab, setActiveAreaTab] = useState<string>("");
   const [areaTargetsMap, setAreaTargetsMap] = useState<Record<string, AreaTargetData>>({});
 
-  // SMART Tooltip State
-  const [showSmartTooltip, setShowSmartTooltip] = useState(false);
-
   // Section 5
   const [actionPlans, setActionPlans] = useState<{ id?: string; title: string; frequency: string; quantity: number; area_category: string }[]>([]);
   const [newActionTitle, setNewActionTitle] = useState("");
@@ -1055,279 +1052,112 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           scheduleAutosave(3);
         };
 
-        const shortcutsByArea: Record<string, { kualitas: string[]; kuantitas: string[]; waktu: string[]; biaya: string[] }> = {
-          "Spiritual Growth": {
-            kualitas: ["Khusyu, tumakninah & dzikir sesudah salam", "Meresapi makna ayat Al-Qur'an yang dibaca", "Menjaga wudhu dan niat ikhlas karena Allah", "Menghindari perkataan sia-sia dan ghibah", "Hadir Hati saat berdoa & istighfar harian"],
-            kuantitas: ["Khatam 1 Juz / minggu (90 hari 13 Juz)", "Sholat 5 waktu berjamaah di masjid", "Sholat Tahajud 4 rakaat + Witir 3x/minggu", "Sholat Dhuha 4 rakaat setiap pagi", "Membaca Al-Matsurat pagi & petang 7x/minggu"],
-            waktu: ["Hadir di masjid 10 menit sebelum adzan", "Tahajud jam 04:00 - 04:30 sebelum Subuh", "Tilawah Al-Qur'an 20 menit setelah Subuh", "Dzikir pagi jam 06:30 - 06:45", "Evaluasi muhasabah malam jam 21:30"],
-            biaya: ["Budget Rp 10.000 / hari via transfer", "Budget Rp 20.000 / hari via transfer", "Budget Rp 50.000 / hari via transfer", "Infak rutin Rp 100.000 / minggu ke panti/masjid", "Wakaf Quran Rp 150.000 / bulan"]
-          },
-          "Personal Development": {
-            kualitas: ["Merespon masalah secara tenang tanpa emosi meluap", "Mampu berpikir jernih saat di bawah tekanan", "Disiplin menjalankan rencana harian tanpa menunda", "Jujur mengakui kesalahan dan langsung memperbaiki", "Fokus mengerjakan 1 tugas hingga tuntas (deep work)"],
-            kuantitas: ["Maksimal 2 jam screen time non-produktif/hari", "Membaca 1 buku pengembangan diri / bulan", "Menulis jurnal refleksi 1x setiap malam", "Menyelesaikan 1 modul kursus/skill baru per minggu", "Evaluasi habit harian 7x / minggu"],
-            waktu: ["Alokasi membaca jam 20:00 - 20:30 setiap malam", "Deep work jam 08:30 - 10:30 tanpa distraksi", "Bangun pagi jam 04:30 secara konsisten", "Review mingguan setiap hari Minggu jam 16:00", "Digital detox jam 21:00 - 05:00"],
-            biaya: ["Budget pembelian buku Rp 150.000 / bulan", "Budget pelatihan / webinar Rp 300.000 / bulan", "Budget langganan platform edukasi Rp 100.000 / bulan", "Budget alat pendukung belajar Rp 200.000 / bulan", "Budget tabungan pengembangan diri Rp 500.000 / bulan"]
-          },
-          "Leadership Excellence": {
-            kualitas: ["Memberikan arahan tugas yang jelas & konstruktif", "Menjadi teladan etos kerja & kedisiplinan tim", "Aktif mendengarkan dan menghargai masukan tim", "Mengambil keputusan berbasis data & nilai etika", "Memberikan feedback positif & membangun secara berkala"],
-            kuantitas: ["100% KPI proyek selesai sebelum deadline", "1-on-1 coaching dengan anggota tim 2x / minggu", "Melakukan pembinaan / mentoring tim 1x / minggu", "Menyelesaikan 3 milestone strategis dalam 90 hari", "Nol keluhan keterlambatan laporan dari manajemen"],
-            waktu: ["Hadir 15 menit sebelum rapat/meeting dimulai", "Session 1-on-1 coaching setiap Senin jam 10:00", "Daily standup meeting jam 09:00 - 09:15", "Review kinerja tim setiap hari Jumat jam 15:00", "Penyelesaian laporan mingguan setiap Kamis jam 16:00"],
-            biaya: ["Budget apresiasi tim Rp 300.000 / bulan", "Budget makan siang / coaching tim Rp 500.000 / bulan", "Budget sertifikasi profesional Rp 1.000.000 / batch", "Budget fasilitasi alat kerja tim Rp 250.000 / bulan", "Budget kegiatan keakraban tim Rp 400.000 / bulan"]
-          },
-          "Relationship": {
-            kualitas: ["Mendengarkan cerita keluarga tanpa terdistraksi HP", "Berbicara dengan nada lembut, sabar & empati tinggi", "Mudah memaafkan & meminta maaf saat ada khilaf", "Menunjukkan apresiasi & rasa terima kasih setiap hari", "Menciptakan suasana hangat & aman di rumah/lingkungan"],
-            kuantitas: ["Makan malam bersama keluarga tanpa gadget 5x/minggu", "Quality time khusus pasangan/keluarga 1x / minggu", "Menghubungi orang tua / saudara via telp 3x / minggu", "Silaturahim dengan sahabat / teman 2x / bulan", "Family gathering weekend 4x / bulan"],
-            waktu: ["No-gadget hour jam 18:30 - 20:00 bersama keluarga", "Family time Sabtu pagi jam 08:00 - 11:00", "Telepon orang tua setiap Minggu jam 19:30", "Ngobrol santai sebelum tidur jam 21:00 - 21:30", "Jalan bersama pasangan setiap Jumat malam jam 19:00"],
-            biaya: ["Budget rekreasi & makan keluarga Rp 500.000 / bulan", "Budget rekreasi & makan keluarga Rp 1.000.000 / bulan", "Budget nafkah / bakti orang tua Rp 500.000 / bulan", "Budget hadiah / kejutan keluarga Rp 300.000 / bulan", "Budget tabungan liburan keluarga Rp 750.000 / bulan"]
-          },
-          "Community Impact": {
-            kualitas: ["Memberikan pendampingan warga secara tulus & ikhlas", "Aktif mencari solusi masalah lingkungan sekitar", "Ramah & peduli terhadap tetangga serta masyarakat", "Berbagi ilmu & pengalaman dengan niat memberi manfaat", "Menjadi penggerak kebaikan di lingkungan tempat tinggal"],
-            kuantitas: ["Mengajar / bakti sosial 4 jam setiap akhir pekan", "Mengikuti kegiatan gotong royong / RT 2x / bulan", "Berbagi makanan / sembako ke tetangga 2x / bulan", "Menjadi relawan program pemberdayaan 1x / bulan", "Mengisi materi / edukasi komunitas 1x / bulan"],
-            waktu: ["Bakti sosial setiap hari Sabtu jam 09:00 - 11:00", "Kerja bakti lingkungan Minggu pagi jam 07:00 - 09:00", "Pengajian / majelis warga Minggu malam jam 19:30", "Rapat RT / komunitas setiap awal bulan jam 20:00", "Aktivitas relawan Sabtu sore jam 15:30 - 17:30"],
-            biaya: ["Donasi rutin kegiatan warga Rp 100.000 / bulan", "Donasi rutin program masyarakat Rp 250.000 / bulan", "Donasi rutin program masyarakat Rp 500.000 / bulan", "Budget santunan anak yatim Rp 300.000 / bulan", "Budget kas kegiatan dakwah/sosial Rp 200.000 / bulan"]
-          }
-        };
+        const editorAreaId = selectedAreas.includes(openAreaEditor) ? openAreaEditor : selectedAreas[0] || "";
+        const editorArea = AREA_LIST.find(area => area.id === editorAreaId);
+        const targetData = editorAreaId ? (areaTargetsMap[editorAreaId] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" }) : null;
+        const areaIndicators = targetData ? (targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)])) : [];
 
         return (
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-600">Pilih area & tetapkan target <span className="font-bold text-amber-600">(maks. 3 area)</span></p>
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${selectedAreas.length >= 3 ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500"}`}>{selectedAreas.length}/3</span>
-            </div>
+          <div className="space-y-6">
+            <section className="space-y-3">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-extrabold text-navy-900">Pilih 3 fokus perubahan</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">Pilih area yang paling penting untuk 90 hari ke depan.</p>
+                </div>
+                <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-amber-700">{selectedAreas.length}/3</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {AREA_LIST.map(area => {
+                  const Icon = area.icon;
+                  const selected = selectedAreas.includes(area.id);
+                  const disabled = !selected && selectedAreas.length >= 3;
+                  return (
+                    <button key={area.id} type="button" disabled={locked || disabled} onClick={() => {
+                      if (selected) {
+                        setOpenAreaEditor(area.id);
+                        return;
+                      }
+                      toggleArea(area.id);
+                      setOpenAreaEditor(area.id);
+                    }} className={`relative min-h-24 rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${selected ? "border-navy-900 bg-navy-900 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-amber-400 hover:bg-amber-50/40"} ${disabled ? "cursor-not-allowed opacity-35" : "active:scale-[0.98]"}`}>
+                      <span className={`mb-3 flex h-8 w-8 items-center justify-center rounded-lg ${selected ? "bg-white/10 text-amber-300" : "bg-slate-100 text-slate-500"}`}><Icon className="h-4 w-4" /></span>
+                      <span className="block text-xs font-bold leading-tight">{area.label}</span>
+                      {selected && <Check className="absolute right-2.5 top-2.5 h-4 w-4 text-amber-300" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400">Untuk mengganti area, hapus salah satu area terpilih dari editor di bawah.</p>
+            </section>
 
-            {/* Area List with inline target editor */}
-            <div className="space-y-2">
-              {AREA_LIST.map(area => {
-                const Icon = area.icon;
-                const isSelected = selectedAreas.includes(area.id);
-                const isOpen = isSelected && openAreaEditor === area.id;
-                const targetData = areaTargetsMap[area.id] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
-                const hasTarget = targetData.mainTarget && targetData.mainTarget.trim().length > 0;
-                const shortcuts = shortcutsByArea[area.id] || shortcutsByArea["Spiritual Growth"];
-
-                return (
-                  <div key={area.id} className={`rounded-2xl overflow-hidden transition-all duration-200 ${
-                    isOpen ? "bg-amber-50 shadow-sm" :
-                    isSelected ? "bg-slate-100" :
-                    "bg-slate-50"
-                  }`}>
-                    {/* Area row — click row to open editor, click checkbox to select/unselect */}
-                    <div
-                      onClick={() => {
-                        if (locked) return;
-                        if (!isSelected) {
-                          if (selectedAreas.length >= 3) return;
-                          toggleArea(area.id);
-                          setOpenAreaEditor(area.id);
-                          if (!areaTargetsMap[area.id]) {
-                            setAreaTargetsMap(prev => ({ ...prev, [area.id]: { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" } }));
-                          }
-                        } else {
-                          setOpenAreaEditor(isOpen ? "" : area.id);
-                        }
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
-                        isSelected ? "bg-white" : "bg-white"
-                      } ${!isSelected && selectedAreas.length >= 3 ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                         isSelected ? "text-white" :
-                         "bg-slate-100 text-slate-500"
-                       }`} style={isSelected ? { backgroundColor: area.color } : undefined}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-bold text-sm ${isSelected ? "text-navy-900" : "text-slate-600"}`}>{area.label}</p>
-                        {hasTarget && isSelected
-                          ? <p className="text-xs text-slate-400 mt-0.5 truncate">{targetData.mainTarget}</p>
-                          : <p className={`text-xs mt-0.5 ${isSelected ? "text-slate-400" : "text-slate-400 opacity-70"}`}>{area.desc}</p>
-                        }
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        {isSelected && hasTarget && <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">✓ Target</span>}
-                        {isSelected && !hasTarget && <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Isi target</span>}
-                        
-                        {/* Interactive Checkbox Toggle (Click to uncheck when selected) */}
-                        {isSelected ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (locked) return;
-                              toggleArea(area.id);
-                              if (openAreaEditor === area.id) setOpenAreaEditor("");
-                            }}
-                            title="Klik untuk uncheck / batal pilih area ini"
-                            className="h-6 w-6 rounded-md bg-emerald-600 hover:bg-red-500 text-white flex items-center justify-center transition-colors shadow-2xs group"
-                          >
-                            <Check className="h-3.5 w-3.5 stroke-[3] group-hover:hidden" />
-                            <X className="h-3.5 w-3.5 stroke-[3] hidden group-hover:block" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (locked || selectedAreas.length >= 3) return;
-                              toggleArea(area.id);
-                              setOpenAreaEditor(area.id);
-                            }}
-                            disabled={locked || selectedAreas.length >= 3}
-                            title="Pilih area ini"
-                            className="h-6 w-6 rounded-md border-2 border-slate-300 hover:border-amber-500 flex items-center justify-center transition-colors bg-white"
-                          />
-                        )}
-
-                        {isSelected && (
-                          <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`} />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Inline target editor — only for selected + open area */}
-                    {isOpen && (
-                      <div className="bg-[#FAF8F4] px-4 py-4 space-y-4">
-                        <div className="flex items-center justify-between pb-2">
-                          <p className="text-xs font-extrabold text-[#0B2C6B] uppercase tracking-wider">Target & Indikator: {area.label}</p>
-                          {!locked && (
-                            <button
-                              type="button"
-                              onClick={() => { toggleArea(area.id); setOpenAreaEditor(""); }}
-                              className="text-[11px] font-semibold text-slate-500 hover:text-red-600 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 hover:bg-red-50"
-                            >
-                              <X className="h-3.5 w-3.5 text-slate-400 hover:text-red-600" />
-                              Batal Pilih Area
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Main target */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1.5 relative">
-                            <p className="text-sm font-bold text-slate-700">Sasaran Utama (90 Hari)</p>
-                            <button type="button" onMouseEnter={() => setShowSmartTooltip(true)} onMouseLeave={() => setShowSmartTooltip(false)} onClick={() => setShowSmartTooltip(v => !v)} className="h-5 w-5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 flex items-center justify-center shrink-0">
-                              <Info className="h-3 w-3" />
-                            </button>
-                            {showSmartTooltip && (
-                              <div className="absolute left-0 top-7 z-50 bg-navy-900 text-white text-xs rounded-xl p-3.5 shadow-xl w-64 border border-amber-400/30">
-                                <p className="font-extrabold text-amber-300 mb-1">💡 Panduan SMART:</p>
-                                <p className="opacity-90 leading-relaxed text-[11px]"><strong>S</strong>pecific · <strong>M</strong>easurable · <strong>A</strong>chievable · <strong>R</strong>elevant · <strong>T</strong>ime-bound.</p>
-                              </div>
-                            )}
-                          </div>
-                          <Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(area.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah..." className="min-h-[80px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:italic p-3" maxLength={500} />
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-bold text-slate-700 mb-1.5">Mengapa sasaran ini penting?</p>
-                          <Textarea disabled={locked} value={targetData.targetAlasan} onChange={e => updateField(area.id, "targetAlasan", e.target.value)} placeholder="Apa motivasi terdalam Anda?" className="min-h-[60px] w-full text-xs sm:text-sm resize-y border-warm-border focus:border-amber-400 rounded-xl bg-white placeholder:italic p-3" maxLength={300} />
-                        </div>
-
-                        {/* Structured indicators */}
-                        <div className="space-y-3 pt-1">
-                          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                            <div><p className="text-xs font-bold text-[#071A33]">Indikator Keberhasilan</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">Tentukan apa yang diukur pada area ini, nilai awalnya, dan target angka yang ingin dicapai.</p></div>
-                            <p className="text-[11px] text-slate-500 italic">1-4 indikator terukur per area</p>
-                          </div>
-                          {(targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)])).map((indicator, index) => {
-                            const areaIndicators = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
-                            const usedTypes = new Set(areaIndicators.filter(item => item.active && item.key !== indicator.key).map(item => item.type));
-                            const areaPlans = actionPlans.filter(plan => plan.area_category === area.id && Boolean(plan.id));
-                            return (
-                            <div key={indicator.key} className="space-y-2 rounded-xl bg-white p-3.5 shadow-xs">
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-xs font-extrabold text-navy-900">{index + 1}. Apa yang ingin diukur?</span>
-                                <div className="flex items-center gap-2">
-                                  <label className="flex items-center gap-1 text-[10px] font-bold text-slate-500"><input type="checkbox" disabled={locked} checked={indicator.active} onChange={e => updateIndicator(area.id, index, { active: e.target.checked })} /> Aktif</label>
-                                  {!locked && index > 0 && <button type="button" onClick={() => {
-                                    const next = (targetData.indicators || []).filter((_, itemIndex) => itemIndex !== index);
-                                    const updated = { ...areaTargetsMap, [area.id]: { ...targetData, indicators: next } };
-                                    setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3);
-                                  }} className="text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
-                                </div>
-                              </div>
-                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Jenis indikator</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(area.id, index, { type, direction: preset.defaultDirection, qualityRubric: type === "quality" ? (indicator.qualityRubric || getDefaultQualityRubric()) : undefined }); }} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select>{usedTypes.has(indicator.type) && <span className="block text-[10px] font-semibold text-rose-600">Jenis ini sudah dipakai indikator aktif lain di area ini.</span>}<span className="block text-[10px] leading-relaxed text-slate-400">{indicatorTypes.find(type => type.key === indicator.type)?.description} Contoh: {indicatorTypes.find(type => type.key === indicator.type)?.example}.</span></label>
-                              <label className="block space-y-1"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Nama indikator</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(area.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-9 text-xs" /></label>
-                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Kondisi saat ini</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(area.id, index, { baseline: Number(e.target.value) })} placeholder="Contoh: 2" className="h-9 text-xs" /></label>
-                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Target 90 hari</span><Input type="number" disabled={locked} value={indicator.target} onChange={e => updateIndicator(area.id, index, { target: Number(e.target.value) })} placeholder="Contoh: 7" className="h-9 text-xs" /></label>
-                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Arah keberhasilan</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(area.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
-                                <label className="space-y-1"><span className="text-[10px] font-bold text-slate-500">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(area.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-9 text-xs" /></label>
-                              </div>
-                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                <label className="block space-y-1">
-                                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Sumber data capaian</span>
-                                  <select disabled={locked} value={indicator.actualSource || "self_report"} onChange={e => updateIndicator(area.id, index, { actualSource: e.target.value as IndicatorActualSource })} className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">{indicatorActualSources.map(source => <option key={source.key} value={source.key}>{source.label}</option>)}</select>
-                                  <span className="block text-[10px] leading-relaxed text-slate-400">{indicatorActualSources.find(source => source.key === (indicator.actualSource || "self_report"))?.description}</span>
-                                </label>
-                                {indicator.actualSource === "action_plan" && (
-                                  <div className="space-y-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Action Plan terhubung</span>
-                                    {areaPlans.length === 0 ? (
-                                      <p className="text-[10px] leading-relaxed text-slate-400">Belum ada Action Plan di area ini. Tambahkan di bagian Action Plan agar capaian dapat dihitung dari tracking habit.</p>
-                                    ) : (
-                                      <div className="space-y-1 rounded-md border border-slate-200 bg-white p-2">
-                                        {areaPlans.map(plan => {
-                                          const checked = (indicator.linkedActionPlanIds || []).includes(plan.id as string);
-                                          return (
-                                            <label key={plan.id} className="flex items-start gap-2 text-[11px] text-slate-700 cursor-pointer">
-                                              <input type="checkbox" disabled={locked} checked={checked} onChange={e => {
-                                                const current = indicator.linkedActionPlanIds || [];
-                                                const next = e.target.checked ? [...current, plan.id as string] : current.filter(id => id !== plan.id);
-                                                updateIndicator(area.id, index, { linkedActionPlanIds: next });
-                                              }} className="mt-0.5" />
-                                              <span className="leading-snug">{plan.title}</span>
-                                            </label>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              {indicator.type === "quality" && (
-                                <div className="space-y-1">
-                                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Rubrik kualitas 1-5</span>
-                                  <div className="space-y-1.5 rounded-md border border-slate-200 bg-white p-2">
-                                    {[1, 2, 3, 4, 5].map(score => (
-                                      <label key={score} className="flex items-center gap-2">
-                                        <span className="w-4 shrink-0 text-[10px] font-extrabold text-slate-500">{score}</span>
-                                        <Input disabled={locked} value={(indicator.qualityRubric || {})[score] ?? ""} placeholder={getDefaultQualityRubric()[score]} onChange={e => updateIndicator(area.id, index, { qualityRubric: { ...getDefaultQualityRubric(), ...(indicator.qualityRubric || {}), [score]: e.target.value } })} className="h-8 text-xs" />
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              <p className="text-[10px] leading-relaxed text-slate-400">Contoh: kondisi saat ini 2 kali, target 7 kali, pilih “Naik lebih baik”, lalu isi satuan “kali”. Untuk durasi atau biaya yang ingin dikurangi, pilih “Turun lebih baik”.</p>
-                            </div>
-                            );
-                          })}
-                          {!locked && (targetData.indicators?.length || legacyIndicators(targetData).length || 1) < 4 && <Button type="button" variant="outline" onClick={() => {
-                            const current = targetData.indicators?.length ? targetData.indicators : (legacyIndicators(targetData).length ? legacyIndicators(targetData) : [createIndicator(0)]);
-                            const usedTypes = new Set(current.filter(indicator => indicator.active).map(indicator => indicator.type));
-                            const nextType = indicatorTypes.find(type => !usedTypes.has(type.key))?.key || "quantity";
-                            const usedKeys = new Set(current.map(indicator => indicator.key));
-                            let nextIndex = current.length;
-                            while (usedKeys.has(`indicator-${nextIndex + 1}`)) nextIndex += 1;
-                            const next = [...current, createIndicator(nextIndex, nextType)];
-                            const updated = { ...areaTargetsMap, [area.id]: { ...targetData, indicators: next } };
-                            setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3);
-                          }} className="h-9 w-full border-dashed text-xs"><Plus className="mr-1 h-3.5 w-3.5" /> Tambah indikator</Button>}
-                        </div>
-
-                        {/* Deselect area */}
-                        {!locked && (
-                          <button type="button" onClick={() => { toggleArea(area.id); setOpenAreaEditor(""); }} className="text-xs text-slate-500 hover:text-red-600 font-medium transition-colors">
-                            ✕ Batal pilih area ini
-                          </button>
-                        )}
-                      </div>
-                    )}
+            {editorArea && targetData ? (
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-200 bg-slate-50/80 px-3 pt-3 sm:px-5 sm:pt-4">
+                  <div className="flex gap-1 overflow-x-auto pb-3">
+                    {selectedAreas.map(areaId => {
+                      const area = AREA_LIST.find(item => item.id === areaId);
+                      if (!area) return null;
+                      const complete = Boolean(areaTargetsMap[areaId]?.mainTarget?.trim()) && validateAreaIndicators(areaTargetsMap[areaId]?.indicators?.length ? areaTargetsMap[areaId].indicators! : legacyIndicators(areaTargetsMap[areaId] || {}), areaId).valid;
+                      return <button key={areaId} type="button" onClick={() => setOpenAreaEditor(areaId)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${editorAreaId === areaId ? "bg-white text-navy-900 shadow-xs ring-1 ring-slate-200" : "text-slate-500 hover:bg-white/70"}`}>{area.label}<span className={`ml-2 inline-block h-1.5 w-1.5 rounded-full ${complete ? "bg-emerald-500" : "bg-amber-400"}`} /></button>;
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+
+                <div className="space-y-7 p-4 sm:p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700">Area aktif</p>
+                      <h3 className="mt-1 text-lg font-extrabold tracking-tight text-navy-900">{editorArea.label}</h3>
+                    </div>
+                    {!locked && <button type="button" onClick={() => { toggleArea(editorArea.id); setOpenAreaEditor(""); }} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600">Hapus area</button>}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,1fr)]">
+                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Sasaran utama 90 hari</span><Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(editorArea.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah" className="min-h-24 resize-none rounded-xl border-slate-200 bg-white text-sm focus:border-amber-400" maxLength={500} /><span className="block text-[11px] text-slate-400">Tulis satu hasil utama yang spesifik dan realistis.</span></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Mengapa ini penting?</span><Textarea disabled={locked} value={targetData.targetAlasan} onChange={e => updateField(editorArea.id, "targetAlasan", e.target.value)} placeholder="Motivasi utama Anda" className="min-h-24 resize-none rounded-xl border-slate-200 bg-slate-50/60 text-sm focus:border-amber-400" maxLength={300} /></label>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-5">
+                      <div><h4 className="text-sm font-extrabold text-navy-900">Bagaimana keberhasilan diukur?</h4><p className="mt-1 text-xs text-slate-500">Cukup mulai dengan satu indikator. Tambahkan hanya jika memang perlu.</p></div>
+                      <span className="shrink-0 text-[11px] font-semibold text-slate-400">{areaIndicators.length}/4</span>
+                    </div>
+                    {areaIndicators.map((indicator, index) => {
+                      const usedTypes = new Set(areaIndicators.filter(item => item.active && item.key !== indicator.key).map(item => item.type));
+                      const areaPlans = actionPlans.filter(plan => plan.area_category === editorArea.id && Boolean(plan.id));
+                      return (
+                        <article key={indicator.key} className="rounded-xl bg-[#FAF8F4] p-3 sm:p-4">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-white font-mono text-[11px] font-bold text-navy-900 shadow-xs">{index + 1}</span><span className="text-xs font-bold text-slate-700">Indikator</span></div>
+                            {!locked && index > 0 && <button type="button" aria-label="Hapus indikator" onClick={() => { const next = areaIndicators.filter((_, itemIndex) => itemIndex !== index); const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: next } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Jenis</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(editorArea.id, index, { type, direction: preset.defaultDirection, qualityRubric: type === "quality" ? (indicator.qualityRubric || getDefaultQualityRubric()) : undefined }); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select></label>
+                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Apa yang diukur?</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(editorArea.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-10 rounded-lg border-slate-200 bg-white text-xs" /></label>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Nilai awal</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(editorArea.id, index, { baseline: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Target</span><Input type="number" disabled={locked} value={indicator.target} onChange={e => updateIndicator(editorArea.id, index, { target: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(editorArea.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Arah hasil</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(editorArea.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
+                          </div>
+                          <details className="group mt-3 border-t border-slate-200/80 pt-3">
+                            <summary className="cursor-pointer list-none text-[11px] font-bold text-slate-500 transition-colors hover:text-navy-900">Sumber data & rubrik <ChevronRight className="ml-1 inline h-3 w-3 transition-transform group-open:rotate-90" /></summary>
+                            <div className="mt-3 space-y-3">
+                              <label className="block max-w-sm space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Sumber capaian</span><select disabled={locked} value={indicator.actualSource || "self_report"} onChange={e => updateIndicator(editorArea.id, index, { actualSource: e.target.value as IndicatorActualSource })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorActualSources.map(source => <option key={source.key} value={source.key}>{source.label}</option>)}</select><span className="block text-[10px] leading-relaxed text-slate-400">{indicatorActualSources.find(source => source.key === (indicator.actualSource || "self_report"))?.description}</span></label>
+                              {indicator.actualSource === "action_plan" && <div className="space-y-2"><span className="text-[11px] font-semibold text-slate-500">Action Plan terhubung</span>{areaPlans.length ? <div className="grid gap-2 sm:grid-cols-2">{areaPlans.map(plan => { const checked = (indicator.linkedActionPlanIds || []).includes(plan.id as string); return <label key={plan.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-xs text-slate-700"><input type="checkbox" disabled={locked} checked={checked} onChange={e => { const current = indicator.linkedActionPlanIds || []; updateIndicator(editorArea.id, index, { linkedActionPlanIds: e.target.checked ? [...current, plan.id as string] : current.filter(id => id !== plan.id) }); }} className="mt-0.5" /><span>{plan.title}</span></label>; })}</div> : <p className="text-[11px] text-slate-400">Action Plan area ini belum dibuat. Anda dapat menghubungkannya setelah Step 4.</p>}</div>}
+                              {indicator.type === "quality" && <div className="space-y-2"><span className="text-[11px] font-semibold text-slate-500">Definisi skor kualitas 1-5</span><div className="grid gap-2">{[1, 2, 3, 4, 5].map(score => <label key={score} className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-2"><span className="font-mono text-xs font-bold text-slate-500">{score}</span><Input disabled={locked} value={(indicator.qualityRubric || {})[score] ?? ""} placeholder={getDefaultQualityRubric()[score]} onChange={e => updateIndicator(editorArea.id, index, { qualityRubric: { ...getDefaultQualityRubric(), ...(indicator.qualityRubric || {}), [score]: e.target.value } })} className="h-9 bg-white text-xs" /></label>)}</div></div>}
+                            </div>
+                          </details>
+                        </article>
+                      );
+                    })}
+                    {!locked && areaIndicators.length < 4 && <button type="button" onClick={() => { const usedTypes = new Set(areaIndicators.filter(indicator => indicator.active).map(indicator => indicator.type)); const nextType = indicatorTypes.find(type => !usedTypes.has(type.key))?.key || "quantity"; const usedKeys = new Set(areaIndicators.map(indicator => indicator.key)); let nextIndex = areaIndicators.length; while (usedKeys.has(`indicator-${nextIndex + 1}`)) nextIndex += 1; const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: [...areaIndicators, createIndicator(nextIndex, nextType)] } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:border-amber-400 hover:bg-amber-50/40 hover:text-amber-800"><Plus className="h-3.5 w-3.5" /> Tambah indikator</button>}
+                  </div>
+                </div>
+              </section>
+            ) : <div className="rounded-2xl bg-amber-50/60 px-5 py-8 text-center"><p className="text-sm font-bold text-navy-900">Pilih area pertama untuk mulai menyusun target.</p><p className="mt-1 text-xs text-slate-500">Anda dapat memilih hingga tiga area.</p></div>}
           </div>
         );
       }
