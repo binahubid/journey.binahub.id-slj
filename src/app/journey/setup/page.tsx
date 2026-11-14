@@ -518,11 +518,11 @@ export default function JourneySetupPage() {
               <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/60 space-y-2 text-xs text-amber-900">
                 <div className="flex items-start gap-2">
                   <span className="font-bold text-amber-700 shrink-0">1.</span>
-                  <span>Apa bagian dari hati dan kehidupan saya yang paling membutuhkan pertolongan Allah?</span>
+                  <span>Bagian mana dari hati dan kehidupan Anda yang paling membutuhkan pertolongan Allah?</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-bold text-amber-700 shrink-0">2.</span>
-                  <span>Apa yang paling ingin saya perbaiki melalui program ini?</span>
+                  <span>Apa yang paling ingin Anda perbaiki melalui program ini?</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-bold text-amber-700 shrink-0">3.</span>
@@ -566,15 +566,15 @@ export default function JourneySetupPage() {
               <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/60 space-y-2 text-xs text-navy-900">
                 <div className="flex items-start gap-2">
                   <span className="font-bold text-amber-700 shrink-0">1.</span>
-                  <span>Mengapa saya ingin berangkat Umrah, dan apakah niat saya benar-benar karena Allah? Bagaimana saya meluruskan niat ini?</span>
+                  <span>Mengapa Anda ingin berangkat Umrah? Bagaimana Anda menjaga niat agar tetap karena Allah?</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-bold text-amber-700 shrink-0">2.</span>
-                  <span>Pribadi seperti apa yang ingin saya bentuk setelah kembali dari Tanah Suci?</span>
+                  <span>Pribadi seperti apa yang ingin Anda bentuk setelah kembali dari Tanah Suci?</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-bold text-amber-700 shrink-0">3.</span>
-                  <span>Apa komitmen yang saya ikrarkan kepada Allah untuk mewujudkan perubahan itu?</span>
+                  <span>Apa komitmen yang Anda ikrarkan kepada Allah untuk mewujudkan perubahan itu?</span>
                 </div>
               </div>
 

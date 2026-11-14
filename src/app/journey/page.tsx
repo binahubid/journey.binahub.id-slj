@@ -120,6 +120,8 @@ export default function JourneyPage() {
   const router = useRouter();
   const supabase = createClient();
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingDraftSaveRef = useRef<Promise<unknown> | null>(null);
+  const advancingRef = useRef(false);
 
   // Profile
   const [userName, setUserName] = useState("Peserta SLJ");
@@ -139,6 +141,8 @@ export default function JourneyPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [areaValidationError, setAreaValidationError] = useState<{ area: string; field: string; message: string } | null>(null);
+  const [advancing, setAdvancing] = useState(false);
 
   // UI
   const [activeSection, setActiveSection] = useState(1);
@@ -518,6 +522,14 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    if (!areaValidationError) return;
+    const field = Array.from(document.querySelectorAll<HTMLElement>("[data-ptp-field]"))
+      .find(element => element.dataset.ptpField === areaValidationError.field && element.getClientRects().length > 0);
+    field?.focus({ preventScroll: true });
+    field?.scrollIntoView({ block: "center" });
+  }, [areaValidationError, openAreaEditor]);
+
   // ─── Autosave ──────────────────────────────────────────────────
   const buildPtpDraft = () => ({
     selected_areas: selectedAreasRef.current,
@@ -567,6 +579,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     // Store sectionNum in the closure, but read field values from refs at fire time
     saveTimerRef.current = setTimeout(() => {
       const operation = sectionNum === 3 ? handleSavePtpDraft() : handleSaveSection(sectionNum);
+      if (sectionNum === 3) pendingDraftSaveRef.current = operation;
       void operation.catch(error => {
         console.error("Autosave error:", error);
         setSaveStatus("idle");
@@ -740,16 +753,45 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   };
 
   // ─── Helpers ───────────────────────────────────────────────────
+  const getSection3ValidationError = () => {
+    if (selectedAreas.length !== requiredAreaCount) {
+      return {
+        area: "",
+        field: "area-selection",
+        message: isTrial ? "Pilih area Spiritual Growth untuk melanjutkan." : "Pilih 3 area transformasi untuk melanjutkan.",
+      };
+    }
+    for (const area of selectedAreas) {
+      const target = areaTargetsMap[area];
+      if (!target?.mainTarget?.trim()) {
+        return { area, field: `${area}:mainTarget`, message: `Isi sasaran utama ${totalDays} hari untuk ${area}.` };
+      }
+      const legacy = legacyIndicators(target);
+      const indicators = target.indicators?.length ? target.indicators : legacy.length ? legacy : [createIndicator(0)];
+      const error = validateAreaIndicators(indicators, area).errors[0];
+      if (!error) continue;
+      const fieldByCode = {
+        indicator_count: "label", duplicate_type: "type", required_label: "label", required_unit: "unit",
+        invalid_baseline: "baseline", invalid_target: "target", equal_baseline_target: "target",
+        invalid_direction_target: "target", invalid_actual_source: "label", invalid_quality_rubric: "label",
+      };
+      const message = error.code === "required_label"
+        ? `Isi nama indikator untuk ${area}.`
+        : error.code === "required_unit"
+        ? `Isi satuan indikator untuk ${area}, misalnya kali atau menit.`
+        : error.message.replaceAll("target 90 hari", "target");
+      return { area, field: `${area}:${error.indicatorKey || indicators[0].key}:${fieldByCode[error.code]}`, message };
+    }
+    return null;
+  };
+
+  const isSection3FormComplete = () => getSection3ValidationError() === null;
+
   const isSectionComplete = (num: number) => {
     switch (num) {
       case 1: return muhasabah.trim().length > 0;
       case 2: return niat.trim().length > 0;
-      case 3: return section3Published && selectedAreas.length === requiredAreaCount && selectedAreas.every(area => {
-        const target = areaTargetsMap[area];
-        if (!target?.mainTarget?.trim()) return false;
-        const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
-        return validateAreaIndicators(indicators, area).valid;
-      });
+      case 3: return section3Published && isSection3FormComplete();
       case 4: return actionPlans.length > 0 && actionPlans.every(plan => selectedAreas.includes(plan.area_category));
       default: return false;
     }
@@ -765,7 +807,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     return "not-started";
   };
 
-  const canOpenSection = (num: number) => num <= maxUnlockedSection
+  const canOpenSection = (num: number) => !advancing && num <= maxUnlockedSection
     && (num < 2 || isSectionComplete(1))
     && (num < 3 || isSectionComplete(2))
     && (num < 4 || isSectionComplete(3));
@@ -797,6 +839,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     }
     else { if (selectedAreas.length >= requiredAreaCount) return; next = [...selectedAreas, id]; }
     setSaveError(null);
+    setAreaValidationError(null);
     setSelectedAreas(next);
     selectedAreasRef.current = next;
     scheduleAutosave(3);
@@ -892,25 +935,34 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     }
   };
 
-  const isSection3FormComplete = () => selectedAreas.length === requiredAreaCount && selectedAreas.every(area => {
-    const target = areaTargetsMap[area];
-    if (!target?.mainTarget?.trim()) return false;
-    const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
-    return validateAreaIndicators(indicators, area).valid;
-  });
-
   const goToNext = async () => {
+    if (advancingRef.current) return;
+    if (activeSection === 3) {
+      const validation = getSection3ValidationError();
+      if (validation) {
+        setSaveError(null);
+        setAreaValidationError(validation);
+        setOpenAreaEditor(validation.area);
+        return;
+      }
+    }
     const currentValid = activeSection === 3 ? isSection3FormComplete() : isSectionComplete(activeSection);
     if (!currentValid) {
       setSaveError(`Lengkapi bagian "${SECTIONS[activeSection - 1].title}" sebelum melanjutkan.`);
       return;
     }
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    if (activeSection === 3) {
-      if (!journeyIdRef.current) return;
-      setSaveStatus("saving");
-      setSaveError(null);
-      try {
+    advancingRef.current = true;
+    setAdvancing(true);
+    setAreaValidationError(null);
+    try {
+      if (activeSection === 3) {
+        if (!journeyIdRef.current) throw new Error("Rencana belum dapat dimuat. Muat ulang halaman lalu coba lagi.");
+        setSaveStatus("saving");
+        // Finish an already-started autosave before publishing the latest draft.
+        await pendingDraftSaveRef.current?.catch(() => undefined);
+        pendingDraftSaveRef.current = null;
+        setSaveError(null);
         const { error } = await supabase.rpc("publish_ptp_draft", { p_journey_id: journeyIdRef.current, p_draft: buildPtpDraft() });
         if (error) {
           if (error.code === "PGRST202" || error.code === "42883") {
@@ -921,23 +973,26 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         setSection3Published(true);
         setSaveStatus("saved");
         setLastSaved(new Date());
-      } catch (error) {
-        console.error("Publish PTP error:", error);
-        setSaveStatus("idle");
-        setSaveError(error instanceof Error ? error.message : (error as { message?: string })?.message || "PTP belum dapat diterapkan.");
+      } else if (!await handleSaveSection(activeSection)) {
         return;
       }
-    } else if (!await handleSaveSection(activeSection)) {
-      return;
+      if (activeSection < SECTIONS.length) {
+        const nextSection = activeSection + 1;
+        setMaxUnlockedSection(current => Math.max(current, nextSection));
+        setSaveError(null);
+        setActiveSection(nextSection);
+        setMobileView("editor");
+      } else {
+        setShowCelebration(true);
+      }
+    } catch (error) {
+      console.error("Publish PTP error:", error);
+      setSaveStatus("idle");
+      setSaveError(error instanceof Error ? error.message : (error as { message?: string })?.message || "PTP belum dapat diterapkan.");
+    } finally {
+      advancingRef.current = false;
+      setAdvancing(false);
     }
-    if (activeSection < SECTIONS.length) {
-      const nextSection = activeSection + 1;
-      setMaxUnlockedSection(current => Math.max(current, nextSection));
-      setSaveError(null);
-      setActiveSection(nextSection);
-      setMobileView("editor");
-    }
-    else { setShowCelebration(true); }
   };
 
   const goToPrev = () => {
@@ -960,7 +1015,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
   // ─── Section Content ───────────────────────────────────────────
   const renderSectionContent = (sectionNum: number) => {
-    const locked = ptpStatus === "LOCKED";
+    const locked = ptpStatus === "LOCKED" || advancing;
     switch (sectionNum) {
       case 1:
         return (
@@ -981,8 +1036,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               {guideOpen && (
                 <div className="px-4 pb-4 pt-1 bg-[#071A33]">
                   <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Apa bagian dari hati dan kehidupan saya yang paling membutuhkan pertolongan Allah?</li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Apa yang paling ingin saya perbaiki melalui program ini?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Bagian mana dari hati dan kehidupan Anda yang paling membutuhkan pertolongan Allah?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Apa yang paling ingin Anda perbaiki melalui program ini?</li>
                     <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Kenapa area perbaikan itu penting?</li>
                   </ul>
                 </div>
@@ -1022,9 +1077,9 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               {hadithOpen && (
                 <div className="px-4 pb-4 pt-1 bg-[#071A33]">
                   <ul className="text-xs sm:text-sm text-slate-200 space-y-2 leading-relaxed">
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Mengapa saya ingin berangkat Umrah, dan apakah niat saya benar-benar karena Allah? Bagaimana saya meluruskan niat ini?</li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Pribadi seperti apa yang ingin saya bentuk setelah kembali dari Tanah Suci?</li>
-                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Apa komitmen yang saya ikrarkan kepada Allah untuk mewujudkan perubahan itu?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">1.</span> Mengapa Anda ingin berangkat Umrah? Bagaimana Anda menjaga niat agar tetap karena Allah?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">2.</span> Pribadi seperti apa yang ingin Anda bentuk setelah kembali dari Tanah Suci?</li>
+                    <li className="flex items-start gap-2"><span className="text-amber-400 font-bold shrink-0">3.</span> Apa komitmen yang Anda ikrarkan kepada Allah untuk mewujudkan perubahan itu?</li>
                   </ul>
                 </div>
               )}
@@ -1045,6 +1100,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       case 3: {
         // Merged: Area selection + inline target editor per area
         const updateField = (areaId: string, field: keyof AreaTargetData, value: string) => {
+          setAreaValidationError(null);
+          setSaveError(null);
           const prev = areaTargetsMap[areaId] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
           const updated = { ...areaTargetsMap, [areaId]: { ...prev, [field]: value } };
           setAreaTargetsMap(updated);
@@ -1053,6 +1110,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         };
 
         const updateIndicator = (areaId: string, index: number, patch: Partial<IndicatorDefinition>) => {
+          setAreaValidationError(null);
+          setSaveError(null);
           const prev = areaTargetsMap[areaId] || { mainTarget: "", targetAlasan: "", kualitas: "", kuantitas: "", kuantitasBaseline: "", waktu: "", biaya: "" };
           const indicators = prev.indicators?.length ? prev.indicators : (legacyIndicators(prev).length ? legacyIndicators(prev) : [createIndicator(0)]);
           const updatedIndicators = indicators.map((indicator, indicatorIndex) => indicatorIndex === index ? { ...indicator, ...patch } : indicator);
@@ -1070,7 +1129,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
         return (
           <div className="space-y-6">
-            <section className="space-y-3">
+            <section data-ptp-field="area-selection" tabIndex={-1} className="space-y-3">
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-extrabold text-navy-900">{isTrial ? "Fokus latihan Spiritual Growth" : "Pilih 3 fokus perubahan"}</h3>
@@ -1136,7 +1195,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                   </div>
 
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,1fr)]">
-                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Sasaran utama {totalDays} hari</span><Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(editorArea.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah" className="min-h-24 resize-none rounded-xl border-slate-200 bg-white text-sm focus:border-amber-400" maxLength={500} /><span className="block text-xs text-slate-600">Tulis satu hasil utama yang spesifik dan realistis.</span></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Sasaran utama {totalDays} hari</span><Textarea data-ptp-field={`${editorArea.id}:mainTarget`} aria-invalid={areaValidationError?.field === `${editorArea.id}:mainTarget`} disabled={locked} value={targetData.mainTarget} onChange={e => updateField(editorArea.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah" className="min-h-24 resize-none rounded-xl border-slate-200 bg-white text-sm focus:border-amber-400" maxLength={500} /><span className="block text-xs text-slate-600">Tulis satu hasil utama yang spesifik dan realistis.</span></label>
                     <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Mengapa ini penting?</span><Textarea disabled={locked} value={targetData.targetAlasan} onChange={e => updateField(editorArea.id, "targetAlasan", e.target.value)} placeholder="Motivasi utama Anda" className="min-h-24 resize-none rounded-xl border-slate-200 bg-slate-50/60 text-sm focus:border-amber-400" maxLength={300} /></label>
                   </div>
 
@@ -1155,13 +1214,13 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                             {!locked && index > 0 && <button type="button" aria-label="Hapus indikator" onClick={() => { const next = areaIndicators.filter((_, itemIndex) => itemIndex !== index); const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: next } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="rounded-md p-1.5 text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                           </div>
                           <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Jenis</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(editorArea.id, index, { type, direction: preset.defaultDirection, qualityRubric: type === "quality" ? (indicator.qualityRubric || getDefaultQualityRubric()) : undefined }); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select></label>
-                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Apa yang diukur?</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(editorArea.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-10 rounded-lg border-slate-200 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Jenis</span><select data-ptp-field={`${editorArea.id}:${indicator.key}:type`} disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(editorArea.id, index, { type, direction: preset.defaultDirection, qualityRubric: type === "quality" ? (indicator.qualityRubric || getDefaultQualityRubric()) : undefined }); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Apa yang diukur?</span><Input data-ptp-field={`${editorArea.id}:${indicator.key}:label`} aria-invalid={areaValidationError?.field === `${editorArea.id}:${indicator.key}:label`} disabled={locked} value={indicator.label} onChange={e => updateIndicator(editorArea.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-10 rounded-lg border-slate-200 bg-white text-xs" /></label>
                           </div>
                           <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Nilai awal</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(editorArea.id, index, { baseline: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
-                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Target</span><Input type="number" disabled={locked} value={indicator.target} onChange={e => updateIndicator(editorArea.id, index, { target: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
-                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(editorArea.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Nilai awal</span><Input data-ptp-field={`${editorArea.id}:${indicator.key}:baseline`} aria-invalid={areaValidationError?.field === `${editorArea.id}:${indicator.key}:baseline`} type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(editorArea.id, index, { baseline: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Target</span><Input data-ptp-field={`${editorArea.id}:${indicator.key}:target`} aria-invalid={areaValidationError?.field === `${editorArea.id}:${indicator.key}:target`} type="number" disabled={locked} value={indicator.target} onChange={e => updateIndicator(editorArea.id, index, { target: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Satuan</span><Input data-ptp-field={`${editorArea.id}:${indicator.key}:unit`} aria-invalid={areaValidationError?.field === `${editorArea.id}:${indicator.key}:unit`} disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(editorArea.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-10 bg-white text-xs" /></label>
                             <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Arah hasil</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(editorArea.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
                           </div>
                           <details className="group mt-3 border-t pt-3" style={{ borderTopColor: areaStyle?.borderColor }}>
@@ -1577,14 +1636,20 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     </div>
   );
 
-  const renderPageAlert = () => (loadError || saveError) ? (
+  const renderPageAlert = () => loadError ? (
     <div role="alert" className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 lg:mx-0">
       <Info className="mt-0.5 h-4 w-4 shrink-0" />
-      <span className="flex-1 whitespace-pre-line">{loadError || saveError}</span>
+      <span className="flex-1 whitespace-pre-line">{loadError}</span>
       <button type="button" onClick={() => { setLoadError(null); setSaveError(null); }} className="text-rose-400 hover:text-rose-700" aria-label="Tutup pesan">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>
+  ) : null;
+
+  const renderStepError = () => (areaValidationError || saveError) ? (
+    <p role="alert" className="text-sm leading-5 text-rose-700">
+      {areaValidationError?.message || saveError}
+    </p>
   ) : null;
 
   const canProceed = activeSection === 3 ? isSection3FormComplete() : isSectionComplete(activeSection);
@@ -1721,6 +1786,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       <ParticipantLayout activePath="/journey" pageTitle="Journey (PTP)" hideBackToHome noPadding hideFooter>
 
       {renderPageAlert()}
+      {mobileView !== "editor" && <div className="px-4 pt-3 xl:hidden">{renderStepError()}</div>}
       <Dialog open={areaPendingRemoval !== null} onOpenChange={(open) => { if (!open) setAreaPendingRemoval(null); }}>
         <DialogContent className="max-w-md border border-rose-200 p-6">
           <DialogHeader>
@@ -1868,13 +1934,16 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             </div>
 
             {/* FIXED BOTTOM NAV (TIDAK BISA DI-SCROLL, MENEMPEL TEPAT DI ATAS BOTTOM DOCK NAV) */}
-            <div className="shrink-0 border-t border-warm-border bg-white p-3 flex items-center gap-3 shadow-md">
-              <Button variant="outline" onClick={goToPrev} className="flex-1 flex items-center justify-center gap-2 border-warm-border text-slate-700 rounded-xl h-11 font-bold">
-                <ArrowLeft className="h-4 w-4" />Sebelumnya
-              </Button>
-              <Button onClick={goToNext} disabled={!canProceed} className="flex-1 flex items-center justify-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 font-bold shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
-                {activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
-              </Button>
+            <div className="shrink-0 space-y-2 border-t border-warm-border bg-white p-3 shadow-md">
+              {renderStepError()}
+              <div className="flex items-center gap-3">
+                <Button variant="outline" onClick={goToPrev} disabled={advancing} className="flex-1 flex items-center justify-center gap-2 border-warm-border text-slate-700 rounded-xl h-11 font-bold">
+                  <ArrowLeft className="h-4 w-4" />Sebelumnya
+                </Button>
+                <Button onClick={goToNext} disabled={advancing || (activeSection !== 3 && !canProceed)} className="flex-1 flex items-center justify-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 font-bold shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
+                  {advancing ? "Menyimpan…" : activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}<ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -1919,14 +1988,15 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                   {renderSectionContent(activeSection)}
                 </div>
                 {/* Bottom nav */}
-                <div className="border-t border-warm-border bg-white px-6 py-4 flex items-center justify-end shrink-0">
-                  <div className="flex items-center gap-3">
+                <div className="shrink-0 space-y-2 border-t border-warm-border bg-white px-6 py-4">
+                  {renderStepError()}
+                  <div className="flex items-center justify-end gap-3">
                     <SaveIndicator />
-                    <Button variant="outline" onClick={goToPrev} disabled={activeSection === 1} className="flex items-center gap-2 border-warm-border text-slate-600 rounded-xl h-10 px-4">
+                    <Button variant="outline" onClick={goToPrev} disabled={advancing || activeSection === 1} className="flex items-center gap-2 border-warm-border text-slate-600 rounded-xl h-10 px-4">
                       <ArrowLeft className="h-4 w-4" /><span className="text-sm font-semibold">Sebelumnya</span>
                     </Button>
-                    <Button onClick={goToNext} disabled={!canProceed} className="flex items-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 font-bold shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
-                      <span className="text-sm">{activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
+                    <Button onClick={goToNext} disabled={advancing || (activeSection !== 3 && !canProceed)} className="flex items-center gap-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-10 px-5 font-bold shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300">
+                      <span className="text-sm">{advancing ? "Menyimpan…" : activeSection === SECTIONS.length ? "Selesai ✓" : "Selanjutnya"}</span><ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

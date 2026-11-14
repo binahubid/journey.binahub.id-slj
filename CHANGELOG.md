@@ -6,6 +6,11 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 
 ## [Unreleased]
 
+### Panduan peserta dan rencana perubahan
+- Pesan trial Kenali Diri dipersingkat dan hanya muncul pada layar pembuka.
+- Panduan refleksi dan jurnal menyapa peserta dengan “Anda”. Panduan akhir jurnal mengikuti durasi 14 atau 90 hari.
+- Tombol Selanjutnya pada Area Transformasi menunjukkan isian yang perlu dilengkapi dan memfokuskan kolom terkait. Publikasi menunggu autosave yang berjalan, dengan pesan gagal dan percobaan ulang di dekat tombol.
+
 ### Trial Spiritual Growth
 - Trial 14 hari memakai hero adaptif yang sama dengan program, termasuk jam lokal, jadwal salat esok hari, serta ringkasan empat aktivitas spiritual berdasarkan catatan peserta.
 - Seluruh menu latihan mandiri terbuka. Kenali diri mencakup Spiritual Growth dan kesiapan. Rencana perubahan dapat diterapkan pada satu area spiritual, beserta kebiasaan dan evaluasi di akhir pekan pertama dan kedua.

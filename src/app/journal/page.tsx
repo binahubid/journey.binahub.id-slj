@@ -37,39 +37,40 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_TIME_ZONE, getLocalDateString, getTimeZoneLabel, resolveParticipantTimeZone } from "@/lib/local-date";
 import { getProgramDay } from "@/lib/program-timeline";
+import { TRIAL_DAYS, TRIAL_PROGRAM_CODE } from "@/lib/program-access";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getCanonicalJournalDate, getJournalStreak, getJourneyDayForDate, parseJournalContent, composeJournalContent } from "@/lib/journal";
 
 // ── DAILY PROMPTS MAPPING (DAY 1 TO 90) ─────────────────────────────────────
 
 const DAILY_PROMPTS: Record<number, string> = {
-  1: "Apa niat terbaik yang ingin kamu jaga hari ini?",
-  2: "Apa rasa syukur pertama yang hadir saat kamu bangun tidur pagi ini?",
-  3: "Siapa orang yang ingin kamu beri kebaikan atau doa hari ini?",
-  4: "Bagaimana kondisimu saat melaksanakan ibadah hari ini?",
-  5: "Apa godaan atau gangguan terbesar yang kamu rasakan hari ini?",
-  7: "Apa perubahan kecil yang paling kamu rasakan dalam satu minggu pertama ini?",
-  10: "Ibadah mana yang terasa paling nikmat dan tenang kamu jalani hari ini?",
-  14: "Apa pelajaran dari kejadian yang membuatmu kurang nyaman hari ini?",
-  17: "Kapan hari ini kamu merasa paling dekat dengan Allah?",
+  1: "Apa niat terbaik yang ingin Anda jaga hari ini?",
+  2: "Apa rasa syukur pertama yang hadir saat Anda bangun tidur pagi ini?",
+  3: "Siapa orang yang ingin Anda beri kebaikan atau doa hari ini?",
+  4: "Bagaimana kondisi Anda saat melaksanakan ibadah hari ini?",
+  5: "Apa godaan atau gangguan terbesar yang Anda rasakan hari ini?",
+  7: "Apa perubahan kecil yang paling Anda rasakan dalam satu minggu pertama ini?",
+  10: "Ibadah mana yang terasa paling nikmat dan tenang Anda jalani hari ini?",
+  14: "Apa pelajaran dari kejadian yang membuat Anda kurang nyaman hari ini?",
+  17: "Kapan hari ini Anda merasa paling dekat dengan Allah?",
   21: "Kebiasaan baik apa yang mulai terasa lebih mudah dijalankan?",
-  24: "Kapan hari ini kamu merasa paling dekat dengan Allah?",
+  24: "Kapan hari ini Anda merasa paling dekat dengan Allah?",
   30: "Apa pelajaran terbesar tentang kesabaran yang Allah ajarkan bulan ini?",
-  37: "Barang siapa mengenal dirinya, maka ia akan mengenal Rabbnya. Apa yang kamu pelajari tentang dirimu hari ini?",
-  41: "Godaan terbesar hari ini apa, dan bagaimana kamu menghadapinya?",
-  50: "Jika kamu melihat dirimu di Hari ke-1, perubahan positif apa yang paling terlihat?",
-  60: "Bagaimana hubunganmu dengan keluarga dan orang-orang terdekatmu saat ini?",
-  75: "Bagaimana kamu menjaga istiqamah di saat rasa lelah datang?",
-  82: "Apa perubahan terbesar yang kamu rasakan mendekati akhir 90 hari ini?",
-  90: "Pesan dan komitmen apa yang ingin kamu sampaikan pada dirimu sendiri untuk masa depan?",
+  37: "Barang siapa mengenal dirinya, maka ia akan mengenal Rabbnya. Apa yang Anda pelajari tentang diri Anda hari ini?",
+  41: "Godaan terbesar hari ini apa, dan bagaimana Anda menghadapinya?",
+  50: "Jika Anda melihat diri Anda di Hari ke-1, perubahan positif apa yang paling terlihat?",
+  60: "Bagaimana hubungan Anda dengan keluarga dan orang-orang terdekat Anda saat ini?",
+  75: "Bagaimana Anda menjaga istiqamah di saat rasa lelah datang?",
+  82: "Apa perubahan terbesar yang Anda rasakan mendekati akhir 90 hari ini?",
+  90: "Pesan dan komitmen apa yang ingin Anda sampaikan pada diri Anda sendiri untuk masa depan?",
 };
 
 function getPromptForDay(day: number): string {
   if (DAILY_PROMPTS[day]) return DAILY_PROMPTS[day];
   const generic = [
-    "Kapan hari ini kamu merasa paling dekat dengan Allah?",
+    "Kapan hari ini Anda merasa paling dekat dengan Allah?",
     "Apa momen paling berharga atau hikmah yang Allah tunjukkan hari ini?",
-    "Bagaimana kondisi hatimu saat menjalani aktivitas dan ibadah hari ini?",
+    "Bagaimana kondisi hati Anda saat menjalani aktivitas dan ibadah hari ini?",
     "Apa bentuk rasa syukur terkecil namun terasa paling hangat hari ini?",
   ];
   return generic[day % generic.length];
@@ -112,6 +113,7 @@ export default function RefactoredJournalPage() {
   const [journalTimeZone, setJournalTimeZone] = useState(DEFAULT_TIME_ZONE);
   const [journeyStartDate, setJourneyStartDate] = useState<string | null>(null);
   const [dayCount, setDayCount] = useState(1);
+  const [totalDays, setTotalDays] = useState(90);
   const [dateFormatted, setDateFormatted] = useState("");
   const [dailyPrompt, setDailyPrompt] = useState("");
   const [streakCount, setStreakCount] = useState(0);
@@ -198,6 +200,7 @@ export default function RefactoredJournalPage() {
       const fName = profile?.full_name || "Peserta";
 
       if (profile) {
+        setTotalDays(profile.program_code === TRIAL_PROGRAM_CODE ? TRIAL_DAYS : 90);
         setUserName(fName.split(" ")[0]);
         if (profile.location) {
           setUserLocation(profile.location);
@@ -477,15 +480,15 @@ export default function RefactoredJournalPage() {
                     <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 space-y-2 text-xs text-amber-900 border-t border-amber-200/40 pt-3">
                       <div className="flex items-start gap-2">
                         <span className="font-bold text-amber-700 shrink-0">1.</span>
-                        <span>Apa pelajaran terbesar yang Allah tunjukkan kepada saya selama perjalanan ini?</span>
+                        <span>Apa pelajaran terbesar yang Allah tunjukkan kepada Anda selama perjalanan ini?</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <span className="font-bold text-amber-700 shrink-0">2.</span>
-                        <span>Apa hal-hal yang bisa saya lakukan lebih baik bila ada kesempatan kembali?</span>
+                        <span>Apa yang bisa Anda lakukan lebih baik bila ada kesempatan kembali?</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <span className="font-bold text-amber-700 shrink-0">3.</span>
-                        <span>Apa amal atau kebiasaan yang akan saya perjuangkan sepulang dari Tanah Suci?</span>
+                        <span>Apa amal atau kebiasaan yang akan Anda jaga sepulang dari Tanah Suci?</span>
                       </div>
                     </div>
                   )}
@@ -509,7 +512,7 @@ export default function RefactoredJournalPage() {
                       maxLength={1000}
                       value={mainReflection}
                       onChange={e => setMainReflection(e.target.value)}
-                      placeholder="Tulis refleksi, rasa syukur, hikmah, atau hal yang ingin kamu pelajari..."
+                      placeholder="Tulis refleksi, rasa syukur, hikmah, atau hal yang ingin Anda pelajari..."
                       className="text-xs sm:text-sm leading-relaxed border-slate-200 focus:border-amber-500 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 placeholder:text-slate-600 placeholder:italic font-serif bg-white"
                     />
                     <span className="absolute right-3.5 bottom-3 text-xs font-mono text-slate-600">
@@ -526,7 +529,7 @@ export default function RefactoredJournalPage() {
                         <Smile className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                       <h2 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
-                        Hari ini saya merasa
+                        Bagaimana perasaan Anda hari ini?
                       </h2>
                     </div>
                     <p className="text-xs text-slate-600 mt-0.5 ml-8 sm:ml-9.5">
@@ -559,8 +562,8 @@ export default function RefactoredJournalPage() {
                   </div>
                 </div>
 
-                {/* ─── PANDUAN ISTIQAMAH (HARI KE-90 SAJA) ─── */}
-                {dayCount >= 90 && (
+                {/* Final-day reflection follows the participant's program duration. */}
+                {dayCount >= totalDays && (
                   <div className="bg-amber-50/70 rounded-2xl border border-amber-200/60 overflow-hidden">
                     <button
                       type="button"
@@ -570,7 +573,7 @@ export default function RefactoredJournalPage() {
                       <div className="flex items-center gap-2">
                         <Target className="h-4 w-4 text-amber-700 shrink-0" />
                         <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider truncate">
-                          Panduan Istiqamah — Refleksi 90 Hari
+                          Panduan Istiqamah — Refleksi {totalDays} Hari
                         </span>
                       </div>
                       <ChevronDown className={`h-4 w-4 text-amber-700 transition-transform duration-200 ${showIstiqamah ? "rotate-180" : ""}`} />
@@ -579,15 +582,15 @@ export default function RefactoredJournalPage() {
                       <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 space-y-2 text-xs text-amber-900 border-t border-amber-200/40 pt-3">
                         <div className="flex items-start gap-2">
                           <span className="font-bold text-amber-700 shrink-0">1.</span>
-                          <span>Perubahan apa yang sudah mulai saya rasakan setelah Umrah? Apa saja dampak perubahan ini terhadap diri, pekerjaan, lingkungan saya?</span>
+                          <span>Perubahan apa yang mulai Anda rasakan setelah Umrah? Bagaimana dampaknya terhadap diri, pekerjaan, dan lingkungan Anda?</span>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="font-bold text-amber-700 shrink-0">2.</span>
-                          <span>Apa tantangan terbesar yang dapat melemahkan komitmen saya?</span>
+                          <span>Apa tantangan terbesar yang dapat melemahkan komitmen Anda?</span>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="font-bold text-amber-700 shrink-0">3.</span>
-                          <span>Apa kebiasaan yang akan saya jaga agar perubahan ini tetap hidup sepanjang perjalanan saya?</span>
+                          <span>Apa kebiasaan yang akan Anda jaga agar perubahan ini bertahan sepanjang perjalanan Anda?</span>
                         </div>
                       </div>
                     )}
@@ -734,7 +737,7 @@ export default function RefactoredJournalPage() {
                   </div>
                   <p className="text-xs font-semibold text-slate-600">Belum ada refleksi</p>
                   <p className="text-xs text-slate-600 leading-relaxed max-w-[200px] mx-auto">
-                    Mulai tulis refleksi pertamamu hari ini di kolom sebelah kiri.
+                    Mulai tulis refleksi pertama Anda hari ini di kolom sebelah kiri.
                   </p>
                 </div>
               ) : (

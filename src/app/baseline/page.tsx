@@ -474,7 +474,7 @@ export default function BaselinePage() {
   return (
     <ParticipantLayout activePath="/baseline" pageTitle="Baseline Self-Discovery">
       <div className="max-w-7xl w-full mx-auto pt-6 pb-20 font-sans text-slate-800 space-y-6">
-        {isTrial && <p className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-relaxed text-navy-900">Uji coba mencakup refleksi Spiritual Growth dan kesiapan menjalani latihan. Empat area transformasi lainnya tersedia dalam program pendampingan.</p>}
+        {isTrial && isIntro && <p className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-relaxed text-navy-900">Latihan 14 hari berfokus pada Spiritual Growth.</p>}
         {errorMessage && (
           <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
             <span className="flex-1">{errorMessage}</span>
