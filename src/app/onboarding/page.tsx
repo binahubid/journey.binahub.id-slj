@@ -24,6 +24,7 @@ export default function OnboardingPage() {
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<"trial" | "program">("trial");
   const [trialOpen, setTrialOpen] = useState(false);
+  const [trialClosed, setTrialClosed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +53,8 @@ export default function OnboardingPage() {
         if (cancelled) return;
         setEmail(user.email || "");
         setName(access?.full_name || user.user_metadata?.full_name || "");
-        setTrialOpen(!offerError && offer?.enabled === true);
+        setTrialOpen(access?.kind !== "trial" && !offerError && offer?.enabled === true);
+        setTrialClosed(access?.kind !== "trial" && !offerError && offer?.enabled === false);
         setMode(
           programMode || offerError || !offer?.enabled ? "program" : "trial",
         );
@@ -155,6 +157,11 @@ export default function OnboardingPage() {
         ) : (
           <>
             <div className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
+              {trialClosed && (
+                <p className="mb-5 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                  Pendaftaran uji coba sedang ditutup. Jika sudah menerima kode program, masukkan kodenya di bawah.
+                </p>
+              )}
               {trialOpen && (
                 <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
                   {(

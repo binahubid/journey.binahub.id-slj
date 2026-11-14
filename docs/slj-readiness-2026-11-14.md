@@ -2,11 +2,11 @@
 
 ## Status
 
-Implementasi tersedia pada branch codex/slj-trial-readiness-2026-11-13.
-SQL33 telah dikonfirmasi pengguna. RPC penawaran di Supabase SLJ mengembalikan
-HTTP 200 dengan trial aktif selama 14 hari. Deploy ulang Edge Function
-memerlukan sesi login Supabase CLI. Tidak ada environment variable atau jadwal
-cron baru. Tidak ada email atau push produksi yang dikirim selama pengujian.
+Situs SLJ v0.8.0 sudah tayang di journey.binahub.id. GitHub Actions dan Vercel
+lulus pada rilis 106c8c3. SQL33 sudah diverifikasi melalui fungsi penawaran
+Supabase. Pendaftaran trial 14 hari terbuka dan tanggal penutupannya masih
+kosong. Deploy ulang Edge Function menunggu login Supabase CLI. Gunakan
+environment dan jadwal cron yang aktif untuk worker tersebut.
 
 ## Keputusan yang diterapkan dari meeting 13 November
 
@@ -39,6 +39,8 @@ cron baru. Tidak ada email atau push produksi yang dikirim selama pengujian.
 | Dialog tidak menahan fokus atau mengembalikan fokus ke tombol pembuka | Dialog Radix, dukungan Escape, fokus kembali ke pembuka | Uji keyboard browser |
 | Penyimpanan salat dapat berlomba pada klik berulang dan gagal tanpa pesan yang terlihat | Penanda simpan per aktivitas, rollback, pesan gagal, dan pemuatan ulang | Uji simpan, reload, serta kegagalan koneksi |
 | Jadwal Makkah/Madinah memakai negara Indonesia dan jam lokal perangkat | Helper bersama untuk kota, metode, tanggal, dan zona waktu; Kemenag untuk Indonesia, Umm Al-Qura untuk kota Arab Saudi yang didukung | Uji URL, zona waktu, serta GET publik Aladhan |
+| Jurnal mencantumkan WIB saat peserta memilih zona Saudi, dan rencana besok bergabung dengan refleksi ketika bagian pelajaran kosong | Jam, tanggal, serta streak mengikuti zona peserta. Rencana besok terbaca sebagai isian terpisah | Regresi jurnal dan uji browser |
+| Status pendaftaran tertutup hanya tampil pada admin | Landing dan formulir mulai mengikuti status penawaran Supabase | Uji penutupan pendaftaran |
 | Pengingat program penuh dapat masuk pada trial atau setelah trial berakhir | Filter database dan worker berdasarkan enrollment trial; tautan dan pesan disesuaikan | Uji database pengingat |
 | Badge PWA memakai API pada objek yang keliru | Gunakan WorkerNavigator, termasuk menghapus badge saat unread nol | Regresi service worker |
 | Tautan notifikasi dapat menunjuk keluar origin aplikasi | Tautan dibatasi pada origin SLJ dan fallback ke Notifikasi | Regresi service worker |
@@ -48,7 +50,7 @@ cron baru. Tidak ada email atau push produksi yang dikirim selama pengujian.
 
 ## Validasi lokal
 
-- 57 pengujian pada 11 berkas lulus.
+- 59 pengujian pada 11 berkas lulus.
 - 12 pengujian database memakai PGlite. Bootstrap memakai schema sumber,
   schema tambahan, RLS konsolidasi, dan migration 005–032 sebelum SQL33.
   Migration 001–004 telah dikonsolidasikan pada src/db/rls.sql.
@@ -59,8 +61,8 @@ cron baru. Tidak ada email atau push produksi yang dikirim selama pengujian.
   produksi maupun development pada saat pemeriksaan ini.
 - Browser menguji komponen SLJ asli dengan provider sintetis pada lebar
   320/390/768/1366: simpan dan reload salat, rollback, fokus/Escape dialog,
-  catatan Al-Qur’an, hadits, preview terkunci, expiry, onboarding, dan
-  pengaturan admin. Semua permintaan luar fixture diblokir atau dimock.
+  catatan Al-Qur’an, hadits, simpan dan buka ulang jurnal dengan zona Saudi,
+  preview terkunci, akhir trial, onboarding, dan penutupan pendaftaran dari admin. Semua permintaan luar fixture diblokir atau dimock.
 - Halaman publik dari server Next produksi lokal juga diperiksa pada empat
   ukuran: Home, Panduan, Login, dan Daftar.
 - Screenshot dan hasil browser berada di tmp/slj-ui-evidence, bukan aset
@@ -87,7 +89,8 @@ cron baru. Tidak ada email atau push produksi yang dikirim selama pengujian.
        .\tools\deploy-reminder-worker.ps1 -ProjectRef <project-ref-SLJ>
 
    Script memakai --use-api sehingga deploy function tidak memerlukan Docker.
-   --no-verify-jwt mempertahankan mekanisme x-cron-secret yang sudah ada.
+   Worker produksi memakai validasi JWT dari Supabase dan pemeriksaan
+   x-cron-secret dari fungsi. Script mempertahankan kedua pemeriksaan tersebut.
 6. Merge/push kode yang sudah lulus pemeriksaan ke main dan pastikan deployment
    Vercel selesai. Jadwal cron dan seluruh secret yang ada tetap digunakan.
 7. Buka Admin SLJ → Uji coba spiritual, periksa status pendaftaran dan daftar

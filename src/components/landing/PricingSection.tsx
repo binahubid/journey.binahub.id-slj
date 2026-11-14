@@ -57,7 +57,13 @@ const plans = [
   },
 ];
 
-export function PricingSection() {
+export function PricingSection({
+  trialClosed = false,
+  trialHref = "/register",
+}: {
+  trialClosed?: boolean;
+  trialHref?: string;
+}) {
   return (
     <section
       id="pricing"
@@ -113,12 +119,17 @@ export function PricingSection() {
                 ))}
               </ul>
               <Link
-                href={plan.href}
+                href={plan.trial ? trialHref : plan.href}
                 className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-center text-sm font-medium ${plan.trial ? "bg-white text-navy-900 hover:bg-blue-50" : "border border-slate-200 hover:bg-slate-50"}`}
               >
-                {plan.action}
+                {plan.trial && trialClosed ? "Masuk ke akun" : plan.action}
                 <ArrowRight aria-hidden className="h-4 w-4" />
               </Link>
+              {plan.trial && trialClosed && (
+                <p className="mt-3 text-center text-xs leading-5 text-blue-100">
+                  Pendaftaran peserta baru sedang ditutup.
+                </p>
+              )}
             </article>
           ))}
         </div>

@@ -35,7 +35,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_TIME_ZONE, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
+import { DEFAULT_TIME_ZONE, getLocalDateString, getTimeZoneLabel, resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getCanonicalJournalDate, getJournalStreak, getJourneyDayForDate, parseJournalContent, composeJournalContent } from "@/lib/journal";
 
@@ -106,13 +106,14 @@ export default function RefactoredJournalPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("Faisal");
+  const [userName, setUserName] = useState("Peserta");
   const [userLocation, setUserLocation] = useState("Jakarta");
+  const [journalTimeZone, setJournalTimeZone] = useState(DEFAULT_TIME_ZONE);
   const [journeyStartDate, setJourneyStartDate] = useState<string | null>(null);
-  const [dayCount, setDayCount] = useState(24);
-  const [dateFormatted, setDateFormatted] = useState("Rabu, 29 Juli 2026");
+  const [dayCount, setDayCount] = useState(1);
+  const [dateFormatted, setDateFormatted] = useState("");
   const [dailyPrompt, setDailyPrompt] = useState("");
-  const [streakCount, setStreakCount] = useState(18);
+  const [streakCount, setStreakCount] = useState(0);
 
   // Form Inputs
   const [mainReflection, setMainReflection] = useState("");
@@ -122,22 +123,26 @@ export default function RefactoredJournalPage() {
   const [journalIsPrivate, setJournalIsPrivate] = useState(true);
 
   // Live Digital Clock & Adaptive Background
-  const [heroClockHH, setHeroClockHH] = useState<string>("18");
-  const [heroClockMM, setHeroClockMM] = useState<string>("50");
+  const [heroClockHH, setHeroClockHH] = useState<string>("--");
+  const [heroClockMM, setHeroClockMM] = useState<string>("--");
   const [showColon, setShowColon] = useState<boolean>(true);
   const [adaptiveJournalBg, setAdaptiveJournalBg] = useState<string>("/malam-journal.webp");
 
   useEffect(() => {
+    const clockFormat = new Intl.DateTimeFormat("en-GB", {
+      timeZone: journalTimeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    });
     const updateClock = () => {
       const d = new Date();
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
+      const parts = clockFormat.formatToParts(d);
+      const hh = parts.find(part => part.type === "hour")?.value || "00";
+      const mm = parts.find(part => part.type === "minute")?.value || "00";
       setHeroClockHH(hh);
       setHeroClockMM(mm);
       setShowColon(d.getSeconds() % 2 === 0);
 
       // Adaptive background based on time
-      const totalMins = d.getHours() * 60 + d.getMinutes();
+      const totalMins = Number(hh) * 60 + Number(mm);
       if (totalMins >= 240 && totalMins < 360) {
         setAdaptiveJournalBg("/fajar-journal.webp"); // 04:00 - 06:00
       } else if (totalMins >= 360 && totalMins < 660) {
@@ -155,7 +160,7 @@ export default function RefactoredJournalPage() {
     updateClock();
     const interval = setInterval(updateClock, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [journalTimeZone]);
 
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -180,17 +185,24 @@ export default function RefactoredJournalPage() {
 
       // Profile
       const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
-      let currentDay = 24;
-      let fName = "Faisal";
+      const resolvedTimeZone = resolveParticipantTimeZone(
+        profile?.timezone || DEFAULT_TIME_ZONE,
+        profile?.timezone_mode || "AUTO",
+      );
+      setJournalTimeZone(resolvedTimeZone);
+      const startDate = profile?.start_date
+        ? getLocalDateString(new Date(profile.start_date), resolvedTimeZone)
+        : null;
+      let currentDay = 1;
+      const fName = profile?.full_name || "Peserta";
 
       if (profile) {
-        fName = profile.full_name || "Faisal";
         setUserName(fName.split(" ")[0]);
         if (profile.location) {
           setUserLocation(profile.location);
         }
         if (profile.start_date) {
-          setJourneyStartDate(profile.start_date);
+          setJourneyStartDate(startDate);
           const startD = new Date(profile.start_date);
           const diff = Math.floor((Date.now() - startD.getTime()) / 86400000);
           currentDay = Math.max(1, diff + 1);
@@ -199,14 +211,14 @@ export default function RefactoredJournalPage() {
 
       const { data: settings } = await supabase.from("settings").select("journal_privacy_default").eq("user_id", user.id).maybeSingle();
       const privacyDefault = settings?.journal_privacy_default ?? true;
-      const resolvedTimeZone = resolveParticipantTimeZone(profile?.timezone || DEFAULT_TIME_ZONE, profile?.timezone_mode || "AUTO");
 
       setDayCount(currentDay);
       setDailyPrompt(getPromptForDay(currentDay));
 
       const now = new Date();
+      const today = getLocalDateString(now, resolvedTimeZone);
       setDateFormatted(
-        now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+        now.toLocaleDateString("id-ID", { timeZone: resolvedTimeZone, weekday: "long", day: "numeric", month: "long", year: "numeric" })
       );
 
       // Load Journals
@@ -217,20 +229,25 @@ export default function RefactoredJournalPage() {
         .order("created_at", { ascending: false });
 
       if (journals && journals.length > 0) {
-        const todayJournal = journals.find((journal: any) => getCanonicalJournalDate(journal.date || journal.created_at) === getLocalDateString(new Date(), resolvedTimeZone));
+        const todayJournal = journals.find((journal: any) => getCanonicalJournalDate(journal.date || journal.created_at) === today);
         setJournalIsPrivate(todayJournal ? todayJournal.is_private ?? true : privacyDefault);
-        setStreakCount(getJournalStreak(journals.map((journal: any) => journal.date || journal.created_at)));
+        setStreakCount(getJournalStreak(journals.map((journal: any) => journal.date || journal.created_at), today));
         setPosts(
           journals.map((j: any) => {
             const d = new Date(j.created_at || j.date);
-            const dateStr = d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-            const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+            const canonicalDate = getCanonicalJournalDate(j.date) || getLocalDateString(d, resolvedTimeZone);
+            const dateStr = new Date(canonicalDate + "T00:00:00Z").toLocaleDateString("id-ID", {
+              timeZone: "UTC", day: "numeric", month: "long", year: "numeric",
+            });
+            const timeStr = d.toLocaleTimeString("id-ID", {
+              timeZone: resolvedTimeZone, hour: "2-digit", minute: "2-digit",
+            }) + " " + getTimeZoneLabel(resolvedTimeZone);
             const parsed = parseJournalContent(j.content);
 
             return {
               id: j.id,
-              canonicalDate: getCanonicalJournalDate(j.date || j.created_at),
-              dayNumber: getJourneyDayForDate(j.date || j.created_at, profile?.start_date),
+              canonicalDate,
+              dayNumber: getJourneyDayForDate(canonicalDate, startDate),
               dateStr,
               timeStr,
               location: j.location || profile?.location || "Jakarta",
@@ -265,7 +282,7 @@ export default function RefactoredJournalPage() {
 
   const handleSaveReflection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mainReflection.trim()) return;
+    if (saving || !mainReflection.trim()) return;
 
     setSaving(true);
     setSaveError(null);
@@ -283,7 +300,9 @@ export default function RefactoredJournalPage() {
         profileTimeZone?.timezone_mode || "AUTO"
       );
       const todayStr = getLocalDateString(now, resolvedTimeZone);
-      const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+      const timeStr = now.toLocaleTimeString("id-ID", {
+        timeZone: resolvedTimeZone, hour: "2-digit", minute: "2-digit",
+      }) + " " + getTimeZoneLabel(resolvedTimeZone);
 
       const combinedContent = composeJournalContent(mainReflection, pelajaran, perbaikanBesok);
 
@@ -310,7 +329,7 @@ export default function RefactoredJournalPage() {
           id: data.id,
           canonicalDate: todayStr,
           dayNumber: getJourneyDayForDate(todayStr, journeyStartDate) || dayCount,
-          dateStr: now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+          dateStr: now.toLocaleDateString("id-ID", { timeZone: resolvedTimeZone, day: "numeric", month: "long", year: "numeric" }),
           timeStr,
           location: userLocation,
           userFullName: userName,
@@ -325,6 +344,7 @@ export default function RefactoredJournalPage() {
         };
 
         setPosts(prev => [newPost, ...prev.filter(post => post.canonicalDate !== todayStr)]);
+        setStreakCount(getJournalStreak([...posts.map(post => post.canonicalDate), todayStr], todayStr));
         setMainReflection("");
         setPelajaran("");
         setPerbaikanBesok("");
@@ -403,7 +423,7 @@ export default function RefactoredJournalPage() {
                     {/* Sisi Kanan Atas: Jam WIB 18:50 (WIB di kiri, titik dua berkedip) */}
                     <div className="flex items-center gap-1.5 text-right">
                       <span className="text-[10px] sm:text-xs font-mono font-bold text-amber-900 bg-amber-400 px-1.5 py-0.5 rounded shadow-2xs">
-                        WIB
+                        {getTimeZoneLabel(journalTimeZone)}
                       </span>
                       <div className="text-2xl sm:text-5xl font-black text-white font-mono tracking-tighter leading-none drop-shadow-lg flex items-center">
                         <span>{heroClockHH}</span>
@@ -486,6 +506,7 @@ export default function RefactoredJournalPage() {
                   <div className="relative">
                     <Textarea
                       rows={4}
+                      aria-label="Refleksi hari ini"
                       maxLength={1000}
                       value={mainReflection}
                       onChange={e => setMainReflection(e.target.value)}
@@ -627,6 +648,7 @@ export default function RefactoredJournalPage() {
                         rows={2}
                         maxLength={500}
                         value={perbaikanBesok}
+                      aria-label="Rencana perbaikan besok"
                         onChange={e => setPerbaikanBesok(e.target.value)}
                         placeholder="Tuliskan komitmen perbaikan..."
                         className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3 placeholder:text-slate-400 placeholder:italic font-serif bg-white"

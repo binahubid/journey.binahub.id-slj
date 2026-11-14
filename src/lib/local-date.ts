@@ -96,5 +96,6 @@ export function getTimeZoneLabel(timeZone: string): string {
   if (normalized === "Asia/Jakarta") return "WIB";
   if (normalized === "Asia/Makassar") return "WITA";
   if (normalized === "Asia/Jayapura") return "WIT";
+  if (normalized === "Asia/Riyadh") return "Waktu Saudi";
   return normalized;
 }

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import re
 import threading
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "tmp/trial-ui-fixture/dist"
@@ -87,7 +87,7 @@ with sync_playwright() as playwright:
                 assert dialog.evaluate("(element) => element.contains(document.activeElement)"), "Focus escaped the dialog"
             page.keyboard.press("Escape")
             assert not dialog.is_visible()
-            assert sunnah.evaluate("(element) => element === document.activeElement"), "Focus did not return to the opener"
+            expect(sunnah).to_be_focused()
             page.get_by_role("button", name="Al-Qur’an", exact=True).click()
             page.get_by_role("button", name="Catat Bacaan", exact=True).click()
             page.get_by_label("Nama surah", exact=True).fill("Al-Fatihah")
@@ -99,6 +99,20 @@ with sync_playwright() as playwright:
             mark = page.get_by_role("button", name="Tandai dibaca", exact=True)
             mark.click()
             page.get_by_role("button", name="Sudah dibaca", exact=True).wait_for()
+            page.get_by_role("button", name="Refleksi", exact=True).click()
+            page.get_by_role("link", name="Buka jurnal refleksi", exact=True).click()
+            page.get_by_role("heading", name="Refleksi Hari Ini", exact=True).wait_for()
+            page.get_by_text("Waktu Saudi", exact=True).wait_for()
+            page.get_by_role("textbox", name="Refleksi hari ini", exact=True).fill("Refleksi peserta demo")
+            page.get_by_role("textbox", name="Rencana perbaikan besok", exact=True).fill("Rencana peserta demo")
+            page.get_by_role("button", name="Simpan Refleksi Hari Ini", exact=True).click()
+            page.get_by_role("button", name=re.compile(r"Refleksi peserta demo")).wait_for()
+            page.reload()
+            page.get_by_role("button", name=re.compile(r"Refleksi peserta demo")).click()
+            page.get_by_role("dialog").get_by_text("Rencana peserta demo", exact=True).wait_for()
+            no_overflow()
+            page.screenshot(path=str(OUTPUT / f"journal-{width}.png"))
+            visit("/trial")
             page.get_by_role("button", name="Pengembangan diri", exact=False).click()
             page.get_by_role("dialog").get_by_role("heading", name="Pengembangan diri").wait_for()
             page.keyboard.press("Escape")
@@ -108,7 +122,7 @@ with sync_playwright() as playwright:
                 opener.click()
                 page.get_by_role("dialog").wait_for()
                 page.keyboard.press("Escape")
-                assert opener.evaluate("(element) => element === document.activeElement")
+                expect(opener).to_be_focused()
             page.evaluate("sessionStorage.clear()")
             visit("/trial?scenario=expired")
             page.get_by_role("heading", name="Langkah kecil Anda berarti.").wait_for()
@@ -135,6 +149,13 @@ with sync_playwright() as playwright:
             page.get_by_role("status").get_by_text("Pengaturan tersimpan.").wait_for()
             page.get_by_text("Ditutup", exact=True).wait_for()
             page.screenshot(path=str(OUTPUT / f"admin-trials-{width}.png"), full_page=True)
+            visit("/")
+            page.get_by_text("Pendaftaran peserta baru sedang ditutup.", exact=True).wait_for()
+            assert page.get_by_role("link", name="Coba 14 hari gratis", exact=True).count() == 0
+            page.evaluate("sessionStorage.removeItem('access')")
+            visit("/onboarding?scenario=none")
+            page.get_by_text("Pendaftaran uji coba sedang ditutup.", exact=False).wait_for()
+            assert page.get_by_role("button", name="Mulai 14 hari gratis", exact=True).count() == 0
             visit("/panduan")
             page.get_by_role("heading", name="Siapkan agar nyaman dipakai setiap hari").wait_for()
             no_overflow()
@@ -144,7 +165,7 @@ with sync_playwright() as playwright:
             page.screenshot(path=str(OUTPUT / f"pricing-{width}.png"), full_page=True)
             assert not errors, errors
             assert not external, external
-            results.append({"width": width, "passed": True, "checks": ["persistence","failed-save rollback","focus trap","Escape","focus restoration","Quran save","hadith save","locked preview","expiry","activation","admin settings","guide","pricing","no overflow"]})
+            results.append({"width": width, "passed": True, "checks": ["persistence","failed-save rollback","focus trap","Escape","focus restoration","Quran save","hadith save","journal save in Saudi timezone","locked preview","expiry","activation","admin settings","closed enrollment","guide","pricing","no overflow"]})
             context.close()
     finally:
         browser.close()

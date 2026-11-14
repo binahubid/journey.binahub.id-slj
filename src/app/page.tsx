@@ -47,20 +47,28 @@ import { PricingSection } from "@/components/landing/PricingSection";
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [trialClosed, setTrialClosed] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     try {
       const supabase = createClient();
-      supabase.auth.getUser().then(({ data }) => {
-        if (data?.user) {
-          setIsLoggedIn(true);
+      void supabase.auth.getUser().then(({ data }) => {
+        if (!cancelled && data?.user) setIsLoggedIn(true);
+      });
+      void supabase.rpc("slj_trial_offer").then(({ data, error }) => {
+        if (!cancelled && !error && typeof data?.enabled === "boolean") {
+          setTrialClosed(!data.enabled);
         }
       });
     } catch {
       // Safe fallback if env variables or auth client fail
     }
+    return () => { cancelled = true; };
   }, []);
 
+  const startHref = isLoggedIn ? "/dashboard" : trialClosed ? "/login" : "/register";
+  const startLabel = isLoggedIn ? "Buka perjalanan" : trialClosed ? "Masuk" : "Coba 14 hari gratis";
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
   };
@@ -173,10 +181,8 @@ export default function LandingPage() {
 
           {/* Action Button */}
           <div className="flex items-center space-x-4">
-            <Link href={isLoggedIn ? "/dashboard" : "/register"}>
-              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] bg-[#0F1E3D] hover:bg-[#07132B] text-white text-[9px] min-[375px]:text-[10px] md:text-[11px] font-extrabold uppercase tracking-[0.1em] min-[375px]:tracking-[0.14em] px-3 min-[375px]:px-4 sm:px-6 py-2.5 shadow-[0_18px_42px_-20px_rgba(15,30,61,0.8)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95">
-                {isLoggedIn ? "Dashboard" : "Coba 14 hari gratis"}
-              </button>
+            <Link href={startHref} className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[9px] bg-[#0F1E3D] px-3 py-2 text-xs font-semibold text-white hover:bg-[#07132B] sm:px-6">
+              {startLabel}
             </Link>
           </div>
         </div>
@@ -232,10 +238,8 @@ export default function LandingPage() {
 
               {/* CTAs */}
               <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-                <Link href={isLoggedIn ? "/dashboard" : "/register"}>
-                  <button className="inline-flex h-11 md:h-12 items-center justify-center gap-2 rounded-[9px] bg-[#0F1E3D] px-6 sm:px-7 text-[10px] md:text-[12px] font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_22px_56px_-30px_rgba(15,30,61,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#07132B] active:scale-95 w-full sm:w-auto">
-                    {isLoggedIn ? "Ke Dashboard" : "Coba 14 hari gratis"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
-                  </button>
+                <Link href={startHref} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[9px] bg-[#0F1E3D] px-6 text-sm font-semibold text-white hover:bg-[#07132B] sm:w-auto sm:px-7 md:h-12">
+                  {startLabel} <ArrowRight aria-hidden className="h-4 w-4 text-[#C79A3C]" />
                 </Link>
                 <a href="https://wa.me/628118494545" target="_blank" rel="noopener noreferrer">
                   <button className="inline-flex h-11 md:h-12 items-center justify-center gap-2 rounded-[9px] border border-[#0F1E3D]/20 bg-white/80 px-6 sm:px-7 text-[10px] md:text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#0F1E3D] shadow-[0_18px_54px_-38px_rgba(15,30,61,0.5)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#0F1E3D]/40 hover:bg-white w-full sm:w-auto">
@@ -1080,7 +1084,7 @@ export default function LandingPage() {
         </section>
 
         {/* ─── 11. PRICING & INVESTASI SECTION ─── */}
-        <PricingSection />
+        <PricingSection trialClosed={trialClosed} trialHref={startHref} />
 
         {/* ─── 12. FAQ SECTION ─── */}
         <section id="faq" className="py-14 sm:py-20 md:py-28 px-5 sm:px-6 md:px-12 lg:px-16 bg-[#FAF8F4] relative border-t border-[#EAE5D9] w-full">
@@ -1154,10 +1158,8 @@ export default function LandingPage() {
               Daftarkan diri Anda atau jadwalkan Discovery Session bersama tim BinaJourney.
             </p>
             <div className="pt-3 sm:pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
-              <Link href={isLoggedIn ? "/dashboard" : "/register"}>
-                <button className="bg-[#0F1E3D] hover:bg-[#07132B] text-white text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] px-7 py-3.5 sm:px-8 sm:py-4 rounded-full shadow-xl transition-all duration-300 hover:-translate-y-0.5 active:scale-95 inline-flex items-center justify-center gap-2 w-full sm:w-auto">
-                  {isLoggedIn ? "Ke Dashboard" : "Mulai Transformasi Sekarang"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
-                </button>
+              <Link href={startHref} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#0F1E3D] px-7 py-3.5 text-sm font-semibold text-white hover:bg-[#07132B] sm:w-auto sm:px-8">
+                {startLabel} <ArrowRight aria-hidden className="h-4 w-4 text-[#C79A3C]" />
               </Link>
               <a href="https://wa.me/628118494545" target="_blank" rel="noopener noreferrer">
                 <button className="border border-[#0F1E3D]/20 bg-white/90 text-[#0F1E3D] hover:border-[#0F1E3D]/40 hover:bg-white text-[10px] sm:text-xs font-bold uppercase tracking-[0.16em] px-6 py-3 sm:px-7 sm:py-3.5 rounded-full shadow-xs transition-all duration-300 hover:-translate-y-0.5 inline-flex items-center justify-center gap-2 w-full sm:w-auto">

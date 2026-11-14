@@ -14,7 +14,7 @@ if (-not $PSCmdlet.ShouldProcess($ProjectRef, 'Deploy Edge Function send-user-re
 
 Push-Location -LiteralPath $sljRepository
 try {
-    & supabase functions deploy send-user-reminders --project-ref $ProjectRef --no-verify-jwt --use-api
+    & supabase functions deploy send-user-reminders --project-ref $ProjectRef --use-api
     if ($LASTEXITCODE -ne 0) {
         throw 'Deployment belum berhasil. Jalankan supabase login melalui browser, pastikan project SLJ benar, lalu ulangi. Jangan mengirim token di chat.'
     }
