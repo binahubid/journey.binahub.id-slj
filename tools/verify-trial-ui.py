@@ -72,6 +72,10 @@ with sync_playwright() as playwright:
                 # Swipe the target above the fixed mobile dock before testing a real hit.
                 detail.evaluate("element => element.scrollIntoView({block:'center',behavior:'instant'})")
                 detail.click()
+            def quran_action_fits():
+                panel = page.locator("#dashboard-quran").bounding_box()
+                action = page.get_by_role("button", name="Catat Bacaan", exact=True).bounding_box()
+                assert action["x"] >= panel["x"] and action["x"] + action["width"] <= panel["x"] + panel["width"]
             visit("/trial")
             page.get_by_test_id("adaptive-journey-hero").wait_for()
             hero = page.get_by_test_id("adaptive-journey-hero")
@@ -114,12 +118,14 @@ with sync_playwright() as playwright:
             assert not dialog.is_visible()
             expect(sunnah).to_be_focused()
             widget("Tilawah")
+            quran_action_fits()
             page.get_by_role("button", name="Catat Bacaan", exact=True).click()
             page.get_by_label("Nama surah", exact=True).fill("Al-Fatihah")
             page.get_by_label("Dari ayat", exact=True).fill("1")
             page.get_by_label("Sampai ayat", exact=True).fill("7")
             page.get_by_role("button", name="Simpan Bacaan", exact=True).click()
             page.get_by_label("Riwayat bacaan Al-Qur’an").get_by_text("Al-Fatihah", exact=True).wait_for()
+            quran_action_fits()
             expect(hero.get_by_text("1/4", exact=True)).to_be_visible()
             widget("Hadits")
             mark = page.get_by_role("button", name="Tandai dibaca", exact=True)

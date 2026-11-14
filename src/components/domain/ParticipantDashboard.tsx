@@ -1308,16 +1308,10 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
           </Card>
           </section>
           <section id="dashboard-hadith" aria-label="Hadits" className={widgetPanelClass("hadith")}>
-            <div className="relative">
-            <button type="button" aria-label="Lihat ringkasan baca hadits" onClick={() => setHadithAnalyticsOpen(true)} className="absolute right-3 top-3 z-20 flex size-11 items-center justify-center rounded-xl bg-white text-slate-600 hover:bg-slate-100"><BarChart3 aria-hidden className="size-4" /></button>
             <DailyHadithWidget userId={userId} timeZone={userTimeZone} onReadChange={isTrial ? setTrialHadithRead : undefined} />
-          </div>
           </section>
           <section id="dashboard-quran" aria-label="Tilawah Al-Qur’an" className={widgetPanelClass("quran")}>
-            <div className="relative">
-            <button type="button" aria-label="Lihat ringkasan bacaan Al-Qur’an" onClick={() => setQuranAnalyticsOpen(true)} className="absolute right-3 top-3 z-20 flex size-11 items-center justify-center rounded-xl bg-white text-slate-600 hover:bg-slate-100"><BarChart3 aria-hidden className="size-4" /></button>
             <QuranTracker userId={userId} timeZone={userTimeZone} onQuranLogged={handleQuranLoggedFromTracker} />
-          </div>
           </section>
           <section id="dashboard-journal" aria-label="Jurnal" className={widgetPanelClass("journal")}>
             <Card className="group bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5 transition-shadow hover:shadow-[0_12px_30px_rgba(15,23,42,0.06)]">

@@ -151,9 +151,9 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
 
   return (
     <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-warm-border/60 pb-3">
-        <div className="flex items-center space-x-3">
-          <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warm-border/60 pb-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="h-8 w-8 shrink-0 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
             <BookOpen className="h-4 w-4" />
           </div>
           <div>
@@ -162,7 +162,7 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           {hasReadToday && (
             <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Telah Membaca Hari Ini
