@@ -106,7 +106,14 @@
   scrollbar-color: rgba(199, 154, 60, 0.85) transparent;
 }
 
-/* Tighter product geometry: reserve full pills for badges and circular controls. */
-.rounded-3xl { border-radius: 0.875rem !important; }
-.rounded-2xl { border-radius: 0.75rem !important; }
-.rounded-xl { border-radius: 0.5rem !important; }
+/* Product controls respect component sizing and remain visible to keyboard users. */
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible { outline: 2px solid #0B2C6B; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

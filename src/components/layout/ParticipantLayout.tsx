@@ -1,27 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { usePwaInstall } from "@/components/pwa/PwaProvider";
 import {
   LayoutDashboard,
   Compass,
   BookOpen,
   TrendingUp,
-  Users,
+  UserRound,
   Settings,
   Bell,
   Menu,
   LogOut,
-  X,
-  ChevronRight,
-  ShieldCheck,
   ArrowLeft,
   Brain,
   Sparkles,
+  CircleHelp,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { getSljAccess } from "@/lib/program-access";
+import { usePwaInstall } from "@/components/pwa/PwaProvider";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ParticipantLayoutProps {
   children: React.ReactNode;
@@ -44,376 +49,288 @@ export function ParticipantLayout({
   const router = useRouter();
   const supabase = createClient();
   const { updateBadge } = usePwaInstall();
-  const currentPath = activePath || pathname;
-
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userName, setUserName] = useState("Peserta SLJ");
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [mobileMenuOpen]);
-
-  // Sync badge app icon setiap jumlah unread berubah.
-  useEffect(() => {
-    updateBadge(unreadNotifications);
-  }, [unreadNotifications, updateBadge]);
-
-  // SW minta re-sync badge setelah notifikasi diklik/dibuka.
-  useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === "SYNC_BADGE") updateBadge(unreadNotifications);
-    };
-    navigator.serviceWorker.addEventListener("message", onMessage);
-    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, [updateBadge, unreadNotifications]);
+  const current = activePath || pathname;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [userName, setUserName] = useState("Peserta");
+  const [isTrial, setIsTrial] = useState(pathname === "/trial");
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    async function loadUser() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
+    setMenuOpen(false);
+  }, [pathname]);
+  useEffect(() => {
+    updateBadge(unread);
+  }, [unread, updateBadge]);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const [{ data: profile }, { count }] = await Promise.all([
+        supabase
           .from("profiles")
           .select("full_name")
           .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (profile?.full_name) {
-          setUserName(profile.full_name);
-        } else if (user.email) {
-          setUserName(user.email.split("@")[0]);
-        }
-
-        const { count } = await supabase
+          .maybeSingle(),
+        supabase
           .from("notifications")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
-          .eq("is_read", false);
-        setUnreadNotifications(count || 0);
+          .eq("is_read", false),
+      ]);
+      if (cancelled) return;
+      setUserName(profile?.full_name || user.email?.split("@")[0] || "Peserta");
+      setUnread(count || 0);
+      try {
+        const access = await getSljAccess(supabase);
+        if (!cancelled && access) setIsTrial(access.kind === "trial");
+      } catch {
+        /* Middleware handles access failures before private pages are rendered. */
       }
     }
-    loadUser();
+    void load();
+    const focus = () => {
+      void load();
+    };
+    const message = (event: MessageEvent) => {
+      if (event.data?.type === "SYNC_BADGE") void load();
+    };
+    window.addEventListener("focus", focus);
+    navigator.serviceWorker?.addEventListener("message", message);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", focus);
+      navigator.serviceWorker?.removeEventListener("message", message);
+    };
   }, [supabase]);
 
-  const handleLogout = async () => {
+  const home = isTrial ? "/trial" : "/dashboard";
+  const trialNav = [
+    { href: "/trial", label: "Beranda", icon: LayoutDashboard },
+    { href: "/journal", label: "Jurnal", icon: BookOpen },
+    { href: "/panduan", label: "Panduan", icon: CircleHelp },
+    { href: "/profile", label: "Profil", icon: UserRound },
+  ];
+  const nav = isTrial
+    ? trialNav
+    : [
+        { href: "/dashboard", label: "Beranda", icon: LayoutDashboard },
+        { href: "/journey", label: "Rencana perubahan", icon: Compass },
+        { href: "/monitoring", label: "Progres & evaluasi", icon: TrendingUp },
+        { href: "/journal", label: "Jurnal refleksi", icon: BookOpen },
+        {
+          href: "/initial-process",
+          label: "Persiapan perjalanan",
+          icon: Sparkles,
+        },
+        { href: "/baseline", label: "Kenali diri", icon: Brain },
+        { href: "/panduan", label: "Panduan", icon: CircleHelp },
+      ];
+  const bottomNav = isTrial
+    ? trialNav
+    : [
+        { href: "/dashboard", label: "Beranda", icon: LayoutDashboard },
+        { href: "/journey", label: "Rencana", icon: Compass },
+        { href: "/monitoring", label: "Progres", icon: TrendingUp },
+        { href: "/journal", label: "Jurnal", icon: BookOpen },
+        { href: "/profile", label: "Profil", icon: UserRound },
+      ];
+  const showDock = !current?.startsWith("/baseline");
+  async function logout() {
     await supabase.auth.signOut();
-    router.push("/login");
+    router.replace("/login");
     router.refresh();
-  };
-
-  const navItems = [
-    { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-    { href: "/journey", label: "Journey (PTP)", icon: Compass },
-    { href: "/monitoring", label: "Monitoring", icon: TrendingUp },
-    { href: "/journal", label: "Journal", icon: BookOpen },
-    { href: "/initial-process", label: "Initial Process", icon: Sparkles },
-    { href: "/baseline", label: "Baseline Self-Discovery", icon: Brain },
-    { href: "/notifications", label: "Notifikasi", icon: Bell },
-  ];
-
-  const bottomNavItems = [
-    { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-    { href: "/journey", label: "Journey", icon: Compass },
-    { href: "/monitoring", label: "Monitoring", icon: TrendingUp },
-    { href: "/journal", label: "Journal", icon: BookOpen },
-    { href: "/profile", label: "Profil", icon: Users },
-  ];
+  }
+  const navigation = (
+    <nav aria-label="Menu peserta" className="space-y-1">
+      {nav.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={() => setMenuOpen(false)}
+          aria-current={current === item.href ? "page" : undefined}
+          className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm ${current === item.href ? "bg-blue-50 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}
+        >
+          <item.icon aria-hidden className="h-[18px] w-[18px] shrink-0" />
+          {item.label}
+        </Link>
+      ))}
+    </nav>
+  );
+  const secondary = (
+    <div className="space-y-1 border-t border-slate-100 pt-4">
+      <Link
+        href="/settings"
+        onClick={() => setMenuOpen(false)}
+        className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm text-slate-600 hover:bg-slate-50"
+      >
+        <Settings className="h-[18px] w-[18px]" />
+        Pengaturan
+      </Link>
+      <Link
+        href="/terms"
+        onClick={() => setMenuOpen(false)}
+        className="flex min-h-11 items-center px-3 text-xs text-slate-500"
+      >
+        Syarat & privasi
+      </Link>
+      <button
+        type="button"
+        onClick={() => void logout()}
+        className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-red-700 hover:bg-red-50"
+      >
+        <LogOut className="h-[18px] w-[18px]" />
+        Keluar
+      </button>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-warm-bg text-navy-900 font-sans flex flex-col md:flex-row">
-      {/* ─── DESKTOP LEFT SIDEBAR (Hidden on Mobile) ─── */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-warm-border p-5 flex-col justify-between shrink-0 h-screen sticky top-0 z-30">
-        <div className="space-y-6">
-          <div className="flex items-center space-x-3 px-2">
-            <Link href="/" className="inline-block py-1">
-              <img
-                src="/BinaJourney_logo.webp"
-                alt="BinaJourney Logo"
-                className="h-8 sm:h-9 w-auto object-contain"
-              />
-            </Link>
-          </div>
-
-          <nav className="space-y-1 text-xs font-semibold">
-            {navItems.map((item) => {
-              const isActive = currentPath === item.href;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-amber-100/80 text-navy-900 font-bold"
-                      : "text-gray-600 hover:bg-warm-bg hover:text-navy-900"
-                  }`}
-                >
-                  <Icon className={`h-4 w-4 ${isActive ? "text-accent" : "text-gray-400"}`} />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="pt-6 border-t border-warm-border space-y-1 text-xs font-semibold text-gray-500">
+    <div className="flex min-h-dvh bg-[#F5F7FB] font-sans text-navy-900">
+      <a
+        href="#participant-content"
+        className="sr-only z-[400] rounded-lg bg-white p-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        Langsung ke isi halaman
+      </a>
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col justify-between gap-7 overflow-y-auto border-r border-slate-200 bg-white p-5 lg:flex">
+        <div>
           <Link
-            href="/profile"
-            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-              currentPath === "/profile" ? "bg-amber-100/80 text-navy-900 font-bold" : "hover:bg-warm-bg hover:text-navy-900"
-            }`}
+            href={home}
+            className="mb-8 inline-flex min-h-11 items-center px-2"
           >
-            <Users className="h-4 w-4 text-gray-400" />
-            <span>Profil Saya</span>
-          </Link>
-          <Link
-            href="/settings"
-            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-              currentPath === "/settings" ? "bg-amber-100/80 text-navy-900 font-bold" : "hover:bg-warm-bg hover:text-navy-900"
-            }`}
-          >
-            <Settings className="h-4 w-4 text-gray-400" />
-            <span>Pengaturan</span>
-          </Link>
-          <Link
-            href="/terms"
-            target="_blank"
-            className="flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors hover:bg-warm-bg hover:text-navy-900"
-          >
-            <ShieldCheck className="h-4 w-4 text-gray-400" />
-            <span>Syarat &amp; Ketentuan</span>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="flex items-center space-x-3 w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors text-left"
-          >
-            <LogOut className="h-4 w-4 text-red-500" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* ─── MOBILE TOP HEADER (Hidden on Desktop) ─── */}
-      <header className="flex md:hidden h-16 bg-white border-b border-warm-border px-4 items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2 -ml-2 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
-            aria-label="Open Mobile Menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <Link href="/" className="inline-block py-1">
             <img
               src="/BinaJourney_logo.webp"
-              alt="BinaJourney Logo"
-              className="h-7 w-auto object-contain"
+              alt="BinaJourney"
+              className="h-8 w-auto"
             />
           </Link>
+          {navigation}
         </div>
-
-        <div className="flex items-center space-x-2">
-          <Link href="/notifications" className="relative p-2 text-slate-600 hover:text-navy-900" aria-label={`Notifikasi${unreadNotifications ? `, ${unreadNotifications} belum dibaca` : ""}`}>
-            <Bell className="h-5 w-5" />
-            {unreadNotifications > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black text-white ring-2 ring-white">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span>}
-          </Link>
-          <Link href="/profile" className="flex items-center space-x-2 pl-1">
-            <div className="h-7 w-7 rounded-full bg-navy-900 text-accent font-bold flex items-center justify-center text-xs border border-accent">
-              {userName.charAt(0).toUpperCase()}
-            </div>
-          </Link>
-        </div>
-      </header>
-
-      {/* ─── MOBILE DRAWER (Slide-out Sheet Menu) ─── */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex h-[100dvh] w-full overflow-hidden md:hidden">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <div className="relative w-4/5 max-w-xs bg-white h-full p-5 flex flex-col justify-between shadow-2xl z-10 overflow-y-auto">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <img
-                  src="/BinaJourney_logo.webp"
-                  alt="BinaJourney Logo"
-                  className="h-8 w-auto object-contain"
-                />
+        {secondary}
+      </aside>
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-40 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-sm sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2">
+            <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
+              <DialogTrigger asChild>
                 <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  type="button"
+                  aria-label="Buka menu peserta"
+                  className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden"
                 >
-                  <X className="h-5 w-5" />
+                  <Menu className="h-5 w-5" />
                 </button>
-              </div>
-
-              <div className="px-1.5 py-2 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center space-x-2.5">
-                <div className="h-9 w-9 rounded-full bg-navy-900 text-accent font-bold flex items-center justify-center text-xs shrink-0">
-                  {userName.charAt(0).toUpperCase()}
+              </DialogTrigger>
+              <DialogContent className="left-0 top-0 flex h-dvh max-h-dvh w-[min(20rem,88vw)] max-w-none translate-x-0 translate-y-0 flex-col justify-between rounded-none border-y-0 border-l-0 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+                <div>
+                  <DialogTitle className="mb-6 flex min-h-11 items-center">
+                    <img
+                      src="/BinaJourney_logo.webp"
+                      alt="Menu BinaJourney"
+                      className="h-8 w-auto"
+                    />
+                  </DialogTitle>
+                  <p className="mb-1 break-words px-3 text-sm font-semibold">
+                    {userName}
+                  </p>
+                  <p className="mb-6 px-3 text-xs text-slate-500">
+                    {isTrial
+                      ? "Uji coba spiritual · 14 hari"
+                      : "Spiritual Leadership Journey"}
+                  </p>
+                  {navigation}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-navy-900 truncate">{userName}</p>
-                  <p className="text-[10px] text-slate-500 font-medium">BinaJourney 90 Hari</p>
-                </div>
-              </div>
-
-              <nav className="space-y-1 text-xs font-semibold">
-                {navItems.map((item) => {
-                  const isActive = currentPath === item.href;
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center justify-between px-3.5 py-3 rounded-xl transition-all ${
-                        isActive
-                          ? "bg-amber-100 text-navy-900 font-bold shadow-2xs"
-                          : "text-slate-600 hover:bg-warm-bg"
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Icon className={`h-4 w-4 ${isActive ? "text-accent" : "text-slate-400"}`} />
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-slate-300" />
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 space-y-1 text-xs font-semibold text-slate-600">
-              <Link
-                href="/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-warm-bg"
-              >
-                <Users className="h-4 w-4 text-slate-400" />
-                <span>Profil Saya</span>
-              </Link>
-              <Link
-                href="/settings"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-warm-bg"
-              >
-                <Settings className="h-4 w-4 text-slate-400" />
-                <span>Pengaturan</span>
-              </Link>
-              <Link
-                href="/terms"
-                target="_blank"
-                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-warm-bg"
-              >
-                <ShieldCheck className="h-4 w-4 text-slate-400" />
-                <span>Syarat &amp; Ketentuan</span>
-              </Link>
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLogout();
-                }}
-                className="flex items-center space-x-3 w-full px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 text-left"
-              >
-                <LogOut className="h-4 w-4 text-red-500" />
-                <span>Logout</span>
-              </button>
-            </div>
+                {secondary}
+              </DialogContent>
+            </Dialog>
+            <Link
+              href={home}
+              className="inline-flex min-h-11 items-center lg:hidden"
+            >
+              <img
+                src="/BinaJourney_logo.webp"
+                alt="BinaJourney"
+                className="h-7 w-auto"
+              />
+            </Link>
+            <p className="hidden truncate text-sm font-medium text-slate-600 lg:block">
+              {pageTitle || "Spiritual Leadership Journey"}
+            </p>
           </div>
-        </div>
-      )}
-
-      {/* ─── MAIN CONTENT AREA ─── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Desktop Top Sub-header (Left: Back to Home, Right: Bell, Avatar, Full Name) */}
-        <header className="hidden md:flex h-16 bg-white border-b border-warm-border px-8 items-center justify-between sticky top-0 z-20">
-          <div />
-          <div className="flex items-center space-x-5">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <Link
               href="/notifications"
-              className="relative p-2 text-slate-500 hover:text-navy-900 transition-colors bg-warm-bg rounded-full hover:bg-slate-200/60"
-              title="Notifikasi"
+              aria-label={`Notifikasi${unread ? `, ${unread} belum dibaca` : ""}`}
+              className="relative flex h-11 w-11 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
             >
-              <Bell className="h-4 w-4" />
-               {unreadNotifications > 0 && <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white"></span>}
+              <Bell className="h-5 w-5" />
+              {unread > 0 && (
+                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-navy-900 px-1 text-[9px] font-semibold text-white ring-2 ring-white">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
             </Link>
             <Link
               href="/profile"
-              className="flex items-center space-x-2.5 hover:opacity-85 transition-opacity py-1 px-2 rounded-xl hover:bg-warm-bg/70"
+              aria-label="Profil saya"
+              className="flex min-h-11 items-center gap-2"
             >
-              <div className="h-9 w-9 rounded-full bg-navy-900 text-amber-300 font-extrabold flex items-center justify-center text-xs overflow-hidden border-2 border-amber-400/40 shadow-2xs shrink-0">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-navy-900">
                 {userName.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-xs font-bold text-navy-900 tracking-tight">{userName}</span>
-              <ChevronRight className="h-3.5 w-3.5 text-slate-400 rotate-90 ml-0.5" />
+              </span>
+              <span className="hidden max-w-48 truncate text-sm font-medium sm:block">
+                {userName}
+              </span>
             </Link>
           </div>
         </header>
-
-        {/* Page Content */}
-        <main className={`flex-1 overflow-x-hidden ${noPadding ? "" : "p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8"}`}>
-          {/* Back to Home bar — shown on pages except Home or when hidden explicitly */}
-          {!hideBackToHome && currentPath !== "/dashboard" && (
-            <div className="mb-4 md:mb-6">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center space-x-1.5 text-xs font-bold text-slate-600 hover:text-navy-900 bg-white border border-warm-border px-3 py-1.5 rounded-full shadow-2xs transition-colors hover:border-navy-900/30"
-              >
-                <ArrowLeft className="h-3.5 w-3.5 text-amber-600" />
-                <span>Kembali ke Home</span>
-              </Link>
-            </div>
+        <main
+          id="participant-content"
+          className={`${noPadding ? "" : "p-4 sm:p-6 lg:p-8"} ${showDock ? "pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8" : ""}`}
+        >
+          {!hideBackToHome && current !== home && (
+            <Link
+              href={home}
+              className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-slate-600"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Kembali ke beranda
+            </Link>
           )}
           {children}
         </main>
-
-        {/* Professional Clean Footer (Desktop Only) */}
         {!hideFooter && (
-          <footer className="hidden md:block border-t border-warm-border bg-white py-4 px-6 md:px-12 text-xs text-slate-500">
-            <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-              <div className="flex items-center space-x-2.5">
-                <img src="/BinaJourney_logo.webp" alt="BinaJourney Logo" className="h-5 w-auto object-contain" />
-                <span className="text-slate-300">•</span>
-                <span className="text-[11px] font-semibold text-slate-600">Spiritual Leadership Journey (SLJ)</span>
-              </div>
-              <div className="flex items-center gap-4 text-[11px] font-medium text-slate-500">
-                <Link href="/journey" className="hover:text-navy-900 transition-colors">Personal Transformation Project</Link>
-                <Link href="/profile" className="hover:text-navy-900 transition-colors">Profil Peserta</Link>
-                <span>&copy; {new Date().getFullYear()} BinaHub</span>
-              </div>
-            </div>
+          <footer className="hidden items-center justify-between gap-3 border-t border-slate-200 px-8 py-5 text-xs text-slate-500 lg:flex">
+            <span>© {new Date().getFullYear()} BinaHub</span>
+            <Link href="/panduan" className="underline underline-offset-4">
+              Panduan penggunaan
+            </Link>
           </footer>
         )}
       </div>
-
-      {/* ─── MOBILE BOTTOM DOCK NAVIGATION (Hidden on Baseline Page) ─── */}
-      {!currentPath?.startsWith("/baseline") && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-warm-border bg-white/95 px-1 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] shadow-lg backdrop-blur-md md:hidden">
-          {bottomNavItems.map((item) => {
-            const isActive = currentPath === item.href;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex min-w-0 flex-1 flex-col items-center rounded-lg px-1 py-1 transition-colors ${
-                  isActive ? "text-[#0B2C6B] font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
-                }`}
+      {showDock && (
+        <nav
+          aria-label="Navigasi utama"
+          className="fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-sm lg:hidden"
+        >
+          {bottomNav.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={current === item.href ? "page" : undefined}
+              className={`flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] ${current === item.href ? "font-semibold text-navy-900" : "text-slate-500"}`}
+            >
+              <span
+                className={`flex h-7 w-12 items-center justify-center rounded-full ${current === item.href ? "bg-blue-50" : ""}`}
               >
-                <Icon className={`h-5 w-5 mb-0.5 ${isActive ? "text-[#C79A3C]" : "text-slate-400"}`} />
-                <span className="max-w-full truncate text-[9px] tracking-tight min-[375px]:text-[10px]">{item.label}</span>
-              </Link>
-            );
-          })}
+                <item.icon aria-hidden className="h-5 w-5" />
+              </span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
         </nav>
       )}
     </div>

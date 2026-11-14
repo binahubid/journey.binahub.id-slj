@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -205,7 +205,7 @@ export default function InitialProcessPage() {
   }, [supabase]);
 
   // Save draft locally
-  const saveDraft = (newL1 = layer1, newL2 = layer2, newL3 = layer3, newPrefs = prefs) => {
+  const saveDraft = useCallback((newL1 = layer1, newL2 = layer2, newL3 = layer3, newPrefs = prefs) => {
     try {
       if (!userId) return;
       localStorage.setItem(`sahabat_safar_profile_draft:${userId}`, JSON.stringify({
@@ -216,11 +216,11 @@ export default function InitialProcessPage() {
         updated_at: new Date().toISOString(),
       }));
     } catch {}
-  };
+  }, [layer1, layer2, layer3, prefs, userId]);
 
   useEffect(() => {
     if (!loading && userId) saveDraft(layer1, layer2, layer3, prefs);
-  }, [layer1, layer2, layer3, prefs, loading, userId]);
+  }, [layer1, layer2, layer3, prefs, loading, userId, saveDraft]);
 
   // Helper toggle commMedia (max 2)
   const toggleCommMedia = (item: string) => {

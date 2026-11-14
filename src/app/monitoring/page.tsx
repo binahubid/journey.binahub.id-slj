@@ -625,7 +625,7 @@ export default function MonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, [timeframe]);
+  }, [timeframe, supabase]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

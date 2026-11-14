@@ -48,7 +48,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-jakarta-sans)", "Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"],
-        secondary: ["var(--font-inter)", "Inter", "sans-serif"],
+        secondary: ["var(--font-jakarta-sans)", "Plus Jakarta Sans", "sans-serif"],
         serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
       },
       boxShadow: {

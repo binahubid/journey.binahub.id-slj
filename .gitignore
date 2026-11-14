@@ -2,6 +2,8 @@
 /node_modules
 /.pnpm
 /.yarn
+/tmp/
+*.tsbuildinfo
 
 # Next.js build outputs
 /.next/

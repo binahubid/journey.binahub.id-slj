@@ -1,14 +1,37 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { getSljAccess, getTrialDestination } from "@/lib/program-access";
+import { getUserRole } from "@/lib/auth-role";
 
 export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    const protectedPrefixes = ["/admin", "/coach", "/company", "/dashboard", "/onboarding", "/baseline", "/initial-process", "/journey", "/monitoring", "/journal", "/profile", "/settings", "/notifications"];
-    if (protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix))) {
-      return new NextResponse("Service configuration unavailable", { status: 503 });
+    const protectedPrefixes = [
+      "/admin",
+      "/coach",
+      "/company",
+      "/dashboard",
+      "/onboarding",
+      "/baseline",
+      "/initial-process",
+      "/journey",
+      "/monitoring",
+      "/journal",
+      "/profile",
+      "/settings",
+      "/notifications",
+      "/trial",
+    ];
+    if (
+      protectedPrefixes.some((prefix) =>
+        request.nextUrl.pathname.startsWith(prefix),
+      )
+    ) {
+      return new NextResponse("Service configuration unavailable", {
+        status: 503,
+      });
     }
     return NextResponse.next({ request });
   }
@@ -27,16 +50,16 @@ export async function middleware(request: NextRequest) {
           name: string;
           value: string;
           options?: Record<string, unknown>;
-        }[]
+        }[],
       ) {
         cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value)
+          request.cookies.set(name, value),
         );
         supabaseResponse = NextResponse.next({
           request,
         });
         cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options as any)
+          supabaseResponse.cookies.set(name, value, options as any),
         );
       },
     },
@@ -45,6 +68,14 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  function redirect(url: URL) {
+    const response = NextResponse.redirect(url);
+    for (const cookie of supabaseResponse.cookies.getAll())
+      response.cookies.set(cookie);
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  }
 
   const path = request.nextUrl.pathname;
 
@@ -63,17 +94,18 @@ export async function middleware(request: NextRequest) {
     "/settings",
     "/notifications",
     "/company",
+    "/trial",
   ];
 
   const isProtectedRoute = protectedRoutes.some((route) =>
-    path.startsWith(route)
+    path.startsWith(route),
   );
 
   // 1. Unauthenticated users accessing protected routes -> Redirect to /login
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirect(url);
   }
 
   // 2. Authenticated user checks
@@ -85,83 +117,128 @@ export async function middleware(request: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const role = profile?.role || (user?.app_metadata?.role as string) || "participant";
+    const role = getUserRole(user, profile?.role);
 
     // Admin route protection: Only admin
     if (path.startsWith("/admin") && role !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = role === "coach" ? "/coach" : "/dashboard";
-      return NextResponse.redirect(url);
+      return redirect(url);
     }
 
     // Coach data is restricted to assigned coaches; admins may inspect it.
     if (path.startsWith("/coach") && role !== "coach" && role !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      return redirect(url);
     }
 
     // Participant Onboarding Gatekeeper Enforcement
-    if (role === "participant") {
-      const { data: journey } = await supabase
-        .from("journeys")
-        .select("status, area_transformasi")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // Onboarding is incomplete if program_code is missing OR journey status is ONBOARDING / missing
-      const isCompletedOnboarding = Boolean(
-        profile?.program_code &&
-          journey?.status &&
-          journey.status !== "ONBOARDING"
-      );
-
-      let baselineCompleted = false;
-      let initialProcessCompleted = false;
-      let ptpCompleted = false;
-
-      if (isCompletedOnboarding) {
-        const [{ data: baseline }, { data: initialProcess }, { data: actionPlans }] = await Promise.all([
-          supabase.from("baseline_assessments").select("completed").eq("user_id", user.id).maybeSingle(),
-          supabase.from("sahabat_safar_profiles").select("is_completed").eq("user_id", user.id).maybeSingle(),
-          supabase.from("action_plans").select("id").eq("user_id", user.id).limit(1),
-        ]);
-        baselineCompleted = baseline?.completed === true;
-        initialProcessCompleted = initialProcess?.is_completed === true;
-        ptpCompleted = Boolean(
-          Array.isArray(journey?.area_transformasi) &&
-          journey.area_transformasi.length === 3 &&
-          actionPlans && actionPlans.length > 0
+    if (
+      role === "participant" &&
+      (isProtectedRoute || path === "/login" || path === "/register")
+    ) {
+      try {
+        const access = await getSljAccess(supabase);
+        if (access?.kind === "trial") {
+          const destination = getTrialDestination(
+            access,
+            path,
+            request.nextUrl.searchParams.get("mode") === "program",
+          );
+          if (destination) {
+            const url = request.nextUrl.clone();
+            url.pathname = destination;
+            url.search = "";
+            return redirect(url);
+          }
+          supabaseResponse.headers.set("Cache-Control", "private, no-store");
+          return supabaseResponse;
+        }
+      } catch {
+        return new NextResponse(
+          "Akses program belum dapat diperiksa. Silakan muat ulang beberapa saat lagi.",
+          { status: 503, headers: { "Cache-Control": "private, no-store" } },
         );
       }
+      if (isProtectedRoute) {
+        const { data: journey } = await supabase
+          .from("journeys")
+          .select("status, area_transformasi")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      // A) Incomplete onboarding -> Block dashboard, journey, journal, monitoring, etc. -> Redirect to /onboarding
-      if (!isCompletedOnboarding && path !== "/onboarding") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/onboarding";
-        return NextResponse.redirect(url);
-      }
+        // Onboarding is incomplete if program_code is missing OR journey status is ONBOARDING / missing
+        const isCompletedOnboarding = Boolean(
+          profile?.program_code &&
+            journey?.status &&
+            journey.status !== "ONBOARDING",
+        );
 
-      // B) Completed onboarding -> Block visiting /onboarding again -> Redirect to /dashboard
-      if (isCompletedOnboarding && path === "/onboarding") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
-      }
+        let baselineCompleted = false;
+        let initialProcessCompleted = false;
+        let ptpCompleted = false;
 
-      const ptpRequiredRoutes = ["/dashboard", "/monitoring"];
-      if (
-        isCompletedOnboarding &&
-        baselineCompleted &&
-        initialProcessCompleted &&
-        !ptpCompleted &&
-        ptpRequiredRoutes.some((route) => path.startsWith(route))
-      ) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/journey";
-        return NextResponse.redirect(url);
+        if (isCompletedOnboarding) {
+          const [
+            { data: baseline },
+            { data: initialProcess },
+            { data: actionPlans },
+          ] = await Promise.all([
+            supabase
+              .from("baseline_assessments")
+              .select("completed")
+              .eq("user_id", user.id)
+              .maybeSingle(),
+            supabase
+              .from("sahabat_safar_profiles")
+              .select("is_completed")
+              .eq("user_id", user.id)
+              .maybeSingle(),
+            supabase
+              .from("action_plans")
+              .select("id")
+              .eq("user_id", user.id)
+              .limit(1),
+          ]);
+          baselineCompleted = baseline?.completed === true;
+          initialProcessCompleted = initialProcess?.is_completed === true;
+          ptpCompleted = Boolean(
+            Array.isArray(journey?.area_transformasi) &&
+              journey.area_transformasi.length === 3 &&
+              actionPlans &&
+              actionPlans.length > 0,
+          );
+        }
+
+        // A) Incomplete onboarding -> Block dashboard, journey, journal, monitoring, etc. -> Redirect to /onboarding
+        if (!isCompletedOnboarding && path !== "/onboarding") {
+          const url = request.nextUrl.clone();
+          url.pathname = "/onboarding";
+          return redirect(url);
+        }
+
+        // B) Completed onboarding -> Block visiting /onboarding again -> Redirect to /dashboard
+        if (isCompletedOnboarding && path === "/onboarding") {
+          const url = request.nextUrl.clone();
+          url.pathname = "/dashboard";
+          return redirect(url);
+        }
+
+        const ptpRequiredRoutes = ["/dashboard", "/monitoring"];
+        if (
+          isCompletedOnboarding &&
+          baselineCompleted &&
+          initialProcessCompleted &&
+          !ptpCompleted &&
+          ptpRequiredRoutes.some((route) => path.startsWith(route))
+        ) {
+          const url = request.nextUrl.clone();
+          url.pathname = "/journey";
+          return redirect(url);
+        }
       }
     }
 
@@ -175,10 +252,12 @@ export async function middleware(request: NextRequest) {
       } else {
         url.pathname = "/dashboard";
       }
-      return NextResponse.redirect(url);
+      return redirect(url);
     }
   }
 
+  if (isProtectedRoute)
+    supabaseResponse.headers.set("Cache-Control", "private, no-store");
   return supabaseResponse;
 }
 

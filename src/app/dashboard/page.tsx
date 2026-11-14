@@ -26,7 +26,8 @@ import { normalizeTransformationArea } from "@/lib/transformation-areas";
 import AreaProgressGraph from "@/components/AreaProgressGraph";
 import { composeJournalContent, getCanonicalJournalDate, parseJournalContent } from "@/lib/journal";
 import { getActiveProgramMonth, getProgramDay } from "@/lib/program-timeline";
-import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalizeHabitFrequency, resolveParticipantTimeZone } from "@/lib/local-date";
+import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalizeHabitFrequency, resolveParticipantTimeZone, getTimeZoneLabel } from "@/lib/local-date";
+import { prayerTimesUrl } from "@/lib/prayer-times";
 import { detectHabitCategory, getPrayerKeyFromHabitTitle } from "@/lib/habit-tracking";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import {
@@ -155,7 +156,7 @@ export default function DashboardPage() {
     graceMessage?: string;
   }>({
     name: "Subuh",
-    time: "04:43",
+    time: "--:--",
     text: "Menghitung...",
     isGracePeriod: false,
     graceMessage: "",
@@ -180,17 +181,22 @@ export default function DashboardPage() {
   useEffect(() => {
     const updateTime = () => {
       const d = new Date();
-      const hour = d.getHours();
+      const clockParts = new Intl.DateTimeFormat("en-GB", { timeZone: userTimeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(d);
+      const part = (type: string) => clockParts.find(value => value.type === type)?.value || "00";
+      const hour = Number(part("hour"));
+      const minute = Number(part("minute"));
+      const second = Number(part("second"));
 
       // Format clock: main = HH:mm, seconds separate
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      const ss = String(d.getSeconds()).padStart(2, "0");
+      const hh = part("hour");
+      const mm = part("minute");
+      const ss = part("second");
       setHeroClockMain(`${hh}:${mm}`);
       setHeroClockSeconds(ss);
 
       setHeroDate(
         d.toLocaleDateString("id-ID", {
+          timeZone: userTimeZone,
           weekday: "long",
           day: "numeric",
           month: "long",
@@ -198,19 +204,10 @@ export default function DashboardPage() {
         })
       );
 
-      // Detect Timezone string without emoji
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (tz.includes("Jakarta")) setTimeZoneStr("WIB");
-        else if (tz.includes("Makassar")) setTimeZoneStr("WITA");
-        else if (tz.includes("Jayapura")) setTimeZoneStr("WIT");
-        else setTimeZoneStr(tz);
-      } catch {
-        setTimeZoneStr("WIB");
-      }
+      setTimeZoneStr(getTimeZoneLabel(userTimeZone));
 
       // Adaptive BG Image based on total minutes
-      const totalMins = hour * 60 + d.getMinutes();
+      const totalMins = hour * 60 + minute;
       if (totalMins >= 240 && totalMins < 360) {
         setAdaptiveHeroBgImage("/fajar.webp"); // 04:00 - 06:00
       } else if (totalMins >= 360 && totalMins < 660) {
@@ -227,7 +224,7 @@ export default function DashboardPage() {
 
       // Live Prayer Times & Circular Progress Calculation (with 3-minute grace period)
       if (prayerTimingsData && prayerTimingsData.length > 0) {
-        const currSecs = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+        const currSecs = hour * 3600 + minute * 60 + second;
         const list = prayerTimingsData;
 
         let found = false;
@@ -309,16 +306,16 @@ export default function DashboardPage() {
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimingsData]);
+  }, [prayerTimingsData, userTimeZone]);
+
+  const heroPrayerDate = getLocalDateString(new Date(), userTimeZone);
 
   // Fetch Prayer Times for Main Header Next Prayer
   useEffect(() => {
     async function fetchHeroPrayerTimes() {
       try {
         const res = await fetch(
-          `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(
-            userLocation || "Jakarta"
-          )}&country=Indonesia&method=11`
+          prayerTimesUrl(userLocation || "Jakarta", heroPrayerDate, userTimeZone)
         );
         const data = await res.json();
         if (data?.data?.timings) {
@@ -345,7 +342,7 @@ export default function DashboardPage() {
       }
     }
     fetchHeroPrayerTimes();
-  }, [userLocation]);
+  }, [userLocation, userTimeZone, heroPrayerDate]);
 
   // Fetch sholat analytics data when modal opens
   useEffect(() => {
@@ -2031,7 +2028,7 @@ export default function DashboardPage() {
           <div className="space-y-4 py-2">
             <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 space-y-2">
               <span className="text-[10px] font-bold text-amber-800 uppercase tracking-widest block">
-                AL-QUR'AN SURAH AT-TALAQ AYAT 2-3
+                AL-QUR&apos;AN SURAH AT-TALAQ AYAT 2-3
               </span>
               <p className="text-sm font-serif italic text-navy-900 leading-relaxed">
                 &ldquo;Dan barang siapa bertakwa kepada Allah, niscaya Dia akan menjadikan baginya jalan keluar, dan memberinya rezeki dari arah yang tidak disangka-sangka.&rdquo;
@@ -2252,7 +2249,7 @@ export default function DashboardPage() {
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-amber-600" />
-              Analitik Khusus Tilawah Al-Qur'an
+              Analitik Khusus Tilawah Al-Qur&apos;an
             </DialogTitle>
           </DialogHeader>
 

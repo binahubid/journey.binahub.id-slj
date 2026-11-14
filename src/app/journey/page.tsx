@@ -490,7 +490,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       finally { setLoading(false); }
     }
     loadData();
-  }, []);
+  }, [router, supabase]);
 
   // ─── Keep refs in sync with latest state (fixes stale closure in setTimeout) ─
   useEffect(() => { muhasabahRef.current = muhasabah; }, [muhasabah]);

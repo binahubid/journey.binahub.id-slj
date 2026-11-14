@@ -36,7 +36,6 @@ import {
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SafarProfileData = Record<string, any>;
 
 interface ParticipantProfile {

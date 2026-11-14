@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         .maybeSingle();
       if (profileError) return NextResponse.redirect(`${origin}/login?error=profile_failed`);
 
-      // 2. Resolve role (app_metadata.role -> user_metadata.role -> profile.role)
+      // 2. Resolve role from trusted app_metadata, then the protected profile role.
       const role = getUserRole(user, profile?.role);
 
       if (!profile) {

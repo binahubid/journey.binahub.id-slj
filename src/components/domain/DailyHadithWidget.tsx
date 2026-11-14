@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { BookMarked, Quote, CheckCircle2 } from "lucide-react";
 import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalizeHabitFrequency } from "@/lib/local-date";
 
@@ -50,7 +50,7 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
   const todayStr = getLocalDateString(new Date(), timeZone);
 
   const dayOfYear = Math.floor(
-    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
+    Date.parse(`${todayStr}T00:00:00Z`) / 86400000
   );
   const hadith = HADITHS[dayOfYear % HADITHS.length];
 
@@ -62,6 +62,8 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
   useEffect(() => {
     async function loadHadithLog() {
       if (!userId) return;
+      setLoading(true);
+      setErrorMsg(null);
       try {
         const { data, error } = await supabase
           .from("hadith_logs")
@@ -71,9 +73,7 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
           .maybeSingle();
         if (error) throw error;
 
-        if (data) {
-          setIsRead(data.is_read || false);
-        }
+        setIsRead(data?.is_read === true);
       } catch (err) {
         console.error("Gagal memuat log hadits:", err);
         setErrorMsg("Status baca hadits belum dapat dimuat.");
@@ -82,7 +82,7 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
       }
     }
     loadHadithLog();
-  }, [userId, todayStr]);
+  }, [userId, todayStr, supabase]);
 
   const syncHabitLog = async (habitTitle: string, completed: boolean) => {
     try {
@@ -151,7 +151,7 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
 
   return (
     <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between relative overflow-hidden h-full">
-      <div className="flex items-center justify-between border-b border-warm-border/60 pb-3 z-10 relative">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 z-10 relative">
         <div className="flex items-center space-x-2">
           <div className="h-7 w-7 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xs">
             <BookMarked className="h-4 w-4 text-amber-600" />
@@ -162,17 +162,9 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 bg-amber-50/70 px-3 py-1.5 rounded-full border border-amber-200">
-          <Checkbox
-            checked={isRead}
-            disabled={loading || saving}
-            onCheckedChange={(c) => toggleHadithRead(!!c)}
-            className="h-4 w-4 rounded-md border-amber-400 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white"
-          />
-          <span className="text-xs font-bold text-amber-900">
-            {isRead ? "Sudah Dibaca ✓" : "Tandai Dibaca"}
-          </span>
-        </div>
+        <button type="button" aria-pressed={isRead} disabled={loading || saving} onClick={() => void toggleHadithRead(!isRead)} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-xs font-medium ${isRead ? 'border-navy-900 bg-blue-50 text-navy-900' : 'border-slate-200 text-slate-600'}`}>
+          <CheckCircle2 className="h-4 w-4" />{saving ? "Menyimpan…" : isRead ? "Sudah dibaca" : "Tandai dibaca"}
+        </button>
       </div>
       {errorMsg && <p role="alert" className="text-xs font-semibold text-rose-700">{errorMsg}</p>}
 

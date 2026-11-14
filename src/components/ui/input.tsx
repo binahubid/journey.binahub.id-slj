@@ -9,7 +9,8 @@ export interface InputProps
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, error, label, id, ...props }, ref) => {
-    const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
     return (
       <div className="w-full space-y-1.5">
         {label && (
@@ -21,15 +22,17 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={type}
           id={inputId}
           className={cn(
-            "flex h-10 w-full rounded-md border border-warm-border bg-white px-3 py-2 text-sm text-navy-900 placeholder:text-gray-400 focus:border-navy-900 focus:outline-none focus:ring-1 focus:ring-navy-900 disabled:cursor-not-allowed disabled:opacity-40 transition-colors",
+            "flex h-11 w-full rounded-lg border border-warm-border bg-white px-3 py-2 text-base sm:text-sm text-navy-900 placeholder:text-gray-400 focus:border-navy-900 focus:outline-none focus:ring-1 focus:ring-navy-900 disabled:cursor-not-allowed disabled:opacity-40 transition-colors",
             error && "border-status-danger focus:ring-status-danger",
             className
           )}
           ref={ref}
           {...props}
+          aria-invalid={error ? true : props["aria-invalid"]}
+          aria-describedby={[props["aria-describedby"], error ? `${inputId}-error` : null].filter(Boolean).join(" ") || undefined}
         />
         {error && (
-          <p className="text-xs text-status-danger">{error}</p>
+          <p id={`${inputId}-error`} className="text-xs text-status-danger">{error}</p>
         )}
       </div>
     );

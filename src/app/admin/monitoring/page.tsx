@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Activity,
   Filter,
@@ -31,7 +31,7 @@ export default function AdminMonitoringPage() {
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [selectedCoachId, setSelectedCoachId] = useState<string>("all");
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -54,11 +54,11 @@ export default function AdminMonitoringPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     loadAllData();
-  }, [supabase]);
+  }, [loadAllData]);
 
   const availableBatches = batches.filter(
     (b) => selectedCompanyId === "all" || b.companyId === selectedCompanyId

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { User, MapPin, Calendar, Building2, Layers, HeartHandshake, Mail, Shield, Briefcase, MessageCircle, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { getSljAccess, getTrialProgress } from "@/lib/program-access";
 import Grainient from "@/components/Grainient";
 
 interface UserProfileData {
@@ -79,6 +80,7 @@ function InfoRow({
 
 function StatusPill({ status }: { status: string }) {
   const config: Record<string, { dot: string; label: string; cls: string }> = {
+    EXPIRED: { dot: "bg-slate-300", label: "Trial berakhir", cls: "bg-white/10 text-slate-200 border-white/20" },
     ACTIVE: { dot: "bg-emerald-400", label: "Aktif", cls: "bg-emerald-400/15 text-emerald-300 border-emerald-300/25" },
     ONBOARDING: { dot: "bg-amber-400", label: "Onboarding", cls: "bg-amber-400/15 text-amber-300 border-amber-300/25" },
     COMPLETED: { dot: "bg-blue-400", label: "Selesai", cls: "bg-blue-400/15 text-blue-300 border-blue-300/25" },
@@ -94,6 +96,7 @@ function StatusPill({ status }: { status: string }) {
 
 export default function ProfilePage() {
   const supabase = createClient();
+  const [duration, setDuration] = useState(90);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfileData>({
@@ -126,6 +129,10 @@ export default function ProfilePage() {
           .maybeSingle();
         if (profileError) throw profileError;
 
+        const access = await getSljAccess(supabase);
+        const trial = access?.kind === "trial";
+        setDuration(trial ? 14 : 90);
+
         // 2. Fetch Journey
         const { data: journey, error: journeyError } = await supabase
           .from("journeys")
@@ -138,7 +145,7 @@ export default function ProfilePage() {
 
         // 3. Fetch Batch & Company info
         let companyName = userProfile?.company_name || "Belum ditentukan";
-        let batchName = userProfile?.program_code || "Batch 1";
+        let batchName = trial ? "Uji coba spiritual 14 hari" : userProfile?.program_code || "Belum ditentukan";
 
         if (userProfile?.program_code) {
           const { data: batchData } = await supabase
@@ -200,19 +207,25 @@ export default function ProfilePage() {
           progressPct = Math.min(100, Math.round((dayNumber / 90) * 100));
         }
 
+        if (trial && access) {
+          const progress = getTrialProgress(access);
+          dayNumber = progress.day;
+          progressPct = Math.round(progress.percent);
+          companyName = "Peserta mandiri";
+        }
         setProfile({
           displayId: userProfile?.display_id || "-",
           fullName,
           email,
           role: roleLabel,
           location: userProfile?.location || "Jakarta",
-          startDate: formatDate(userProfile?.start_date),
-          endDate: formatDate(userProfile?.end_date),
+          startDate: formatDate(trial ? access?.starts_at || undefined : userProfile?.start_date),
+          endDate: formatDate(trial ? access?.expires_at || undefined : userProfile?.end_date),
           dayNumber,
           progressPct,
           companyName,
           batchName,
-          status: journey?.status || "ONBOARDING",
+          status: trial && !access?.active ? "EXPIRED" : journey?.status || "ONBOARDING",
           areaTransformasi: Array.isArray(journey?.area_transformasi) ? journey.area_transformasi : [],
           sahabatSafarName,
           gender: (layer1?.gender as string) || undefined,
@@ -233,7 +246,7 @@ export default function ProfilePage() {
     }
 
     loadProfileData();
-  }, []);
+  }, [supabase]);
 
   if (loading) {
     return (
@@ -310,7 +323,7 @@ export default function ProfilePage() {
             <div className="mt-7 pt-5 border-t border-white/10">
               <div className="flex items-baseline justify-between text-[11px] mb-2">
                 <span className="font-semibold text-blue-100/90">
-                  Hari ke-{profile.dayNumber} <span className="text-blue-200/50 font-normal">dari 90</span>
+                  Hari ke-{profile.dayNumber} <span className="text-blue-200/50 font-normal">dari {duration}</span>
                 </span>
                 <span className="font-mono font-bold text-amber-300 tabular-nums">{profile.progressPct}%</span>
               </div>

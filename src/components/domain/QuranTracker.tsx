@@ -62,7 +62,7 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
       }
     }
     loadQuranLogs();
-  }, [userId]);
+  }, [userId, supabase]);
 
   const hasReadToday = logs.some((l) => l.date === todayStr);
 
@@ -97,6 +97,7 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
 
   const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!surahName.trim() || !fromAyat || !toAyat) return;
 
     const fromNum = Number(fromAyat);
@@ -153,7 +154,7 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-warm-border/60 pb-3">
         <div className="flex items-center space-x-3">
           <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-            📖
+            <BookOpen className="h-4 w-4" />
           </div>
           <div>
             <h3 className="font-bold text-xs sm:text-sm text-navy-900">Tilawah & Baca Al-Qur&apos;an</h3>
@@ -169,8 +170,9 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
           )}
 
           <Button
+            disabled={saving}
             onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
-            className="text-xs h-8.5 gap-1.5 font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl px-3.5 shadow-2xs"
+            className="min-h-11 gap-1.5 rounded-xl px-3.5 text-sm"
           >
             <Plus className="h-4 w-4" />
             <span>Catat Bacaan</span>
@@ -192,41 +194,14 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
           </Button>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-500 text-left font-bold">
-                <th className="py-2 px-3">Tanggal</th>
-                <th className="py-2 px-3">Nama Surat</th>
-                <th className="py-2 px-3 text-center">Jumlah Ayat</th>
-                <th className="py-2 px-3 text-right">Rentang Ayat</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {logs.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-2.5 px-3 font-medium text-slate-600 whitespace-nowrap">
-                    {new Date(item.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-navy-900 flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                    <span>Surat {item.surah_name}</span>
-                  </td>
-                  <td className="py-2.5 px-3 text-center font-semibold text-emerald-700">
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-bold">
-                      {item.total_ayat} Ayat
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-medium text-slate-600">
-                    Ayat {item.from_ayat} - {item.to_ayat}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="divide-y divide-slate-100" aria-label="Riwayat bacaan Al-Qur’an">
+          {logs.map(item => <li key={item.id} className="flex items-start justify-between gap-3 py-3">
+            <div className="min-w-0"><p className="break-words text-sm font-medium text-navy-900">{item.surah_name}</p><p className="mt-1 text-xs leading-5 text-slate-500">Ayat {item.from_ayat}–{item.to_ayat} · {new Date(item.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</p></div>
+            <span className="shrink-0 rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium tabular-nums text-navy-900">{item.total_ayat} ayat</span>
+          </li>)}
+        </ul>
       )}
-      {errorMsg && <p role="alert" className="text-xs font-semibold text-rose-700">{errorMsg}</p>}
+      {errorMsg && !showModal && <p role="alert" className="text-xs font-semibold text-rose-700">{errorMsg}</p>}
 
       {/* Modal Input Bacaan Al-Qur'an */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
@@ -239,40 +214,47 @@ export function QuranTracker({ userId, onQuranLogged, timeZone = DEFAULT_TIME_ZO
           </DialogHeader>
 
           <form onSubmit={handleSaveEntry} className="space-y-3.5 py-2">
+            {errorMsg && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm leading-6 text-red-700">{errorMsg}</p>}
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 block">Nama Surat:</label>
+              <label htmlFor="quran-surah" className="text-sm font-medium text-slate-700 block">Nama surah</label>
               <Input
+                id="quran-surah"
+                disabled={saving}
                 value={surahName}
                 onChange={(e) => setSurahName(e.target.value)}
                 placeholder="Contoh: Al-Baqarah, Yasin, Al-Mulk..."
-                className="text-xs rounded-xl"
+                className="rounded-xl"
                 required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Dari Ayat:</label>
+                <label htmlFor="quran-from" className="text-sm font-medium text-slate-700 block">Dari ayat</label>
                 <Input
                   type="number"
+                  id="quran-from"
+                  disabled={saving}
                   value={fromAyat}
                   onChange={(e) => setFromAyat(e.target.value ? Number(e.target.value) : "")}
                   placeholder="1"
                   min={1}
-                  className="text-xs rounded-xl"
+                  className="rounded-xl"
                   required
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Sampai Ayat:</label>
+                <label htmlFor="quran-to" className="text-sm font-medium text-slate-700 block">Sampai ayat</label>
                 <Input
                   type="number"
+                  id="quran-to"
+                  disabled={saving}
                   value={toAyat}
                   onChange={(e) => setToAyat(e.target.value ? Number(e.target.value) : "")}
                   placeholder="20"
                   min={1}
-                  className="text-xs rounded-xl"
+                  className="rounded-xl"
                   required
                 />
               </div>

@@ -1,0 +1,33 @@
+# Copy or merge these exclusions into the indexed repository's .cbmignore.
+# Do not replace existing project-specific rules.
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+credentials/
+secrets/
+private/
+.codex/
+.hermes/
+node_modules/
+.next/
+.nuxt/
+.output/
+.vercel/
+dist/
+build/
+coverage/
+outputs/
+data/
+logs/
+strix_runs/
+
+*.tsbuildinfo
+public/
+.agents/
+*.patch
+
+tmp/

@@ -165,7 +165,7 @@ export default function RegisterPage() {
               Buat akun Anda
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Gratis. Satu profil untuk seluruh perjalanan SLJ 90 Hari.
+              Mulai uji coba spiritual 14 hari atau bergabung dengan kode program Anda.
             </p>
           </div>
 
@@ -274,7 +274,7 @@ export default function RegisterPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-[#C79A3C] focus:outline-none focus:ring-2 focus:ring-[#C79A3C]/10"
+                  className="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-[#C79A3C] focus:outline-none focus:ring-2 focus:ring-[#C79A3C]/10"
                   placeholder="nama@email.com"
                   autoComplete="email"
                 />
@@ -289,7 +289,7 @@ export default function RegisterPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-[#C79A3C] focus:outline-none focus:ring-2 focus:ring-[#C79A3C]/10"
+                    className="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 pr-10 text-base sm:text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-[#C79A3C] focus:outline-none focus:ring-2 focus:ring-[#C79A3C]/10"
                     placeholder="Minimal 6 karakter"
                     autoComplete="new-password"
                   />
@@ -321,7 +321,7 @@ export default function RegisterPage() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-[#C79A3C] focus:outline-none focus:ring-2 focus:ring-[#C79A3C]/10"
+                  className="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-[#C79A3C] focus:outline-none focus:ring-2 focus:ring-[#C79A3C]/10"
                   placeholder="Ulangi password"
                   autoComplete="new-password"
                 />

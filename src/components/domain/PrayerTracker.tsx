@@ -1,293 +1,320 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Loader2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Sparkles, X, ExternalLink } from "lucide-react";
 import { DEFAULT_TIME_ZONE, getLocalDateRange } from "@/lib/local-date";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface PrayerTrackerProps {
   userId: string;
-  onPrayerToggle?: (dateStr: string, prayerName: string, isCompleted: boolean) => void;
+  onPrayerToggle?: (
+    dateStr: string,
+    prayerName: string,
+    isCompleted: boolean,
+  ) => void;
   externalLogs?: Record<string, boolean>;
-  accountCreatedDate?: string; // YYYY-MM-DD format
+  accountCreatedDate?: string;
   timeZone?: string;
+  view?: "today" | "week";
 }
-
-const MANDATORY_PRAYERS = [
+const mandatory = [
   { key: "subuh", label: "Subuh" },
-  { key: "dzuhur", label: "Dzuhur" },
-  { key: "ashar", label: "Ashar" },
-  { key: "maghrib", label: "Maghrib" },
+  { key: "dzuhur", label: "Zuhur" },
+  { key: "ashar", label: "Asar" },
+  { key: "maghrib", label: "Magrib" },
   { key: "isya", label: "Isya" },
 ];
-
-const AVAILABLE_SUNNAH_PRAYERS = [
-  { key: "tahajud", label: "Sholat Tahajud" },
-  { key: "dhuha", label: "Sholat Dhuha" },
-  { key: "rawatib", label: "Sholat Rawatib" },
-  { key: "witir", label: "Sholat Witir" },
-  { key: "tarawih", label: "Sholat Tarawih" },
-  { key: "hajat", label: "Sholat Hajat" },
-  { key: "istikharah", label: "Sholat Istikharah" },
-  { key: "taubat", label: "Sholat Taubat" },
+const sunnah = [
+  { key: "tahajud", label: "Tahajud" },
+  { key: "dhuha", label: "Duha" },
+  { key: "rawatib", label: "Rawatib" },
+  { key: "witir", label: "Witir" },
+  { key: "tarawih", label: "Tarawih" },
+  { key: "hajat", label: "Hajat" },
+  { key: "istikharah", label: "Istikharah" },
+  { key: "taubat", label: "Tobat" },
 ];
+const weekdays = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
-const DAY_INITIALS: Record<number, string> = {
-  0: "M", 1: "S", 2: "S", 3: "R", 4: "K", 5: "J", 6: "S",
-};
-
-export function PrayerTracker({ userId, accountCreatedDate, onPrayerToggle, externalLogs, timeZone = DEFAULT_TIME_ZONE }: PrayerTrackerProps) {
+export function PrayerTracker({
+  userId,
+  accountCreatedDate,
+  onPrayerToggle,
+  externalLogs,
+  timeZone = DEFAULT_TIME_ZONE,
+  view = "week",
+}: PrayerTrackerProps) {
   const supabase = createClient();
   const [logs, setLogs] = useState<Record<string, boolean>>({});
-  const [activeSunnahKeys, setActiveSunnahKeys] = useState<string[]>([]);
-  const [showSunnahModal, setShowSunnahModal] = useState(false);
+  const [activeSunnah, setActiveSunnah] = useState<string[]>([]);
+  const [showSunnah, setShowSunnah] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const pendingRef = useRef(new Set<string>());
+  const externalLogsRef = useRef(externalLogs);
+  externalLogsRef.current = externalLogs;
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    if (externalLogs) {
-      setLogs((prev) => ({ ...prev, ...externalLogs }));
-    }
+    if (externalLogs) setLogs((previous) => ({ ...previous, ...externalLogs }));
   }, [externalLogs]);
-
   useEffect(() => {
-    async function loadLogs() {
-      if (!userId) return;
-      try {
-        const { data, error } = await supabase
-          .from("prayer_logs")
-          .select("date, prayer_name, is_completed")
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        const map: Record<string, boolean> = {};
-        const autoSunnah: string[] = [];
-
-        (data || []).forEach((row) => {
-          map[`${row.date}_${row.prayer_name}`] = row.is_completed;
-          const isSunnah = AVAILABLE_SUNNAH_PRAYERS.some((s) => s.key === row.prayer_name);
-          if (isSunnah && row.is_completed && !autoSunnah.includes(row.prayer_name)) {
-            autoSunnah.push(row.prayer_name);
-          }
-        });
-
-        setLogs((prev) => ({ ...map, ...prev }));
-        if (autoSunnah.length > 0) {
-          setActiveSunnahKeys((prev) => Array.from(new Set([...prev, ...autoSunnah])));
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setLoaded(false);
+      setError("");
+      const { data, error: failure } = await supabase
+        .from("prayer_logs")
+        .select("date, prayer_name, is_completed")
+        .eq("user_id", userId);
+      if (cancelled) return;
+      if (failure)
+        setError(
+          "Catatan salat belum dapat dimuat. Coba muat ulang sebelum mengubah catatan.",
+        );
+      else {
+        setLoaded(true);
+        const values: Record<string, boolean> = {};
+        const keys: string[] = [];
+        for (const row of data || []) {
+          values[`${row.date}_${row.prayer_name}`] = row.is_completed;
+          if (
+            row.is_completed &&
+            sunnah.some((item) => item.key === row.prayer_name)
+          )
+            keys.push(row.prayer_name);
         }
-      } catch (err) {
-        console.error("Load prayer logs error:", err);
-      } finally {
-        setLoading(false);
+        setLogs({ ...values, ...externalLogsRef.current });
+        setActiveSunnah((previous) => [...new Set([...previous, ...keys])]);
       }
+      setLoading(false);
     }
-    loadLogs();
-  }, [userId, supabase]);
+    if (userId) void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, supabase, retry]);
 
-  const togglePrayer = async (dateStr: string, prayerName: string) => {
-    const current = !!logs[`${dateStr}_${prayerName}`];
-    const nextVal = !current;
-
-    setLogs((prev) => ({ ...prev, [`${dateStr}_${prayerName}`]: nextVal }));
-    onPrayerToggle?.(dateStr, prayerName, nextVal);
-
+  async function togglePrayer(date: string, prayer: string) {
+    const key = `${date}_${prayer}`;
+    if (pendingRef.current.has(key)) return;
+    const current = Boolean(logs[key]);
+    pendingRef.current.add(key);
+    setPending(new Set(pendingRef.current));
+    setError("");
+    setLogs((previous) => ({ ...previous, [key]: !current }));
+    onPrayerToggle?.(date, prayer, !current);
     try {
-      if (nextVal) {
-        const { error } = await supabase.from("prayer_logs").upsert({
-          user_id: userId,
-          date: dateStr,
-          prayer_name: prayerName,
-          is_completed: true,
-        }, { onConflict: "user_id,date,prayer_name" });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("prayer_logs")
-          .delete()
-          .eq("user_id", userId)
-          .eq("date", dateStr)
-          .eq("prayer_name", prayerName);
-        if (error) throw error;
-      }
-
-    } catch (err) {
-      console.error("Save prayer log error:", err);
-      setLogs((prev) => ({ ...prev, [`${dateStr}_${prayerName}`]: current }));
-      onPrayerToggle?.(dateStr, prayerName, current);
+      const result = !current
+        ? await supabase
+            .from("prayer_logs")
+            .upsert(
+              {
+                user_id: userId,
+                date,
+                prayer_name: prayer,
+                is_completed: true,
+              },
+              { onConflict: "user_id,date,prayer_name" },
+            )
+        : await supabase
+            .from("prayer_logs")
+            .delete()
+            .eq("user_id", userId)
+            .eq("date", date)
+            .eq("prayer_name", prayer);
+      if (result.error) throw result.error;
+    } catch {
+      setLogs((previous) => ({ ...previous, [key]: current }));
+      onPrayerToggle?.(date, prayer, current);
+      setError(
+        "Perubahan belum tersimpan. Pilihan sudah dikembalikan. Periksa koneksi atau masa akses Anda, lalu coba lagi.",
+      );
+    } finally {
+      pendingRef.current.delete(key);
+      setPending(new Set(pendingRef.current));
     }
-  };
+  }
 
-  const days = getLocalDateRange(7, timeZone).map((day) => ({
-    ...day,
-    initial: DAY_INITIALS[day.dayIndex],
-  }));
-  const toggleSunnahActive = (key: string) => {
-    if (activeSunnahKeys.includes(key)) {
-      setActiveSunnahKeys(activeSunnahKeys.filter((k) => k !== key));
-    } else {
-      setActiveSunnahKeys([...activeSunnahKeys, key]);
-    }
-  };
-
-  const activeSunnahList = AVAILABLE_SUNNAH_PRAYERS.filter((s) => activeSunnahKeys.includes(s.key));
+  const days = getLocalDateRange(view === "today" ? 1 : 7, timeZone);
+  const today = days[days.length - 1].dateStr;
+  const prayers = [
+    ...mandatory,
+    ...sunnah.filter((item) => activeSunnah.includes(item.key)),
+  ];
+  const completed = mandatory.filter(
+    (item) => logs[`${today}_${item.key}`],
+  ).length;
+  function prayerButton(
+    date: string,
+    prayer: (typeof mandatory)[number],
+    compact = false,
+  ) {
+    const key = `${date}_${prayer.key}`;
+    const checked = Boolean(logs[key]);
+    const locked = Boolean(accountCreatedDate && date < accountCreatedDate);
+    return (
+      <button
+        type="button"
+        aria-pressed={checked}
+        aria-label={`${prayer.label}, ${date}${locked ? ", sebelum perjalanan dimulai" : ""}`}
+        disabled={!loaded || locked || pending.has(key)}
+        onClick={() => void togglePrayer(date, prayer.key)}
+        className={`flex min-h-11 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-900 disabled:opacity-50 ${compact ? "mx-auto w-11 justify-center" : "w-full justify-between gap-3 px-3 py-2 text-sm"} ${checked ? "bg-blue-50 font-medium text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}
+      >
+        {!compact && <span>{prayer.label}</span>}
+        <span
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${checked ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white"}`}
+        >
+          {pending.has(key) ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : checked ? (
+            <Check className="h-4 w-4" />
+          ) : null}
+        </span>
+      </button>
+    );
+  }
 
   return (
-    <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4">
-      <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
-        <div className="flex items-center space-x-2.5">
-          <div className="h-8 w-8 rounded-xl bg-amber-100/80 text-amber-900 flex items-center justify-center font-bold shrink-0 border border-amber-200">
-            <svg className="h-4 w-4 fill-amber-700 text-amber-700" viewBox="0 0 24 24">
-              <path d="M12 2L10 5H14L12 2ZM12 6C9 6 7 8 7 11V22H17V11C17 8 15 6 12 6ZM12 8C13.66 8 15 9.34 15 11V20H9V11C9 9.34 10.34 8 12 8ZM11 14H13V18H11V14Z" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="font-bold text-sm text-navy-900 leading-snug">Tracking Sholat</h3>
-          </div>
-        </div>
+    <section
+      className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"
+      aria-label="Catatan salat"
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-navy-900">Catatan salat</h3>
+        <span className="text-xs tabular-nums text-slate-500">
+          Hari ini {completed} / 5
+        </span>
       </div>
-
+      {error && (
+        <p
+          role="alert"
+          className="mb-3 rounded-lg bg-red-50 p-3 text-xs leading-5 text-red-700"
+        >
+          {error}
+          <button
+            type="button"
+            onClick={() => setRetry((value) => value + 1)}
+            className="ml-1 min-h-11 font-medium underline"
+          >
+            Muat ulang
+          </button>
+        </p>
+      )}
       {loading ? (
-        <div className="py-6 text-center text-xs text-slate-400 animate-pulse">Memuat tracking sholat...</div>
+        <p role="status" className="py-8 text-sm text-slate-500">
+          Memuat catatan salat…
+        </p>
+      ) : view === "today" ? (
+        <div className="space-y-1">
+          {prayers.map((prayer) => (
+            <div key={prayer.key}>{prayerButton(today, prayer)}</div>
+          ))}
+        </div>
       ) : (
-        <div className="space-y-3">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left font-bold text-slate-700 py-2 pr-2">Sholat</th>
-                  {days.map((d) => (
-                    <th key={d.dateStr} className={`text-center font-bold py-2 px-1 w-9 ${d.isToday ? "text-amber-900" : "text-slate-500"}`}>
-                      <div className="flex flex-col items-center">
-                        <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs ${
-                          d.isToday ? "bg-amber-500 text-white font-extrabold shadow-2xs" : "bg-slate-100 text-slate-700"
-                        }`}>
-                          {d.initial}
-                        </span>
-                        <span className="text-[9px] text-slate-400 font-normal mt-0.5">{d.dayNum}</span>
-                      </div>
-                    </th>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[440px] text-xs">
+            <caption className="sr-only">
+              Catatan salat tujuh hari terakhir
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" className="text-left font-medium">
+                  Salat
+                </th>
+                {days.map((day) => (
+                  <th
+                    scope="col"
+                    key={day.dateStr}
+                    className={`pb-2 text-center font-medium ${day.isToday ? "text-navy-900" : "text-slate-500"}`}
+                  >
+                    {weekdays[day.dayIndex]}
+                    <span className="block pt-1 tabular-nums">
+                      {day.dayNum}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {prayers.map((prayer) => (
+                <tr key={prayer.key} className="border-t border-slate-100">
+                  <th
+                    scope="row"
+                    className="py-1 text-left font-medium text-slate-600"
+                  >
+                    {prayer.label}
+                  </th>
+                  {days.map((day) => (
+                    <td key={day.dateStr} className="py-1">
+                      {prayerButton(day.dateStr, prayer, true)}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {MANDATORY_PRAYERS.map((p) => (
-                  <tr key={p.key} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-2.5 pr-2 font-bold text-navy-900">{p.label}</td>
-                    {days.map((d) => {
-                      const isChecked = !!logs[`${d.dateStr}_${p.key}`];
-                      const isLocked = !!(accountCreatedDate && d.dateStr < accountCreatedDate);
-                      return (
-                        <td key={d.dateStr} className="text-center py-2.5 px-1 w-9">
-                          <Checkbox
-                            checked={isChecked}
-                            disabled={isLocked}
-                            onCheckedChange={() => !isLocked && togglePrayer(d.dateStr, p.key)}
-                            className={`h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto ${
-                              isLocked ? "opacity-30 cursor-not-allowed bg-slate-100" : ""
-                            }`}
-                            title={isLocked ? "Hari sebelum akun dibuat (terkunci)" : ""}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-
-                {activeSunnahList.map((p) => (
-                  <tr key={p.key} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-2.5 pr-2 font-bold text-navy-900">
-                      <span className="truncate text-xs">{p.label}</span>
-                    </td>
-                    {days.map((d) => {
-                      const isChecked = !!logs[`${d.dateStr}_${p.key}`];
-                      const isLocked = !!(accountCreatedDate && d.dateStr < accountCreatedDate);
-                      return (
-                        <td key={d.dateStr} className="text-center py-2.5 px-1 w-9">
-                          <Checkbox
-                            checked={isChecked}
-                            disabled={isLocked}
-                            onCheckedChange={() => !isLocked && togglePrayer(d.dateStr, p.key)}
-                            className={`h-4 w-4 rounded-md border-slate-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white mx-auto ${
-                              isLocked ? "opacity-30 cursor-not-allowed bg-slate-100" : ""
-                            }`}
-                            title={isLocked ? "Hari sebelum akun dibuat (terkunci)" : ""}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 text-center">
-            <button
-              type="button"
-              onClick={() => setShowSunnahModal(true)}
-              className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors group cursor-pointer"
-            >
-              <Plus className="h-3.5 w-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
-              <span className="underline underline-offset-4 decoration-amber-300 hover:decoration-amber-600">
-                Tambah / Kelola Sholat Sunnah
-              </span>
-              <ExternalLink className="h-3 w-3 text-amber-500 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-            </button>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-
-      <Dialog open={showSunnahModal} onOpenChange={setShowSunnahModal}>
-        <DialogContent className="max-w-sm p-5 rounded-2xl">
+      <button
+        type="button"
+        onClick={() => setShowSunnah(true)}
+        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-medium text-navy-900 hover:bg-slate-50"
+      >
+        <Plus className="h-4 w-4" />
+        Kelola salat sunnah
+      </button>
+      <Dialog open={showSunnah} onOpenChange={setShowSunnah}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-sm font-bold text-navy-900 flex items-center space-x-2">
-              <Sparkles className="h-4 w-4 text-amber-500" />
-              <span>Pilih Sholat Sunnah</span>
-            </DialogTitle>
+            <DialogTitle>Salat sunnah</DialogTitle>
+            <DialogDescription>
+              Pilih salat sunnah yang ingin Anda tampilkan. Catatan yang sudah
+              tersimpan tetap tersimpan saat pilihan disembunyikan.
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-2 py-3">
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Centang sholat sunnah yang ingin Anda tampilkan di tabel tracking:
-            </p>
-            <div className="space-y-2 pt-1 max-h-60 overflow-y-auto pr-1">
-              {AVAILABLE_SUNNAH_PRAYERS.map((s) => {
-                const isSelected = activeSunnahKeys.includes(s.key);
-                return (
-                  <div
-                    key={s.key}
-                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                      isSelected
-                        ? "bg-amber-50 border-amber-300 text-amber-900 font-bold"
-                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <button type="button" onClick={() => toggleSunnahActive(s.key)} className="flex-1 text-left text-xs">{s.label}</button>
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => toggleSunnahActive(s.key)}
-                      className="h-4 w-4 rounded-md border-amber-400 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
-                    />
-                  </div>
-                );
-              })}
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            {sunnah.map((item) => (
+              <button
+                type="button"
+                key={item.key}
+                aria-pressed={activeSunnah.includes(item.key)}
+                onClick={() =>
+                  setActiveSunnah((previous) =>
+                    previous.includes(item.key)
+                      ? previous.filter((key) => key !== item.key)
+                      : [...previous, item.key],
+                  )
+                }
+                className={`min-h-11 rounded-xl border px-3 text-sm ${activeSunnah.includes(item.key) ? "border-navy-900 bg-blue-50 font-medium text-navy-900" : "border-slate-200 text-slate-600"}`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
-
           <DialogFooter>
             <Button
-              onClick={() => setShowSunnahModal(false)}
-              className="bg-navy-900 text-white font-bold text-xs w-full rounded-xl"
+              onClick={() => setShowSunnah(false)}
+              className="w-full rounded-xl"
             >
-              Selesai & Tampilkan
+              Selesai
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </section>
   );
 }

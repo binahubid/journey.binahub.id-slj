@@ -173,7 +173,7 @@ export default function JourneySetupPage() {
       }
     }
     loadUserData();
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     setAreaTargets((current) => {

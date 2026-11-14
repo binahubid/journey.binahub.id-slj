@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { getLocalDateString, getDeviceTimeZone, normalizeTimeZone, getTimeZoneLabel } from "@/lib/local-date";
+import { prayerTimesUrl, zonedMinutes } from "@/lib/prayer-times";
 import { Clock, MapPin, Sparkles, Compass } from "lucide-react";
 
 interface PrayerTimes {
@@ -39,6 +41,7 @@ export function LiveClockPrayerWidget({
   timeFormat = "24",
   timezone = "Auto",
 }: LiveClockPrayerWidgetProps) {
+  const zone = normalizeTimeZone(timezone === "Auto" ? getDeviceTimeZone() : timezone);
   const [now, setNow] = useState<Date | null>(null);
   const [timings, setTimings] = useState<PrayerTimes>({
     Fajr: "--:--",
@@ -63,12 +66,14 @@ export function LiveClockPrayerWidget({
     return () => clearInterval(timer);
   }, []);
 
+  const prayerDate = getLocalDateString(now || new Date(), zone);
+
   // Fetch Prayer Times
   useEffect(() => {
     async function fetchPrayerTimes() {
       try {
         const res = await fetch(
-          `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(location)}&country=Indonesia&method=11`
+          prayerTimesUrl(location, prayerDate, zone)
         );
         const data = await res.json();
         if (data?.data?.timings) {
@@ -88,13 +93,13 @@ export function LiveClockPrayerWidget({
       }
     }
     fetchPrayerTimes();
-  }, [location]);
+  }, [location, prayerDate, zone]);
 
   // Recalculate next prayer & countdown
   useEffect(() => {
     if (!now || timings.Fajr === "--:--") return;
 
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = zonedMinutes(now, zone);
 
     const prayers = [
       { name: "Subuh", time: timings.Fajr, mins: parseMinutes(timings.Fajr) },
@@ -127,28 +132,20 @@ export function LiveClockPrayerWidget({
         minutesLeft: minutesUntilMidnight + subuhMins,
       });
     }
-  }, [now, timings]);
+  }, [now, timings, zone]);
 
   // Format Time Label
   const timeString = now
     ? timeFormat === "12"
-      ? now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })
-      : now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+      ? now.toLocaleTimeString("en-US", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })
+      : now.toLocaleTimeString("id-ID", { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
     : "--:--:--";
 
   const dateString = now
-    ? now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    ? now.toLocaleDateString("id-ID", { timeZone: zone, weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "...";
 
-  // Timezone label
-  let tzLabel = timezone;
-  if (timezone === "Auto") {
-    const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (tzName.includes("Jakarta")) tzLabel = "WIB";
-    else if (tzName.includes("Makassar")) tzLabel = "WITA";
-    else if (tzName.includes("Jayapura")) tzLabel = "WIT";
-    else tzLabel = "WIB";
-  }
+  const tzLabel = getTimeZoneLabel(zone);
 
   return (
     <Card className="bg-gradient-to-br from-navy-900 via-navy-800 to-[#0F2847] text-white p-5 rounded-2xl shadow-md space-y-4 border border-navy-700 relative overflow-hidden flex flex-col justify-between h-full">

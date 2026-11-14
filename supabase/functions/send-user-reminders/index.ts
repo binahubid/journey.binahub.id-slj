@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { prayerTimesUrl } from "../_shared/prayer-location.ts";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -35,14 +36,24 @@ serve(async (req) => {
     // Prayer reminders are generated here because prayer times come from Aladhan, not the database.
     const { data: prayerUsers, error: prayerUsersError } = await supabase
       .from("settings")
-      .select("user_id, preferred_prayer_city, prayer_reminder_minutes, profiles!inner(timezone, role)")
+      .select("user_id, preferred_prayer_city, prayer_reminder_minutes, profiles!inner(timezone, role, program_code)")
       .eq("prayer_notifications_enabled", true);
     if (prayerUsersError) throw prayerUsersError;
+
+    const activeTrials = new Set<string>();
+    if (prayerUsers?.some(setting => setting.profiles?.program_code === "SLJ-TRIAL-14")) {
+      const { data: trials, error: trialError } = await supabase.from("slj_trial_enrollments")
+        .select("user_id").gt("expires_at", new Date().toISOString());
+      if (trialError) throw trialError;
+      for (const trial of trials || []) activeTrials.add(trial.user_id);
+    }
 
     const prayerCache = new Map();
     let prayerCreated = 0;
     for (const setting of prayerUsers || []) {
       if (setting.profiles?.role !== "participant") continue;
+      if (!setting.profiles?.program_code) continue;
+      if (setting.profiles.program_code === "SLJ-TRIAL-14" && !activeTrials.has(setting.user_id)) continue;
       const timezone = setting.profiles?.timezone || "Asia/Jakarta";
       const city = setting.preferred_prayer_city || "Jakarta";
       const localParts = new Intl.DateTimeFormat("en-CA", {
@@ -57,18 +68,22 @@ serve(async (req) => {
       const part = (type) => localParts.find((item) => item.type === type)?.value;
       const localDate = `${part("year")}-${part("month")}-${part("day")}`;
       const currentMinutes = Number(part("hour")) * 60 + Number(part("minute"));
-      const cacheKey = `${city}:${localDate}`;
+      const cacheKey = `${city}:${localDate}:${timezone}`;
 
       let timings = prayerCache.get(cacheKey);
       if (!timings) {
-        const response = await fetch(
-          `https://api.aladhan.com/v1/timingsByCity/${localDate}?city=${encodeURIComponent(city)}&country=Indonesia&method=11`
-        );
-        if (!response.ok) continue;
-        const result = await response.json();
-        timings = result?.data?.timings;
-        if (!timings) continue;
-        prayerCache.set(cacheKey, timings);
+        try {
+          const response = await fetch(prayerTimesUrl(city, localDate, timezone), {
+            signal: AbortSignal.timeout(8_000),
+          });
+          if (!response.ok) continue;
+          const result = await response.json();
+          timings = result?.data?.timings;
+          if (!timings) continue;
+          prayerCache.set(cacheKey, timings);
+        } catch {
+          continue;
+        }
       }
 
       const reminderMinutes = Number(setting.prayer_reminder_minutes || 10);
@@ -84,7 +99,7 @@ serve(async (req) => {
         const time = String(rawTime || "").replace(/\s*\(.*\)/, "");
         const [hour, minute] = time.split(":").map(Number);
         const targetMinutes = hour * 60 + minute;
-        if (currentMinutes < targetMinutes - reminderMinutes || currentMinutes > targetMinutes) continue;
+        if (!Number.isFinite(targetMinutes) || currentMinutes < targetMinutes - reminderMinutes || currentMinutes > targetMinutes) continue;
 
         const { error: insertError } = await supabase.from("notifications").insert({
           user_id: setting.user_id,
@@ -92,7 +107,7 @@ serve(async (req) => {
           message: `Persiapkan diri dan wudhu untuk menunaikan sholat ${name}.`,
           category: "reminder",
           dedupe_key: `prayer:${localDate}:${name.toLowerCase()}`,
-          action_url: "/dashboard",
+          action_url: setting.profiles.program_code === "SLJ-TRIAL-14" ? "/trial" : "/dashboard",
         });
         if (!insertError) prayerCreated++;
         else if (insertError.code !== "23505") throw insertError;

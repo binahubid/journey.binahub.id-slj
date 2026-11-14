@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Users, Search, Building2, Layers, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -43,7 +43,7 @@ export default function ParticipantsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  async function loadDataFromSupabase() {
+  const loadDataFromSupabase = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -106,11 +106,11 @@ export default function ParticipantsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [supabase]);
 
   useEffect(() => {
     loadDataFromSupabase();
-  }, []);
+  }, [loadDataFromSupabase]);
 
   const filtered = participants.filter((p) => {
     const q = searchTerm.toLowerCase();

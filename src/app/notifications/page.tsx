@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { NotificationCard } from "@/components/domain/NotificationCard";
 import { Button } from "@/components/ui/button";
@@ -26,10 +26,10 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Sync badge with unread count
-  const syncBadge = (items: NotificationItemData[]) => {
+  const syncBadge = useCallback((items: NotificationItemData[]) => {
     const unread = items.filter((n) => !n.isRead).length;
     updateBadge(unread);
-  };
+  }, [updateBadge]);
 
   useEffect(() => {
     async function loadNotifications() {
@@ -73,7 +73,7 @@ export default function NotificationsPage() {
     }
 
     loadNotifications();
-  }, []);
+  }, [supabase, syncBadge]);
 
   const markAllRead = async () => {
     const { data: { user } } = await supabase.auth.getUser();

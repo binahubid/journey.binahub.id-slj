@@ -1,124 +1,122 @@
+"use client";
+
 import * as React from "react";
+import * as Primitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ─── Dialog Root ─────────────────────────────────────────────────────────────
-interface DialogProps {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  children: React.ReactNode;
+const Dialog = Primitive.Root;
+const DialogTrigger = Primitive.Trigger;
+const DialogPortal = Primitive.Portal;
+const DialogOverlay = React.forwardRef<
+  React.ElementRef<typeof Primitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof Primitive.Overlay>
+>(({ className, ...props }, ref) => (
+  <Primitive.Overlay
+    ref={ref}
+    className={cn("fixed inset-0 z-[300] bg-navy-900/40", className)}
+    {...props}
+  />
+));
+DialogOverlay.displayName = "DialogOverlay";
+
+const DialogContent = React.forwardRef<
+  React.ElementRef<typeof Primitive.Content>,
+  React.ComponentPropsWithoutRef<typeof Primitive.Content>
+>(
+  (
+    { children, className, onOpenAutoFocus, onCloseAutoFocus, ...props },
+    ref,
+  ) => {
+    const opener = React.useRef<HTMLElement | null>(null);
+    return (
+      <DialogPortal>
+        <DialogOverlay />
+        <Primitive.Content
+          ref={ref}
+          aria-describedby={undefined}
+          onOpenAutoFocus={(event) => {
+            opener.current =
+              document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+            onOpenAutoFocus?.(event);
+          }}
+          onCloseAutoFocus={(event) => {
+            onCloseAutoFocus?.(event);
+            if (!event.defaultPrevented && opener.current?.isConnected) {
+              event.preventDefault();
+              opener.current.focus();
+            }
+          }}
+          className={cn(
+            "fixed left-1/2 top-1/2 z-[300] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-2xl border border-warm-border bg-white p-5 shadow-xl focus:outline-none sm:p-6",
+            className,
+          )}
+          {...props}
+        >
+          <Primitive.Close
+            className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-900"
+            aria-label="Tutup dialog"
+          >
+            <X className="h-5 w-5" />
+          </Primitive.Close>
+          {children}
+        </Primitive.Content>
+      </DialogPortal>
+    );
+  },
+);
+DialogContent.displayName = "DialogContent";
+
+function DialogHeader({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("mb-4 space-y-2 pr-9", className)} {...props} />;
 }
-
-const DialogContext = React.createContext<{
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}>({ open: false, onOpenChange: () => {} });
-
-function Dialog({ open = false, onOpenChange = () => {}, children }: DialogProps) {
+function DialogTitle({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.Title>) {
   return (
-    <DialogContext.Provider value={{ open, onOpenChange }}>
-      {children}
-    </DialogContext.Provider>
+    <Primitive.Title
+      className={cn("text-lg font-semibold text-navy-900", className)}
+      {...props}
+    />
   );
 }
-
-// ─── Dialog Trigger ───────────────────────────────────────────────────────────
-function DialogTrigger({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) {
-  const { onOpenChange } = React.useContext(DialogContext);
-  if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
-      onClick: () => onOpenChange(true),
-    });
-  }
-  return <button onClick={() => onOpenChange(true)}>{children}</button>;
+function DialogDescription({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.Description>) {
+  return (
+    <Primitive.Description
+      className={cn("text-sm leading-relaxed text-slate-600", className)}
+      {...props}
+    />
+  );
 }
-
-// ─── Dialog Portal (Overlay + Content wrapper) ────────────────────────────────
-function DialogPortal({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-
-// ─── Dialog Overlay ───────────────────────────────────────────────────────────
-function DialogOverlay({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  const { open, onOpenChange } = React.useContext(DialogContext);
-  if (!open) return null;
+function DialogFooter({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[300] bg-navy-900/40 backdrop-blur-sm",
-        "animate-in fade-in-0 duration-200",
-        className
+        "mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        className,
       )}
-      onClick={() => onOpenChange(false)}
       {...props}
     />
   );
 }
-
-// ─── Dialog Content ───────────────────────────────────────────────────────────
-interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
-}
-
-function DialogContent({ children, className, ...props }: DialogContentProps) {
-  const { open, onOpenChange } = React.useContext(DialogContext);
-  if (!open) return null;
-  return (
-    <>
-      <DialogOverlay />
-      <div
-        className={cn(
-          "fixed left-1/2 top-1/2 z-[300] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2",
-          "max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-white rounded-lg shadow-lg border border-warm-border p-4 sm:p-6",
-          "animate-in fade-in-0 zoom-in-95 duration-200",
-          className
-        )}
-        {...props}
-      >
-        {/* Close button */}
-        <button
-          onClick={() => onOpenChange(false)}
-          className="absolute right-3 top-3 rounded-md p-1 text-gray-400 transition-colors hover:bg-slate-100 hover:text-navy-900 sm:right-4 sm:top-4"
-          aria-label="Tutup dialog"
-        >
-          <X className="h-4 w-4" />
-        </button>
-        {children}
-      </div>
-    </>
-  );
-}
-
-// ─── Dialog sub-components ────────────────────────────────────────────────────
-function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mb-4 space-y-1.5", className)} {...props} />;
-}
-
-function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("text-base font-bold text-navy-900", className)} {...props} />;
-}
-
-function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("text-sm text-gray-500 leading-relaxed", className)} {...props} />;
-}
-
-function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2", className)}
-      {...props}
-    />
-  );
-}
-
 function DialogClose({ children }: { children: React.ReactNode }) {
-  const { onOpenChange } = React.useContext(DialogContext);
-  if (React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
-      onClick: () => onOpenChange(false),
-    });
-  }
-  return <button onClick={() => onOpenChange(false)}>{children}</button>;
+  return (
+    <Primitive.Close asChild={React.isValidElement(children)}>
+      {children}
+    </Primitive.Close>
+  );
 }
 
 export {

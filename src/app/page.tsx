@@ -42,6 +42,7 @@ import {
   Flame,
 } from "lucide-react";
 import { MotivationDeclineChart } from "@/components/domain/MotivationDeclineChart";
+import { PricingSection } from "@/components/landing/PricingSection";
 
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -83,7 +84,7 @@ export default function LandingPage() {
     {
       question: "Apakah saya akan didampingi oleh coach?",
       answer:
-        "Ya, akan ada sesi-sesi khusus bersama Coach selama program berlangsung.",
+        "Program pendampingan menyediakan sesi bersama coach sesuai cakupan yang disepakati. Uji coba gratis berfokus pada pencatatan ibadah dan jurnal secara mandiri.",
     },
     {
       question: "Bagaimana jika saya tertinggal atau melewatkan beberapa hari?",
@@ -108,7 +109,7 @@ export default function LandingPage() {
     {
       question: "Apa itu Kode Program dan dari mana saya mendapatkannya?",
       answer:
-        "Kode Program adalah kode unik yang menghubungkan akun Anda ke program SLJ di batch keberangkatan tertentu. Kode ini diberikan oleh BinaHub kepada perusahaan, komunitas, atau mitra penyelenggara yang mendaftarkan Anda. Setelah membuat akun, masukkan Kode Program ini untuk mengaktifkan akses ke program",
+        "Kode program menghubungkan akun Anda dengan program pendampingan yang diikuti. Kode diberikan oleh BinaHub atau penyelenggara. Anda tidak memerlukan kode untuk memulai uji coba spiritual 14 hari.",
     },
     {
       question: "Apa yang akan saya lakukan selama 90 hari?",
@@ -128,7 +129,7 @@ export default function LandingPage() {
     {
       question: "Bagaimana cara bergabung?",
       answer:
-        "Buat akun, lalu masukkan Kode Program yang diberikan oleh perusahaan atau mitra penyelenggara yang mendaftarkan Anda untuk mengaktifkan akses. Belum punya Kode Program? Hubungi tim BinaHub untuk konsultasi program dan pendaftaran perusahaan/kelompok Anda terlebih dahulu.",
+        "Buat akun, lalu pilih Uji coba gratis untuk memulai 14 hari aktivitas spiritual. Jika sudah terdaftar pada program pendampingan, pilih Kode program dan masukkan kode dari penyelenggara. Hubungi BinaHub untuk membahas pendampingan yang sesuai.",
     },
   ];
 
@@ -162,6 +163,9 @@ export default function LandingPage() {
             <a href="#sasaran" className="hover:text-[#0F1E3D] transition-colors">
               Untuk Siapa
             </a>
+            <a href="#pricing" className="hover:text-[#0F1E3D] transition-colors">
+              Investasi
+            </a>
             <a href="#faq" className="hover:text-[#0F1E3D] transition-colors">
               FAQ
             </a>
@@ -171,7 +175,7 @@ export default function LandingPage() {
           <div className="flex items-center space-x-4">
             <Link href={isLoggedIn ? "/dashboard" : "/register"}>
               <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] bg-[#0F1E3D] hover:bg-[#07132B] text-white text-[9px] min-[375px]:text-[10px] md:text-[11px] font-extrabold uppercase tracking-[0.1em] min-[375px]:tracking-[0.14em] px-3 min-[375px]:px-4 sm:px-6 py-2.5 shadow-[0_18px_42px_-20px_rgba(15,30,61,0.8)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95">
-                {isLoggedIn ? "Dashboard" : "Mulai Journey"}
+                {isLoggedIn ? "Dashboard" : "Coba 14 hari gratis"}
               </button>
             </Link>
           </div>
@@ -230,7 +234,7 @@ export default function LandingPage() {
               <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                 <Link href={isLoggedIn ? "/dashboard" : "/register"}>
                   <button className="inline-flex h-11 md:h-12 items-center justify-center gap-2 rounded-[9px] bg-[#0F1E3D] px-6 sm:px-7 text-[10px] md:text-[12px] font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_22px_56px_-30px_rgba(15,30,61,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#07132B] active:scale-95 w-full sm:w-auto">
-                    {isLoggedIn ? "Ke Dashboard" : "Mulai Journey"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
+                    {isLoggedIn ? "Ke Dashboard" : "Coba 14 hari gratis"} <ArrowRight className="h-4 w-4 text-[#C79A3C]" />
                   </button>
                 </Link>
                 <a href="https://wa.me/628118494545" target="_blank" rel="noopener noreferrer">
@@ -357,7 +361,7 @@ export default function LandingPage() {
                 MEMPERKUAT KARAKTER KEPEMIMPINAN
               </span>
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-[#0F1E3D] tracking-tight">
-                Why This Program?
+                Mengapa SLJ?
               </h2>
             </div>
 
@@ -845,7 +849,7 @@ export default function LandingPage() {
                   OUTCOME PROGRAM
                 </span>
                 <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-[#0F1E3D] tracking-tight leading-tight">
-                  Key Benefits
+                  Manfaat untuk Anda
                 </h2>
                 <p className="text-xs sm:text-base text-slate-600 font-normal leading-relaxed">
                   Dampak nyata yang insya Allah dirasakan oleh peserta dan organisasi setelah mengikuti 90 hari pendampingan.
@@ -1075,7 +1079,10 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── 11. FAQ SECTION ─── */}
+        {/* ─── 11. PRICING & INVESTASI SECTION ─── */}
+        <PricingSection />
+
+        {/* ─── 12. FAQ SECTION ─── */}
         <section id="faq" className="py-14 sm:py-20 md:py-28 px-5 sm:px-6 md:px-12 lg:px-16 bg-[#FAF8F4] relative border-t border-[#EAE5D9] w-full">
           <div className="w-full pl-0 sm:pl-8 md:pl-12 lg:pl-16">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-start">
@@ -1085,7 +1092,7 @@ export default function LandingPage() {
                   PERTANYAAN UMUM
                 </span>
                 <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-[#0F1E3D] tracking-tight leading-tight">
-                  Frequently Asked Questions
+                  Pertanyaan umum
                 </h2>
                 <p className="text-xs sm:text-base text-slate-600 font-normal leading-relaxed">
                   Temukan jawaban atas pertanyaan umum seputar program pendampingan Spiritual Leadership Journey (SLJ).
@@ -1101,6 +1108,8 @@ export default function LandingPage() {
                       className="border border-[#EAE5D9] rounded-xl overflow-hidden bg-white shadow-2xs hover:border-[#C79A3C]/50 transition-all duration-300"
                     >
                       <button
+                        aria-expanded={openFaq === idx}
+                        aria-controls={`slj-faq-${idx}`}
                         onClick={() => toggleFaq(idx)}
                         className="w-full p-3.5 sm:p-5 text-left flex items-center justify-between font-bold text-[#0F1E3D] text-xs sm:text-base gap-3 hover:bg-[#FAF8F4]/80 transition-colors"
                       >
@@ -1112,7 +1121,7 @@ export default function LandingPage() {
                         />
                       </button>
                       {openFaq === idx && (
-                        <div className="p-4 pt-0 text-xs sm:text-sm text-gray-600 leading-relaxed font-normal border-t border-[#EAE5D9]/50 pt-3">
+                        <div id={`slj-faq-${idx}`} className="p-4 pt-0 text-xs sm:text-sm text-gray-600 leading-relaxed font-normal border-t border-[#EAE5D9]/50 pt-3">
                           {faq.answer}
                         </div>
                       )}
@@ -1236,6 +1245,7 @@ export default function LandingPage() {
                     <li><a href="#tahapan" className="text-sm font-light text-[#0F1E3D]/70 hover:text-[#C79A3C] transition-colors">4 Tahapan Transformasi</a></li>
                     <li><a href="#ekosistem" className="text-sm font-light text-[#0F1E3D]/70 hover:text-[#C79A3C] transition-colors">Manfaat &amp; Ekosistem</a></li>
                     <li><a href="#sasaran" className="text-sm font-light text-[#0F1E3D]/70 hover:text-[#C79A3C] transition-colors">Untuk Siapa</a></li>
+                    <li><a href="#pricing" className="text-sm font-light text-[#0F1E3D]/70 hover:text-[#C79A3C] transition-colors">Investasi &amp; Paket</a></li>
                     <li><a href="#faq" className="text-sm font-light text-[#0F1E3D]/70 hover:text-[#C79A3C] transition-colors">Pertanyaan Umum (FAQ)</a></li>
                   </ul>
                 </div>

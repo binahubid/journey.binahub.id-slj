@@ -1,5 +1,20 @@
-const CACHE_NAME = "slj-shell-v1";
-const APP_SHELL = ["/", "/login", "/offline", "/manifest.webmanifest"];
+const CACHE_NAME = "slj-shell-v2";
+const APP_SHELL = ["/", "/offline", "/manifest.webmanifest"];
+
+function updateUnreadBadge(value) {
+  const count = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  const badges = self.navigator;
+  const operation = count > 0 ? badges.setAppBadge?.(count) : badges.clearAppBadge?.();
+  return Promise.resolve(operation).catch(() => {});
+}
+
+function notificationUrl(value) {
+  const fallback = new URL("/notifications", self.location.origin);
+  try {
+    const target = new URL(value || "/notifications", self.location.origin);
+    return target.origin === fallback.origin && ["https:", "http:"].includes(target.protocol) && !target.username && !target.password ? target.href : fallback.href;
+  } catch { return fallback.href; }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -10,7 +25,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("slj-shell-") && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -47,18 +62,12 @@ self.addEventListener("push", (event) => {
     body: payload.body,
     icon: "/icons/app-icon.webp",
     badge: "/icons/app-icon.webp",
-    data: { url: payload.url || "/notifications" },
+    data: { url: notificationUrl(payload.url) },
     tag: payload.tag || "slj-reminder",
   });
 
-  // Set badge count (Chrome Android + iOS PWA 16.4+)
-  // badgeCount dikirim Edge Function = jumlah unread sebenarnya.
-  if (self.registration.setAppBadge) {
-    const count = typeof payload.badgeCount === "number" && payload.badgeCount > 0 ? payload.badgeCount : 1;
-    notificationPromise.then(() => self.registration.setAppBadge(count)).catch(() => {});
-  }
-
-  event.waitUntil(notificationPromise);
+  // The Badging API belongs to WorkerNavigator; zero clears an existing badge.
+  event.waitUntil(notificationPromise.then(() => updateUnreadBadge(payload.badgeCount)));
 });
 
 self.addEventListener("notificationclick", (event) => {
@@ -66,7 +75,7 @@ self.addEventListener("notificationclick", (event) => {
 
   // Jangan clear badge buta — biarkan halaman yang menghitung unread sebenarnya
   // (badge mungkin masih berisi notif lain yang belum dibaca).
-  const targetUrl = new URL(event.notification.data?.url || "/notifications", self.location.origin).href;
+  const targetUrl = notificationUrl(event.notification.data?.url);
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
@@ -86,13 +95,6 @@ self.addEventListener("notificationclick", (event) => {
 // Handle badge update messages from the main app
 self.addEventListener("message", (event) => {
   if (event.data?.type === "UPDATE_BADGE") {
-    const count = event.data.count || 0;
-    if (self.registration.setAppBadge) {
-      if (count > 0) {
-        self.registration.setAppBadge(count).catch(() => {});
-      } else {
-        self.registration.clearAppBadge().catch(() => {});
-      }
-    }
+    event.waitUntil(updateUnreadBadge(event.data.count));
   }
 });

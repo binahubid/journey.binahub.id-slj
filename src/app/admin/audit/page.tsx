@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   ScrollText,
   Filter,
@@ -87,11 +87,9 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
-  useEffect(() => {
-    loadAuditLog();
-  }, [page, filterTable]);
 
-  async function loadAuditLog() {
+
+  const loadAuditLog = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -108,7 +106,11 @@ export default function AuditLogPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, filterTable]);
+
+  useEffect(() => {
+    loadAuditLog();
+  }, [loadAuditLog]);
 
   const filtered = entries.filter((e) => {
     if (filterAction !== "all" && e.action !== filterAction) return false;

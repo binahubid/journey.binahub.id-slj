@@ -1,25 +1,18 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { PwaProvider } from "@/components/pwa/PwaProvider";
 import "./globals.css";
 
-const jakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+const jakartaSans = localFont({
+  src: "../../public/fonts/plus-jakarta-sans/PlusJakartaSans-Variable.ttf",
+  weight: "200 800",
   variable: "--font-jakarta-sans",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-inter",
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "Spiritual Leadership Journey (SLJ) — BinaHub",
-  description: "Platform digital pendamping program transformasi 90 hari BinaJourney.",
+  description: "Mulai uji coba spiritual 14 hari dan lanjutkan perjalanan transformasi bersama BinaJourney.",
   manifest: "/manifest.webmanifest",
   applicationName: "SLJ BinaJourney",
   appleWebApp: {
@@ -40,8 +33,9 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   minimumScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -50,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`scroll-smooth ${jakartaSans.variable} ${inter.variable}`}>
+    <html lang="id" className={`scroll-smooth ${jakartaSans.variable}`}>
       <body className={`antialiased bg-[#FAF8F4] text-[#0B2C6B] min-h-screen overflow-x-hidden ${jakartaSans.className}`}>
         <PwaProvider>{children}</PwaProvider>
       </body>

@@ -4,6 +4,30 @@ Semua perubahan penting pada proyek Spiritual Leadership Journey (SLJ) dicatat d
 
 Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) dan proyek ini mematuhi [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-11-14
+
+### Added
+- Uji coba spiritual gratis 14 hari per akun terverifikasi, diaktifkan melalui onboarding tanpa kode program. Empat area lainnya ditampilkan sebagai pratinjau terkunci.
+- Dashboard trial `/trial`, pengaturan pendaftaran dan daftar peserta `/admin/trials`, serta panduan web `/panduan`.
+- SQL33: waktu akses otoritatif pada database, RLS dan pembatas RPC, riwayat trial yang tidak direset, serta kontrol pengingat setelah masa trial berakhir.
+- Pengujian SQL dengan PGlite dari struktur dan migration yang ada, regresi middleware, pengujian browser terisolasi, dan workflow CI tanpa kredensial produksi.
+
+### Changed
+- Navigasi admin dan peserta disederhanakan, memakai bahasa Indonesia, drawer dengan fokus terjaga, serta layout HP/tablet yang berbeda dari sidebar desktop.
+- Pilihan program menampilkan trial dan estimasi pendampingan 1/2/3 bulan. Pembayaran dan jumlah sesi pendampingan tidak ditentukan otomatis.
+- Font Plus Jakarta Sans disajikan lokal beserta lisensinya. Zoom, area aman layar, ukuran kontrol sentuh, dan dukungan reduced motion diperbaiki.
+- Next.js dan dependensi diperbarui, dan ESLint CLI menggantikan perintah lint Next.js yang ditinggalkan.
+
+### Fixed
+- Cookie sesi yang diperbarui tetap disertakan pada redirect. Peserta yang belum bergabung dapat membuka panduan publik.
+- Beralih dari trial ke kode program yang sah memulai durasi program baru tanpa menghapus catatan spiritual.
+- Penyimpanan salat menangani klik berulang dan kegagalan koneksi tanpa meninggalkan status sukses palsu. Dialog mengembalikan fokus ke pembukanya.
+- Jadwal salat memakai metode Kemenag untuk Indonesia dan Umm Al-Qura untuk Makkah/Madinah/Jeddah, dengan tanggal dan zona waktu peserta.
+- Pembatasan pembuat notifikasi sambutan, pemeriksaan akses pada RPC assessment/PTP, serta pengingat trial yang menyesuaikan masa akses.
+
+### Deployment
+- Jalankan `033_spiritual_trial_access.sql` pada Supabase SLJ dan deploy ulang Edge Function `send-user-reminders`. Tidak ada env atau cron baru. Lihat `docs/slj-readiness-2026-11-14.md` untuk status dan pemeriksaan rilis.
+
 ## [0.7.0] — 2026-08-04
 
 ### Added

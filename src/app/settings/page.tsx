@@ -14,6 +14,7 @@ import { getDeviceTimeZone, normalizeTimeZone } from "@/lib/local-date";
 import { disableWebPush, enableWebPush, getPushPermission, isPushSupported } from "@/lib/web-push";
 
 export default function SettingsPage() {
+  const [isTrial, setIsTrial] = useState(false);
   const supabase = createClient();
   const { canInstall, isInstalled, isIos, install } = usePwaInstall();
   const [city, setCity] = useState("Jakarta");
@@ -73,10 +74,11 @@ export default function SettingsPage() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("location, timezone, timezone_mode")
+          .select("location, timezone, timezone_mode, program_code")
           .eq("user_id", user.id)
           .maybeSingle();
         if (profileError) throw profileError;
+        setIsTrial(profile?.program_code === "SLJ-TRIAL-14");
 
         if (profile?.location) {
           setCity(profile.location);
@@ -130,7 +132,7 @@ export default function SettingsPage() {
     }
 
     loadSettings();
-  }, []);
+  }, [supabase]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,11 +297,13 @@ export default function SettingsPage() {
                     <Input
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      placeholder="Nama kota, misal: Jakarta, Surabaya, Bandung"
-                      className="text-xs"
+                      aria-label="Kota untuk jadwal salat"
+                      list="settings-prayer-cities"
+                      placeholder="Jakarta, Makkah, Madinah…"
                     />
+                    <datalist id="settings-prayer-cities"><option value="Jakarta" /><option value="Makkah" /><option value="Madinah" /><option value="Jeddah" /></datalist>
                     <p className="text-[11px] text-gray-500">
-                      Dihitung otomatis via Aladhan API berdasarkan lokasi kota Anda.
+                      Pilih kota Anda. Jadwal untuk Makkah dan Madinah mengikuti pengaturan Arab Saudi.
                     </p>
                   </div>
 
@@ -308,9 +312,10 @@ export default function SettingsPage() {
                       <Clock className="h-4 w-4 text-accent" /> Zona Waktu
                     </label>
                     <select
+                      aria-label="Zona waktu"
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-navy-900 bg-white"
+                      className="min-h-11 w-full px-3 py-2 text-base sm:text-sm border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-navy-900 bg-white"
                     >
                        <option value="Auto">Otomatis mengikuti perangkat ({detectedTimeZone})</option>
                        <option value="WIB">WIB (Asia/Jakarta - UTC+7)</option>
@@ -322,7 +327,7 @@ export default function SettingsPage() {
                        <option value="Australia/Sydney">Australia Timur (Sydney)</option>
                     </select>
                     <p className="text-[11px] text-gray-500">
-                      Penentuan tampilan nama zona waktu pada Live Clock.
+                      Digunakan untuk tanggal catatan, jadwal salat, dan pengingat Anda.
                     </p>
                   </div>
                 </div>
@@ -390,46 +395,46 @@ export default function SettingsPage() {
                     <Bell className="h-4 w-4 text-accent" /> Preferensi Pengingat
                   </label>
 
-                  <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
+                  {!isTrial && (<div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
                       <span className="text-xs font-semibold text-navy-900 block">Pengingat Habit Harian</span>
                       <span className="text-[11px] text-gray-500">Pengingat utama pukul 20.00 jika habit hari ini belum selesai.</span>
                     </div>
-                    <Switch checked={habitNotif} onCheckedChange={setHabitNotif} />
-                  </div>
+                    <Switch aria-label="Pengingat habit harian" checked={habitNotif} onCheckedChange={setHabitNotif} />
+                  </div>)}
 
                   <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
                       <span className="text-xs font-semibold text-navy-900 block">Pengingat Jurnal Harian</span>
                       <span className="text-[11px] text-gray-500">Pengingat utama pukul 21.00 jika jurnal hari ini belum ditulis.</span>
                     </div>
-                    <Switch checked={journalNotif} onCheckedChange={setJournalNotif} />
+                    <Switch aria-label="Pengingat jurnal harian" checked={journalNotif} onCheckedChange={setJournalNotif} />
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-2">
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Waktu Sholat</span><span className="text-[11px] text-gray-500">Opsional, pengingat waktu sholat.</span></div>
-                      <Switch checked={prayerNotif} onCheckedChange={setPrayerNotif} />
+                      <Switch aria-label="Pengingat salat" checked={prayerNotif} onCheckedChange={setPrayerNotif} />
                     </div>
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Tilawah Al-Qur'an</span><span className="text-[11px] text-gray-500">Opsional, pukul 06.30 waktu lokal.</span></div>
-                      <Switch checked={quranNotif} onCheckedChange={setQuranNotif} />
+                      <div><span className="text-xs font-semibold text-navy-900 block">Tilawah Al-Qur&apos;an</span><span className="text-[11px] text-gray-500">Opsional, pukul 06.30 waktu lokal.</span></div>
+                      <Switch aria-label="Pengingat Al-Qur’an" checked={quranNotif} onCheckedChange={setQuranNotif} />
                     </div>
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Hadits Hari Ini</span><span className="text-[11px] text-gray-500">Opsional, pukul 07.00 waktu lokal.</span></div>
-                      <Switch checked={hadithNotif} onCheckedChange={setHadithNotif} />
+                      <Switch aria-label="Pengingat hadits" checked={hadithNotif} onCheckedChange={setHadithNotif} />
                     </div>
-                    <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                    {!isTrial && (<div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Checkpoint Program</span><span className="text-[11px] text-gray-500">H-3, H-1, dan hari checkpoint.</span></div>
-                      <Switch checked={checkpointNotif} onCheckedChange={setCheckpointNotif} />
-                    </div>
+                      <Switch aria-label="Pengingat evaluasi program" checked={checkpointNotif} onCheckedChange={setCheckpointNotif} />
+                    </div>)}
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Coach & Sahabat Safar</span><span className="text-[11px] text-gray-500">Respons coach dan pengingat pasangan.</span></div>
-                      <Switch checked={socialNotif} onCheckedChange={setSocialNotif} />
+                      <Switch aria-label="Notifikasi pendamping" checked={socialNotif} onCheckedChange={setSocialNotif} />
                     </div>
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Pengingat Tidak Aktif</span><span className="text-[11px] text-gray-500">Dikirim setelah 3 hari tanpa aktivitas.</span></div>
-                      <Switch checked={inactivityNotif} onCheckedChange={setInactivityNotif} />
+                      <Switch aria-label="Pengingat saat tidak aktif" checked={inactivityNotif} onCheckedChange={setInactivityNotif} />
                     </div>
                   </div>
                 </div>
@@ -442,12 +447,12 @@ export default function SettingsPage() {
                     <div>
                       <span className="block text-xs font-semibold text-navy-900">Tampilkan pengingat di layar HP</span>
                       <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
-                        Pengingat tetap masuk ke akun. Opsi ini menambahkan Web Push ke notification tray perangkat.
+                        Aktifkan agar pengingat juga muncul di layar HP Anda, termasuk saat aplikasi sedang ditutup.
                         {pushPermission === "denied" ? " Izin saat ini diblokir oleh browser." : ""}
                       </span>
                     </div>
                     <Switch
-                      checked={pushNotif}
+                      aria-label="Pengingat di layar HP" checked={pushNotif}
                       onCheckedChange={handlePushToggle}
                       disabled={updatingPush || !isPushSupported() || pushPermission === "denied"}
                     />
