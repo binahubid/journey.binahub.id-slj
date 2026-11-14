@@ -164,7 +164,7 @@ describe("spiritual trial database", () => {
   it("persists prayer activity and keeps it isolated to its participant", async () => {
     await asUser(users[0]);
     await db.exec(
-      "INSERT INTO prayer_logs(user_id,date,prayer_name,is_completed) VALUES(auth.uid(),CURRENT_DATE,'subuh',true)",
+      "INSERT INTO prayer_logs(user_id,date,prayer_name,is_completed) VALUES(auth.uid(),(NOW() AT TIME ZONE 'Asia/Jakarta')::DATE,'subuh',true)",
     );
     const own = await db.query("SELECT prayer_name FROM prayer_logs");
     expect(own.rows).toEqual([{ prayer_name: "subuh" }]);
@@ -195,7 +195,7 @@ describe("spiritual trial database", () => {
     expect((await access()).active).toBe(false);
     await expect(
       db.exec(
-        "INSERT INTO prayer_logs(user_id,date,prayer_name,is_completed) VALUES(auth.uid(),CURRENT_DATE,'isya',true)",
+        "INSERT INTO prayer_logs(user_id,date,prayer_name,is_completed) VALUES(auth.uid(),(NOW() AT TIME ZONE 'Asia/Jakarta')::DATE,'isya',true)",
       ),
     ).rejects.toThrow(/Fitur ini memerlukan/);
     await owner();
@@ -382,7 +382,7 @@ describe("spiritual trial database", () => {
     await db.exec("INSERT INTO sahabat_safar_profiles(user_id,preferences,is_completed) VALUES(auth.uid(),'{\"trialGoal\":\"Tilawah rutin\"}',true)");
     const ids = (await db.query<{ id: string }>(`INSERT INTO habits(user_id,title,area_category,action_plan_id)
       SELECT auth.uid(),'Tilawah','Spiritual Growth',id FROM action_plans WHERE journey_id=$1 RETURNING id`, [id])).rows;
-    await db.query("INSERT INTO habit_logs(user_id,habit_id,date,completed) VALUES(auth.uid(),$1,CURRENT_DATE::TEXT,true)", [ids[0].id]);
+    await db.query("INSERT INTO habit_logs(user_id,habit_id,date,completed) VALUES(auth.uid(),$1,(NOW() AT TIME ZONE 'Asia/Jakarta')::DATE::TEXT,true)", [ids[0].id]);
 
     // Enrolling after the free trial ends must preserve the same answers and weekly records.
     await owner();
