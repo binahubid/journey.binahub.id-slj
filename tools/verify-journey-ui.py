@@ -71,10 +71,18 @@ try:
         expect(page.get_by_role("spinbutton", name="Target", exact=True)).to_be_focused()
         page.get_by_role("spinbutton", name="Target", exact=True).fill("14")
 
+        page.get_by_role("combobox").first.select_option("quality")
+        page.get_by_role("textbox", name="Apa yang diukur?").fill("Kekhusyukan salat")
+        page.get_by_role("spinbutton", name="Nilai awal", exact=True).fill("1")
+        page.get_by_role("spinbutton", name="Target", exact=True).fill("5")
+        page.get_by_role("textbox", name="Satuan", exact=True).fill("skor")
+        page.locator("summary:visible").filter(has_text="Sumber data & rubrik").click()
+        page.get_by_role("textbox", name="3", exact=True).fill("Mulai khusyuk secara konsisten")
+
         page.evaluate("window.__failSave = true")
         next_button.click()
         expect(page.get_by_role("alert")).to_contain_text("Synthetic save failure")
-        expect(page.get_by_role("textbox", name="Apa yang diukur?")).to_have_value("Sesi tilawah")
+        expect(page.get_by_role("textbox", name="Apa yang diukur?")).to_have_value("Kekhusyukan salat")
         page.evaluate("window.__failSave = false")
         next_button.click()
         expect(page.get_by_role("heading", name="Action Plan & Habit Engine")).to_be_visible()
@@ -83,6 +91,13 @@ try:
         page.get_by_role("button", name="Simpan Action Plan", exact=True).click()
         page.get_by_role("button", name="Selesai ✓", exact=True).click()
         expect(page.get_by_role("heading", name="Rencana perubahan Selesai!")).to_be_visible()
+        indicator = page.evaluate("JSON.parse(sessionStorage.getItem('db')).ptp_indicators[0]")
+        assert set(indicator["quality_rubric"]) == {"1", "2", "3", "4", "5"}
+        assert indicator["quality_rubric"]["3"] == "Mulai khusyuk secara konsisten"
+        page.goto(origin + "/journey", wait_until="networkidle")
+        page.get_by_role("button").filter(has_text="Area Transformasi").click()
+        page.locator("summary:visible").filter(has_text="Sumber data & rubrik").click()
+        expect(page.get_by_role("textbox", name="3", exact=True)).to_have_value("Mulai khusyuk secara konsisten")
         print("Passed validation, save failure recovery and plan completion", flush=True)
 
         page.goto(origin + "/baseline", wait_until="networkidle")

@@ -13,7 +13,7 @@ import { getProgramDay } from "@/lib/program-timeline";
 import { resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { TRANSFORMATION_AREAS, getTransformationAreaStyle } from "@/lib/transformation-areas";
-import { indicatorTypes, validateAreaIndicators, indicatorActualSources, getDefaultQualityRubric, type IndicatorDefinition, type IndicatorType, type IndicatorActualSource } from "@/lib/assessment-methodology";
+import { indicatorTypes, validateAreaIndicators, indicatorActualSources, getDefaultQualityRubric, serializePtpIndicator, type IndicatorDefinition, type IndicatorType, type IndicatorActualSource } from "@/lib/assessment-methodology";
 import {
   CheckCircle2,
   Lock,
@@ -537,7 +537,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       const target = areaTargetsMapRef.current[area] || {};
       return [area, {
         ...target,
-        indicators: target.indicators?.length ? target.indicators : legacyIndicators(target),
+        indicators: (target.indicators?.length ? target.indicators : legacyIndicators(target)).map(serializePtpIndicator),
       }];
     })),
     status: isSection3ReadyForAutosave() ? "READY" : "INCOMPLETE",

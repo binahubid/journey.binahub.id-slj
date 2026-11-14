@@ -1,6 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { serializePtpIndicator, type IndicatorDefinition } from "./assessment-methodology";
 
 const db = new PGlite();
 const admin = "00000000-0000-4000-8000-000000000001";
@@ -420,6 +421,54 @@ describe("spiritual trial database", () => {
     expect((await db.query<{ result: unknown }>("SELECT get_slj_trial_result() AS result")).rows[0].result).toEqual(archived);
     await asUser(users[3]);
     expect((await db.query<{ result: unknown }>("SELECT get_slj_trial_result() AS result")).rows[0].result).toBeNull();
+  });
+
+  it("publishes quality rubrics and linked habits from the participant draft in both trial and full programs", async () => {
+    await asUser(users[7]);
+    await db.query("SELECT start_slj_spiritual_trial($1)", ["Peserta Kualitas"]);
+    const journeyId = (await db.query<{ id: string }>("SELECT id FROM journeys WHERE user_id=auth.uid()")).rows[0].id;
+    const rubric = { 1: "Belum konsisten", 2: "Mulai mencoba", 3: "Cukup konsisten", 4: "Konsisten", 5: "Sangat konsisten" };
+    const quality: IndicatorDefinition = {
+      key: "quality", type: "quality", label: "Kekhusyukan salat", active: true,
+      baseline: 1, target: 5, direction: "higher_is_better", unit: "skor",
+      qualityRubric: rubric, actualSource: "external",
+    };
+    const publish = (areas: string[], definition = quality) => db.query("SELECT publish_ptp_draft($1,$2::JSONB)", [
+      journeyId, JSON.stringify({
+        selected_areas: areas,
+        targets: Object.fromEntries(areas.map(area => [area, {
+          mainTarget: "Meningkatkan konsistensi latihan",
+          indicators: [serializePtpIndicator(definition)],
+        }])),
+      }),
+    ]);
+
+    await publish(["Spiritual Growth"]);
+    expect((await db.query("SELECT quality_rubric,actual_source FROM ptp_indicators WHERE journey_id=$1", [journeyId])).rows)
+      .toEqual([{ quality_rubric: rubric, actual_source: "external" }]);
+    await expect(publish(["Spiritual Growth"], { ...quality, qualityRubric: { 1: "Belum konsisten" } }))
+      .rejects.toThrow(/ptp_indicators_quality_rubric_check/);
+    expect((await db.query("SELECT quality_rubric FROM ptp_indicators WHERE journey_id=$1", [journeyId])).rows)
+      .toEqual([{ quality_rubric: rubric }]);
+
+    const plan = (await db.query<{ id: string }>("INSERT INTO action_plans(user_id,journey_id,title,area_category) VALUES(auth.uid(),$1,'Tilawah harian','Spiritual Growth') RETURNING id", [journeyId])).rows[0].id;
+    await publish(["Spiritual Growth"], {
+      ...quality, key: "quantity", type: "quantity", qualityRubric: undefined,
+      label: "Sesi tilawah", baseline: 0, target: 14, unit: "sesi",
+      actualSource: "action_plan", linkedActionPlanIds: [plan],
+    });
+    expect((await db.query("SELECT quality_rubric,actual_source FROM ptp_indicators WHERE journey_id=$1", [journeyId])).rows)
+      .toEqual([{ quality_rubric: null, actual_source: "action_plan" }]);
+    expect((await db.query("SELECT action_plan_id FROM ptp_indicator_action_plans WHERE indicator_id IN (SELECT id FROM ptp_indicators WHERE journey_id=$1)", [journeyId])).rows)
+      .toEqual([{ action_plan_id: plan }]);
+
+    await owner();
+    await db.exec("INSERT INTO batches(company_name,name,access_code,status) VALUES('Organisasi Uji','Program Kualitas','SLJ-QUALITY','active')");
+    await asUser(users[7]);
+    await db.query("SELECT enroll_participant_by_access_code($1,$2)", ["Peserta Kualitas", "SLJ-QUALITY"]);
+    await publish(["Spiritual Growth", "Personal Development", "Relationship"]);
+    expect((await db.query("SELECT area,quality_rubric FROM ptp_indicators WHERE journey_id=$1 ORDER BY area", [journeyId])).rows)
+      .toEqual(["Personal Development", "Relationship", "Spiritual Growth"].map(area => ({ area, quality_rubric: rubric })));
   });
 
   it("can safely be reapplied without resetting registration settings or trial dates", async () => {

@@ -50,6 +50,16 @@ export type IndicatorDefinition = {
   qualityRubric?: Record<number, string>;
 };
 
+export function serializePtpIndicator(indicator: IndicatorDefinition) {
+  // Keep client fields for reopening saved drafts and include the RPC's database field names.
+  return {
+    ...indicator,
+    actual_source: indicator.actualSource || "self_report",
+    quality_rubric: indicator.type === "quality" ? indicator.qualityRubric : undefined,
+    linked_action_plan_ids: indicator.linkedActionPlanIds || [],
+  };
+}
+
 export type IndicatorValidationError = {
   code: "indicator_count" | "duplicate_type" | "required_label" | "required_unit" | "invalid_baseline" | "invalid_target" | "equal_baseline_target" | "invalid_direction_target" | "invalid_actual_source" | "invalid_quality_rubric";
   area: string;
