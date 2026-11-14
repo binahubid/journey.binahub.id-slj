@@ -1,4 +1,5 @@
 "use client";
+import { averageMeasuredScore } from "@/lib/assessment-report";
 
 import { useEffect, useState, useCallback } from "react";
 import {
@@ -85,9 +86,7 @@ export default function AdminMonitoringPage() {
     return matchesComp && matchesBatch && matchesCoach;
   });
 
-  const avgHabit = filtered.length
-    ? Math.round(filtered.reduce((acc, p) => acc + p.habitAvgPercent, 0) / filtered.length)
-    : 0;
+  const avgHabit = averageMeasuredScore(filtered.map(participant => participant.habitAvgPercent));
   const needSupportCount = filtered.filter(
     (p) => p.needsSupport || p.daysInactive > DAY_INACTIVE_THRESHOLD
   ).length;
@@ -109,9 +108,9 @@ export default function AdminMonitoringPage() {
       <div className="border-b border-[#EAE5D9] pb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight flex items-center gap-2">
-            <Activity className="h-7 w-7 text-[#C79A3C]" /> Drill-down Program Monitoring
+            <Activity className="h-7 w-7 text-[#C79A3C]" /> Progres peserta
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">
+          <p className="text-sm text-slate-600 font-medium mt-1">
             Filter hierarki lengkap: Company → Batch → Coach → Participant (sumber: canonical view).
           </p>
         </div>
@@ -133,15 +132,15 @@ export default function AdminMonitoringPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Peserta", value: filtered.length },
-          { label: "Progres Habit Rata-rata", value: `${avgHabit}%` },
+          { label: "Konsistensi rata-rata", value: avgHabit === null ? "Belum terukur" : `${avgHabit}%` },
           { label: "Perlu Dukungan", value: needSupportCount, accent: "text-amber-700 bg-amber-50" },
-          { label: "PTP Terlocked", value: lockedCount, accent: "text-purple-700 bg-purple-50" },
+          { label: "Rencana dikunci", value: lockedCount, accent: "text-purple-700 bg-purple-50" },
         ].map((s) => (
           <div
             key={s.label}
             className={`rounded-xl border border-[#EAE5D9] p-4 bg-white ${s.accent || ""}`}
           >
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{s.label}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-600">{s.label}</p>
             <p className="mt-1 text-2xl font-extrabold text-[#071A33]">{s.value}</p>
           </div>
         ))}
@@ -156,8 +155,8 @@ export default function AdminMonitoringPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 uppercase block">1. Company</label>
-            <select
+            <label className="text-xs font-bold text-slate-600 uppercase block">1. Company</label>
+            <select aria-label="Perusahaan"
               value={selectedCompanyId}
               onChange={(e) => {
                 setSelectedCompanyId(e.target.value);
@@ -176,8 +175,8 @@ export default function AdminMonitoringPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 uppercase block">2. Batch</label>
-            <select
+            <label className="text-xs font-bold text-slate-600 uppercase block">2. Batch</label>
+            <select aria-label="Batch program"
               value={selectedBatchId}
               onChange={(e) => {
                 setSelectedBatchId(e.target.value);
@@ -195,8 +194,8 @@ export default function AdminMonitoringPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 uppercase block">3. Coach</label>
-            <select value={selectedCoachId} onChange={(e) => setSelectedCoachId(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4] text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]">
+            <label className="text-xs font-bold text-slate-600 uppercase block">3. Coach</label>
+            <select aria-label="Coach pendamping" value={selectedCoachId} onChange={(e) => setSelectedCoachId(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4] text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]">
               <option value="all">Semua Coach ({availableCoaches.length})</option>
               {availableCoaches.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -207,12 +206,12 @@ export default function AdminMonitoringPage() {
           </div>
         </div>
 
-        <div className="pt-2 flex items-center gap-2 text-xs font-medium text-slate-500 overflow-x-auto">
+        <div className="pt-2 flex items-center gap-2 text-xs font-medium text-slate-600 overflow-x-auto">
           <span className="font-bold text-[#0B2C6B]">Filter Aktif:</span>
           <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">{selectedCompanyName}</span>
-          <ChevronRight className="h-3 w-3 text-slate-400" />
+          <ChevronRight className="h-3 w-3 text-slate-600" />
           <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">{selectedBatchName}</span>
-          <ChevronRight className="h-3 w-3 text-slate-400" />
+          <ChevronRight className="h-3 w-3 text-slate-600" />
           <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">{selectedCoachName}</span>
         </div>
       </div>
@@ -224,10 +223,10 @@ export default function AdminMonitoringPage() {
             Hasil Drill-Down ({filtered.length} Peserta)
           </h2>
         </div>
-        <div className="overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Tabel data program" className="overflow-x-auto">
           <table className="w-full min-w-[58rem] text-left text-xs">
             <thead>
-              <tr className="border-b border-[#EAE5D9] text-slate-400 font-bold bg-[#FAF8F4]">
+              <tr className="border-b border-[#EAE5D9] text-slate-600 font-bold bg-[#FAF8F4]">
                 <th className="p-4 font-semibold">Peserta</th>
                 <th className="p-4 font-semibold">Perusahaan</th>
                 <th className="p-4 font-semibold">Batch</th>
@@ -241,13 +240,13 @@ export default function AdminMonitoringPage() {
             <tbody className="divide-y divide-[#EAE5D9]">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-600">
                     Memuat canonical view...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-600">
                     {errorMsg ? errorMsg : "Tidak ada peserta pada filter ini."}
                   </td>
                 </tr>
@@ -256,19 +255,19 @@ export default function AdminMonitoringPage() {
                   <tr key={p.userId} className="hover:bg-[#FAF8F4]/80">
                     <td className="p-4 font-extrabold text-[#071A33]">
                       {p.fullName}
-                      <span className="block text-[10px] font-medium text-slate-400">
+                      <span className="block text-xs font-medium text-slate-600">
                         Status: {p.journeyStatus}
                       </span>
                     </td>
                     <td className="p-4 font-bold text-slate-700">{p.companyName || "—"}</td>
                     <td className="p-4 font-medium text-slate-600">{p.batchName || "—"}</td>
                     <td className="p-4 font-medium text-slate-600">{p.coachName || "—"}</td>
-                    <td className="p-4 font-bold text-emerald-700">{p.habitAvgPercent}%</td>
+                    <td className="p-4 font-bold text-emerald-700">{p.habitAvgPercent === null ? "Belum terukur" : `${p.habitAvgPercent}%`}</td>
                     <td className="p-4 font-medium text-slate-600">{p.daysInactive} hari</td>
                     <td className="p-4 font-medium text-slate-600">{p.monthsReviewed} bulan</td>
                     <td className="p-4">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                           p.needsSupport ? "bg-amber-50 text-amber-700" : p.ptpStatus === "LOCKED" ? "bg-purple-50 text-purple-700" : "bg-blue-50 text-blue-700"
                         }`}
                       >

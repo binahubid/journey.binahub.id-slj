@@ -45,6 +45,23 @@ describe("assessment methodology v1.1", () => {
     expect(calculateIndicatorOutcome({ baseline: 10, target: 20, actual: Number.NaN, direction: "higher_is_better" }).score).toBeNull();
   });
 
+  it.each([
+    { baseline: 10, target: 20, actual: 15, direction: "lower_is_better" as const },
+    { baseline: 20, target: 10, actual: 15, direction: "higher_is_better" as const },
+    { baseline: 20, target: 10, actual: -1, direction: "lower_is_better" as const },
+  ])("excludes invalid indicator definitions and negative actuals: %o", (input) => {
+    expect(calculateIndicatorOutcome(input).score).toBeNull();
+  });
+
+  it("rejects a target that contradicts its success direction before publishing", () => {
+    const result = validateAreaIndicators([{
+      key: "quantity", type: "quantity", label: "Kegiatan per minggu", active: true,
+      direction: "lower_is_better", baseline: 2, target: 7, unit: "kali/minggu",
+    }]);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.code === "invalid_direction_target")).toBe(true);
+  });
+
   it("keeps structural and measurement coverage separate from outcome", () => {
     expect(calculateIndicatorCoverage(2).score).toBe(50);
     expect(calculateMeasurementCoverage(1, 2).score).toBe(50);

@@ -60,7 +60,7 @@ function DiffViewer({ oldData, newData }: { oldData: any; newData: any }) {
   if (changes.length === 0) return null;
 
   return (
-    <div className="mt-2 text-[10px] space-y-1">
+    <div className="mt-2 text-xs space-y-1">
       {changes.map((key) => (
         <div key={key} className="flex items-start gap-2">
           <span className="font-bold text-slate-600 shrink-0 w-24 truncate">{key}:</span>
@@ -125,7 +125,7 @@ export default function AuditLogPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight flex items-center gap-2">
             <ScrollText className="h-7 w-7 text-[#C79A3C]" /> Audit Log
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">
+          <p className="text-sm text-slate-600 font-medium mt-1">
             Catatan perubahan data perusahaan, batch, profil, dan perjalanan.
           </p>
         </div>
@@ -151,7 +151,7 @@ export default function AuditLogPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 uppercase block">Tabel</label>
+            <label className="text-xs font-bold text-slate-600 uppercase block">Tabel</label>
             <select
               value={filterTable}
               onChange={(e) => { setFilterTable(e.target.value); setPage(0); }}
@@ -165,7 +165,7 @@ export default function AuditLogPage() {
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-500 uppercase block">Aksi</label>
+            <label className="text-xs font-bold text-slate-600 uppercase block">Aksi</label>
             <select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
@@ -187,10 +187,10 @@ export default function AuditLogPage() {
             {filtered.length} Entri
           </h2>
         </div>
-        <div className="overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Tabel data program" className="overflow-x-auto">
           <table className="w-full min-w-[58rem] text-left text-xs">
             <thead>
-              <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
+              <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-600 font-bold">
                 <th className="p-4 font-semibold">Waktu</th>
                 <th className="p-4 font-semibold">Actor</th>
                 <th className="p-4 font-semibold">Aksi</th>
@@ -202,13 +202,13 @@ export default function AuditLogPage() {
             <tbody className="divide-y divide-[#EAE5D9]">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={6} className="py-12 text-center text-xs text-slate-600">
                     Memuat audit log...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={6} className="py-12 text-center text-xs text-slate-600">
                     {errorMsg || "Tidak ada entri audit."}
                   </td>
                 </tr>
@@ -235,19 +235,19 @@ export default function AuditLogPage() {
                           {entry.actor_email || "System"}
                         </td>
                         <td className="p-4">
-                          <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${ACTION_COLORS[entry.action] || "bg-slate-100 text-slate-600"}`}>
+                          <span className={`px-2.5 py-0.5 rounded-full font-bold text-xs ${ACTION_COLORS[entry.action] || "bg-slate-100 text-slate-600"}`}>
                             {ACTION_LABELS[entry.action] || entry.action}
                           </span>
                         </td>
                         <td className="p-4 font-bold text-[#071A33]">
                           {TABLE_LABELS[entry.table_name] || entry.table_name}
                         </td>
-                        <td className="p-4 font-mono text-[10px] text-slate-500 max-w-[120px] truncate">
+                        <td className="p-4 font-mono text-xs text-slate-600 max-w-[120px] truncate">
                           {entry.record_id}
                         </td>
                         <td className="p-4">
                           {(entry.old_data || entry.new_data) && (
-                            isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                            isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-slate-600" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-600" />
                           )}
                         </td>
                       </tr>
@@ -255,16 +255,16 @@ export default function AuditLogPage() {
                         <tr key={`${entry.id}-detail`}>
                           <td colSpan={6} className="px-4 pb-4">
                             <div className="bg-[#FAF8F4] rounded-xl p-3 border border-[#EAE5D9]">
-                              <p className="text-[10px] font-bold text-slate-500 mb-1">Perubahan Data:</p>
+                              <p className="text-xs font-bold text-slate-600 mb-1">Perubahan Data:</p>
                               <DiffViewer oldData={entry.old_data} newData={entry.new_data} />
                               {!entry.old_data && entry.new_data && (
-                                <div className="text-[10px] text-slate-600 mt-1">
+                                <div className="text-xs text-slate-600 mt-1">
                                   <span className="font-bold">Data baru:</span>{" "}
                                   {JSON.stringify(entry.new_data).slice(0, 200)}...
                                 </div>
                               )}
                               {entry.old_data && !entry.new_data && (
-                                <div className="text-[10px] text-rose-600 mt-1">
+                                <div className="text-xs text-rose-600 mt-1">
                                   <span className="font-bold">Data dihapus:</span>{" "}
                                   {JSON.stringify(entry.old_data).slice(0, 200)}...
                                 </div>
@@ -291,7 +291,7 @@ export default function AuditLogPage() {
             >
               Sebelumnya
             </button>
-            <span className="text-xs font-medium text-slate-500">Halaman {page + 1}</span>
+            <span className="text-xs font-medium text-slate-600">Halaman {page + 1}</span>
             <button
               onClick={() => setPage(page + 1)}
               disabled={filtered.length < pageSize}

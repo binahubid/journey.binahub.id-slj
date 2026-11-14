@@ -23,7 +23,7 @@ export interface ParticipantReal {
   coachName: string;
   journeyStatus: string;
   ptpStatus: string;
-  habitAvgPercent: number;
+  habitAvgPercent: number | null;
   daysInactive: number;
   monthsReviewed: number;
   needsSupport: boolean;
@@ -142,9 +142,9 @@ export default function ParticipantsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EAE5D9] pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight flex items-center gap-2">
-            <Users className="h-7 w-7 text-[#C79A3C]" /> Participants (Daftar Peserta)
+            <Users className="h-7 w-7 text-[#C79A3C]" /> Daftar peserta
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">
+          <p className="text-sm text-slate-600 font-medium mt-1">
             Data canonical dari view admin monitoring — journey aktif, habit, checkpoint, dan inactivity.
           </p>
         </div>
@@ -166,7 +166,7 @@ export default function ParticipantsPage() {
       {/* Filters Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative max-w-md w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
           <input
             type="text"
             placeholder="Cari nama, ID, perusahaan, atau batch..."
@@ -177,7 +177,7 @@ export default function ParticipantsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
+          <select aria-label="Perusahaan"
             value={selectedCompanyFilter}
             onChange={(e) => {
               setSelectedCompanyFilter(e.target.value);
@@ -193,7 +193,7 @@ export default function ParticipantsPage() {
             ))}
           </select>
 
-          <select
+          <select aria-label="Batch program"
             value={selectedBatchFilter}
             onChange={(e) => setSelectedBatchFilter(e.target.value)}
             className="px-3.5 py-2.5 rounded-xl border border-[#EAE5D9] bg-white text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
@@ -214,15 +214,15 @@ export default function ParticipantsPage() {
           <span className="text-xs font-extrabold text-[#071A33]">
             Menampilkan {filtered.length} dari {participants.length} Peserta Terdaftar
           </span>
-          <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
             {loading ? "Memuat…" : errorMsg ? "Gagal memuat" : "Sumber: Canonical View"}
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Tabel data program" className="overflow-x-auto">
           <table className="w-full min-w-[62rem] text-left text-xs">
             <thead>
-              <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
+              <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-600 font-bold">
                 <th className="p-4 font-semibold">Nama Peserta</th>
                 <th className="p-4 font-semibold">ID</th>
                 <th className="p-4 font-semibold">Company</th>
@@ -237,14 +237,14 @@ export default function ParticipantsPage() {
             <tbody className="divide-y divide-[#EAE5D9]">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={9} className="py-12 text-center text-xs text-slate-600">
                     <div className="animate-spin h-6 w-6 border-2 border-amber-600 border-t-transparent rounded-full mx-auto mb-2" />
                     Memuat data peserta dari canonical view...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={9} className="py-12 text-center text-xs text-slate-600">
                     {errorMsg ? errorMsg : "Tidak ada peserta yang cocok dengan filter saat ini."}
                   </td>
                 </tr>
@@ -253,12 +253,12 @@ export default function ParticipantsPage() {
                   <tr key={p.userId} className="hover:bg-[#FAF8F4]/80 transition-colors">
                     <td className="p-4">
                       <div className="font-extrabold text-[#071A33]">{p.name}</div>
-                      <div className="text-slate-400 text-[11px] font-normal">
+                      <div className="text-slate-600 text-xs font-normal">
                         PTP: {p.ptpStatus === "LOCKED" ? "Terlocked" : "Editable"}
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className="font-mono font-bold text-[#C79A3C] bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">
+                      <span className="font-mono font-bold text-[#C79A3C] bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-xs">
                         {p.displayId}
                       </span>
                     </td>
@@ -275,26 +275,26 @@ export default function ParticipantsPage() {
                         <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
-                              p.habitAvgPercent >= 80
+                              (p.habitAvgPercent ?? 0) >= 80
                                 ? "bg-emerald-500"
-                                : p.habitAvgPercent >= 50
+                                : (p.habitAvgPercent ?? 0) >= 50
                                 ? "bg-amber-500"
                                 : "bg-red-400"
                             }`}
-                            style={{ width: `${p.habitAvgPercent}%` }}
+                            style={{ width: `${p.habitAvgPercent ?? 0}%` }}
                           />
                         </div>
-                        <span className="font-bold text-slate-700">{p.habitAvgPercent}%</span>
+                        <span className="font-bold text-slate-700">{p.habitAvgPercent === null ? "Belum terukur" : `${p.habitAvgPercent}%`}</span>
                       </div>
                     </td>
                     <td className="p-4 font-medium text-slate-600">
                       {p.monthsReviewed} bulan
-                      {p.needsSupport && <span className="block text-[10px] font-bold text-amber-700">Perlu dukungan</span>}
+                      {p.needsSupport && <span className="block text-xs font-bold text-amber-700">Perlu dukungan</span>}
                     </td>
                     <td className="p-4 font-medium text-slate-600">{p.daysInactive} hari</td>
                     <td className="p-4">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
                           p.status === "ACTIVE"
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : p.status === "NEED_SUPPORT"

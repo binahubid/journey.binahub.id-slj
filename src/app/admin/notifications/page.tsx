@@ -203,7 +203,7 @@ export default function AdminNotificationsPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight flex items-center gap-2">
           <Bell className="h-7 w-7 text-[#C79A3C]" /> Broadcast Notification System
         </h1>
-        <p className="text-sm text-slate-500 font-medium mt-1">
+        <p className="text-sm text-slate-600 font-medium mt-1">
           Kirim pengumuman / reminder secara terarah ke seluruh entitas atau grup spesifik.
         </p>
       </div>
@@ -217,7 +217,7 @@ export default function AdminNotificationsPage() {
 
           {sentSuccess && (
             <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
               <span>Notifikasi berhasil dikirimkan ke target audiens!</span>
             </div>
           )}
@@ -359,22 +359,22 @@ export default function AdminNotificationsPage() {
           <h2 className="text-base font-extrabold text-[#071A33] flex items-center gap-2">
             <Bell className="h-4 w-4 text-[#C79A3C]" /> Riwayat Broadcast Terkirim
           </h2>
-          {loadingHistory && <p className="text-xs text-slate-500">Memuat riwayat dari database...</p>}
+          {loadingHistory && <p className="text-xs text-slate-600">Memuat riwayat dari database...</p>}
 
           <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
             {sentList.length === 0 && !loadingHistory ? (
-              <p className="text-xs text-slate-500">Belum ada broadcast tercatat.</p>
+              <p className="text-xs text-slate-600">Belum ada broadcast tercatat.</p>
             ) : null}
             {sentList.map((item) => (
               <div key={item.id} className="p-4 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4]/50 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <h3 className="font-extrabold text-[#071A33] text-sm">{item.title}</h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
                     {item.recipientCount} Penerima
                   </span>
                 </div>
                 <p className="text-slate-600 font-normal leading-relaxed">{item.message}</p>
-                <div className="pt-2 flex items-center justify-between border-t border-[#EAE5D9]/60 text-[11px] text-slate-400 font-medium">
+                <div className="pt-2 flex items-center justify-between border-t border-[#EAE5D9]/60 text-xs text-slate-600 font-medium">
                   <span>Target: <strong className="text-[#0B2C6B]">{item.targetLabel}</strong></span>
                   <span>{item.sentAt}</span>
                 </div>
@@ -406,15 +406,15 @@ export default function AdminNotificationsPage() {
           </div>
         )}
 
-        <p className="text-xs text-slate-500 font-medium">
+        <p className="text-xs text-slate-600 font-medium">
           Alert dihasilkan otomatis oleh sistem berdasarkan data monitoring peserta (inaktivitas, respons coach).
         </p>
 
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
           {loadingAlerts ? (
-            <p className="text-xs text-slate-500">Memuat monitoring alerts...</p>
+            <p className="text-xs text-slate-600">Memuat monitoring alerts...</p>
           ) : alerts.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4 text-center">Tidak ada monitoring alert saat ini.</p>
+            <p className="text-xs text-slate-600 py-4 text-center">Tidak ada monitoring alert saat ini.</p>
           ) : (
             alerts.map((alert) => (
               <div
@@ -429,13 +429,13 @@ export default function AdminNotificationsPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                    <span className={`px-2 py-0.5 rounded-full font-bold text-xs ${
                       alert.alert_type === "INACTIVITY" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"
                     }`}>
                       {alert.alert_type === "INACTIVITY" ? "INAKTIVITAS" : "RESPONS COACH"}
                     </span>
                     {alert.status === "RESOLVED" && (
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[10px]">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">
                         RESOLVED
                       </span>
                     )}
@@ -443,14 +443,14 @@ export default function AdminNotificationsPage() {
                   {alert.status !== "RESOLVED" && (
                     <button
                       onClick={() => handleResolveAlert(alert.id)}
-                      className="text-[10px] font-bold text-slate-500 hover:text-slate-700 underline"
+                      className="text-xs font-bold text-slate-600 hover:text-slate-700 underline"
                     >
                       Tandai Selesai
                     </button>
                   )}
                 </div>
                 <p className="text-slate-700 font-medium">{alert.message}</p>
-                <p className="text-[10px] text-slate-400 font-medium">
+                <p className="text-xs text-slate-600 font-medium">
                   {new Date(alert.created_at).toLocaleString("id-ID", {
                     day: "2-digit",
                     month: "short",

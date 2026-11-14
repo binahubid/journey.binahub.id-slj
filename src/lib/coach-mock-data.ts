@@ -17,9 +17,9 @@ export interface CoachParticipant {
   company: string;
   batch: string;
   city: string;
-  dayCount: number;
-  journeyStatus: JourneyStatus;
-  habitCompletionPercent: number;
+  dayCount: number | null;
+  journeyStatus: JourneyStatus | null;
+  habitCompletionPercent: number | null;
   streak: number;
   lastActive: string;
   lastActiveDaysAgo: number;
@@ -282,6 +282,7 @@ export function getCoachParticipant(id: string) {
 }
 
 export function getCoachAlert(participant: CoachParticipant): { type: CoachAlertType; label: string } | undefined {
+  if (!participant.journeyStatus || participant.journeyStatus === JourneyStatus.COMPLETED || participant.journeyStatus === JourneyStatus.ARCHIVED) return undefined;
   if (participant.lastActiveDaysAgo > 14) return { type: "INACTIVE", label: "Tidak aktif" };
   if (participant.lastCheckpointStatus === "NEED_SUPPORT" && (participant.coachRepliedDaysAgo === undefined || participant.coachRepliedDaysAgo > 3)) {
     return { type: "COACH_ACTION_NEEDED", label: "Perlu tindak lanjut" };

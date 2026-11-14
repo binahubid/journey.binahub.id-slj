@@ -25,7 +25,6 @@ import { RawMonitoringRow } from "@/lib/admin-types";
 
 interface MonitoringSummary {
   totalParticipants: number;
-  avgHabitPercent: number;
   needSupportCount: number;
   coachCount: number;
 }
@@ -35,7 +34,6 @@ export default function AdminDashboardPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [monitoring, setMonitoring] = useState<MonitoringSummary>({
     totalParticipants: 0,
-    avgHabitPercent: 0,
     needSupportCount: 0,
     coachCount: 0,
   });
@@ -61,9 +59,6 @@ export default function AdminDashboardPage() {
 
         const rows: RawMonitoringRow[] = monitoringRes.data || [];
         const totalParticipants = rows.length;
-        const avgHabitPercent = totalParticipants > 0
-          ? Math.round(rows.reduce((acc, r) => acc + (r.habit_avg_percent ?? 0), 0) / totalParticipants)
-          : 0;
         const needSupportCount = rows.filter(
           (r) => r.needs_support === true || (r.days_inactive ?? 0) > 5
         ).length;
@@ -72,7 +67,6 @@ export default function AdminDashboardPage() {
 
         setMonitoring({
           totalParticipants,
-          avgHabitPercent,
           needSupportCount,
           coachCount: coachIds.size,
         });
@@ -88,23 +82,16 @@ export default function AdminDashboardPage() {
 
   const activeBatchesCount = batches.filter((b) => b.status === "Active").length;
 
-  const healthScore = monitoring.totalParticipants === 0
-    ? 100
-    : Math.min(100, Math.round(
-        monitoring.avgHabitPercent * 0.6 +
-        (100 - Math.min(monitoring.needSupportCount / monitoring.totalParticipants * 100, 100)) * 0.4
-      ));
-
   return (
     <div className="space-y-8">
       {/* Header Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EAE5D9] pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight">
-            Admin Dashboard Overview
+            Ringkasan program
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">
-            Manajemen hierarki ekosistem: Company &rarr; Batch &rarr; Coach &rarr; Participant.
+          <p className="text-sm text-slate-600 font-medium mt-1">
+            Kelola perusahaan, kelompok program, coach, dan peserta dari satu tempat.
           </p>
         </div>
 
@@ -134,13 +121,13 @@ export default function AdminDashboardPage() {
         <Link href="/admin/companies" className="block group">
           <div className="p-5 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs group-hover:border-[#C79A3C] transition-all space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Companies</span>
+              <span className="text-xs font-bold text-slate-600">Companies</span>
               <div className="h-8 w-8 rounded-lg bg-[#0B2C6B]/10 flex items-center justify-center text-[#0B2C6B]">
                 <Building2 className="h-4 w-4" />
               </div>
             </div>
             <div className="text-3xl font-extrabold text-[#071A33]">{companies.length}</div>
-            <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+            <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
               {companies.length > 0 ? `${companies.length} Active Companies` : 'Belum Ada Perusahaan'}
             </p>
           </div>
@@ -150,13 +137,13 @@ export default function AdminDashboardPage() {
         <Link href="/admin/batches" className="block group">
           <div className="p-5 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs group-hover:border-[#C79A3C] transition-all space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Active Batches</span>
+              <span className="text-xs font-bold text-slate-600">Active Batches</span>
               <div className="h-8 w-8 rounded-lg bg-[#C79A3C]/10 flex items-center justify-center text-[#C79A3C]">
                 <Layers className="h-4 w-4" />
               </div>
             </div>
             <div className="text-3xl font-extrabold text-[#071A33]">{activeBatchesCount}</div>
-            <p className="text-[11px] font-semibold text-emerald-600">Tersebar di {companies.length} Perusahaan</p>
+            <p className="text-xs font-semibold text-emerald-700">Tersebar di {companies.length} Perusahaan</p>
           </div>
         </Link>
 
@@ -164,13 +151,13 @@ export default function AdminDashboardPage() {
         <Link href="/admin/participants" className="block group">
           <div className="p-5 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs group-hover:border-[#C79A3C] transition-all space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Participants</span>
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <span className="text-xs font-bold text-slate-600">Participants</span>
+              <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700">
                 <Users className="h-4 w-4" />
               </div>
             </div>
             <div className="text-3xl font-extrabold text-[#071A33]">{monitoring.totalParticipants}</div>
-            <p className="text-[11px] font-semibold text-slate-500">Peserta Terdaftar</p>
+            <p className="text-xs font-semibold text-slate-600">Peserta Terdaftar</p>
           </div>
         </Link>
 
@@ -178,31 +165,27 @@ export default function AdminDashboardPage() {
         <Link href="/admin/coaches" className="block group">
           <div className="p-5 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs group-hover:border-[#C79A3C] transition-all space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Coaches</span>
+              <span className="text-xs font-bold text-slate-600">Coaches</span>
               <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                 <UserCheck className="h-4 w-4" />
               </div>
             </div>
             <div className="text-3xl font-extrabold text-[#071A33]">{monitoring.coachCount}</div>
-            <p className="text-[11px] font-semibold text-slate-500">Coach Bimbingan</p>
+            <p className="text-xs font-semibold text-slate-600">Coach Bimbingan</p>
           </div>
         </Link>
 
-        {/* Card 5: Program Health */}
+        {/* Card 5: Perlu pendampingan */}
         <Link href="/admin/monitoring" className="block group min-[375px]:col-span-2 lg:col-span-1">
           <div className="p-5 rounded-2xl border border-[#EAE5D9] bg-white shadow-2xs group-hover:border-[#C79A3C] transition-all space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Program Health</span>
+              <span className="text-xs font-bold text-slate-600">Perlu pendampingan</span>
               <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center text-[#C79A3C]">
                 <Activity className="h-4 w-4" />
               </div>
             </div>
-            <div className={`text-3xl font-extrabold ${healthScore >= 80 ? "text-emerald-600" : healthScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
-              {healthScore}
-            </div>
-            <p className={`text-[11px] font-semibold ${healthScore >= 80 ? "text-emerald-600" : healthScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
-              Health Score Ekosistem
-            </p>
+            <div className="text-3xl font-semibold text-navy-900">{monitoring.needSupportCount}</div>
+            <p className="text-xs text-slate-600">Peserta yang memerlukan tindak lanjut</p>
           </div>
         </Link>
       </div>
@@ -216,18 +199,18 @@ export default function AdminDashboardPage() {
               <h2 className="text-base font-extrabold text-[#071A33] flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-[#C79A3C]" /> Perusahaan Terdaftar (Company)
               </h2>
-              <p className="text-xs text-slate-500 font-medium">Monitoring per entitas perusahaan</p>
+              <p className="text-xs text-slate-600 font-medium">Monitoring per entitas perusahaan</p>
             </div>
             <Link href="/admin/companies" className="text-xs font-bold text-[#0B2C6B] hover:underline flex items-center gap-1">
               Lihat Semua <ArrowRight className="h-3.5 w-3.5 text-[#C79A3C]" />
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
+          <div tabIndex={0} role="region" aria-label="Tabel data program" className="overflow-x-auto">
             {loading ? (
-              <div className="py-8 text-center text-xs text-slate-500 font-medium">Memuat data...</div>
+              <div className="py-8 text-center text-xs text-slate-600 font-medium">Memuat data...</div>
             ) : companies.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500 font-medium space-y-2">
+              <div className="py-8 text-center text-xs text-slate-600 font-medium space-y-2">
                 <p>Belum ada perusahaan mitra terdaftar di Supabase.</p>
                 <Link href="/admin/companies" className="inline-block font-bold text-[#0B2C6B] underline">
                   + Tambah Perusahaan Baru
@@ -236,7 +219,7 @@ export default function AdminDashboardPage() {
             ) : (
               <table className="w-full min-w-[48rem] text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#EAE5D9] text-slate-400 font-bold">
+                  <tr className="border-b border-[#EAE5D9] text-slate-600 font-bold">
                     <th className="pb-3 font-semibold">Nama Perusahaan</th>
                     <th className="pb-3 font-semibold">Peserta</th>
                     <th className="pb-3 font-semibold">Batch</th>
@@ -269,7 +252,7 @@ export default function AdminDashboardPage() {
               <h2 className="text-base font-extrabold text-[#071A33] flex items-center gap-2">
                 <Layers className="h-4 w-4 text-[#C79A3C]" /> Batch & Access Code
               </h2>
-              <p className="text-xs text-slate-500 font-medium">Kode akses pendaftaran otomatis</p>
+              <p className="text-xs text-slate-600 font-medium">Kode akses pendaftaran otomatis</p>
             </div>
             <Link href="/admin/batches" className="text-xs font-bold text-[#0B2C6B] hover:underline flex items-center gap-1">
               Kelola Batch <ArrowRight className="h-3.5 w-3.5 text-[#C79A3C]" />
@@ -278,9 +261,9 @@ export default function AdminDashboardPage() {
 
           <div className="space-y-3">
             {loading ? (
-              <div className="py-8 text-center text-xs text-slate-500 font-medium">Memuat data...</div>
+              <div className="py-8 text-center text-xs text-slate-600 font-medium">Memuat data...</div>
             ) : batches.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500 font-medium space-y-2">
+              <div className="py-8 text-center text-xs text-slate-600 font-medium space-y-2">
                 <p>Belum ada batch rombongan yang dibuat.</p>
                 <Link href="/admin/batches" className="inline-block font-bold text-[#0B2C6B] underline">
                   + Generate Batch & Access Code
@@ -291,15 +274,15 @@ export default function AdminDashboardPage() {
                 <div key={b.id} className="p-4 rounded-xl border border-[#EAE5D9] bg-[#FAF8F4]/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-[#071A33] text-sm">{b.name}</h3>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                       b.status === "Active" ? "bg-[#0B2C6B] text-white" : b.status === "Upcoming" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"
                     }`}>
                       {b.status}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 font-medium">{b.companyName}</p>
+                  <p className="text-xs text-slate-600 font-medium">{b.companyName}</p>
                   <div className="pt-2 flex items-center justify-between border-t border-[#EAE5D9]/60 text-xs">
-                    <span className="font-bold text-slate-500">Access Code:</span>
+                    <span className="font-bold text-slate-600">Access Code:</span>
                     <span className="font-mono font-extrabold text-[#0B2C6B] bg-white px-2.5 py-1 rounded border border-[#0B2C6B]/20 select-all">
                       {b.accessCode}
                     </span>

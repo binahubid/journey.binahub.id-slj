@@ -353,7 +353,7 @@ export default function InitialProcessPage() {
 
   return (
     <ParticipantLayout activePath="/initial-process" pageTitle="Initial Process — Sahabat Safar Profile">
-      <main className="max-w-4xl mx-auto pt-4 pb-20 space-y-6 font-sans">
+      <div className="max-w-4xl mx-auto pt-4 pb-20 space-y-6 font-sans">
 
         {/* ── HEADER BANNER ───────────────────────────────────────────────── */}
         <div className="bg-gradient-to-r from-[#071A33] via-navy-900 to-slate-800 text-white rounded-3xl p-6 shadow-md border border-slate-700/50 space-y-3 relative overflow-hidden">
@@ -362,7 +362,7 @@ export default function InitialProcessPage() {
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Initial Process: Sahabat Safar Matching Profile</h1>
+              <h1 className="text-xl font-bold text-white">Persiapan perjalanan</h1>
               <p className="text-xs text-slate-300">Instrumen rekomendasi pairing Sahabat Safar oleh Tim binaJourney.</p>
             </div>
           </div>
@@ -390,10 +390,10 @@ export default function InitialProcessPage() {
                     ? "bg-amber-400 text-navy-900 border-amber-300 font-extrabold shadow-sm"
                     : activeStep > s.num
                     ? "bg-white/10 text-emerald-300 border-white/20"
-                    : `bg-white/5 text-slate-400 border-white/10 ${!canOpenStep(s.num) ? "cursor-not-allowed opacity-60" : ""}`
+                    : `bg-white/5 text-slate-600 border-white/10 ${!canOpenStep(s.num) ? "cursor-not-allowed opacity-60" : ""}`
                 }`}
               >
-                <div className="text-[11px] sm:text-[10px] uppercase tracking-wider font-extrabold">Step {s.num}</div>
+                <div className="text-xs sm:text-xs uppercase tracking-wider font-extrabold">Step {s.num}</div>
                 <div className="truncate text-xs hidden sm:block">{s.label}</div>
               </button>
             ))}
@@ -417,7 +417,7 @@ export default function InitialProcessPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-navy-900">LAYER 1 – Eligibility Filter</h2>
-                <p className="text-xs text-slate-500">Informasi dasar domisili, pekerjaan, & kecenderungan komunikasi.</p>
+                <p className="text-xs text-slate-600">Informasi dasar domisili, pekerjaan, & kecenderungan komunikasi.</p>
               </div>
             </div>
 
@@ -446,7 +446,7 @@ export default function InitialProcessPage() {
               {/* Tahun Lahir */}
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-700 block">
-                  2. Tahun Lahir {getGenerationLabel(layer1.birthYear) && <span className="text-amber-600">({getGenerationLabel(layer1.birthYear)})</span>}
+                  2. Tahun Lahir {getGenerationLabel(layer1.birthYear) && <span className="text-amber-700">({getGenerationLabel(layer1.birthYear)})</span>}
                 </label>
                 <Input
                   type="number"
@@ -525,7 +525,7 @@ export default function InitialProcessPage() {
               {/* Media Komunikasi (Maks 2) */}
               <div className="space-y-1.5 sm:col-span-2">
                 <label className="font-bold text-slate-700 block">
-                  8. Media Komunikasi Nyaman <span className="text-amber-600 font-normal">(Pilih maks. 2)</span>
+                  8. Media Komunikasi Nyaman <span className="text-amber-700 font-normal">(Pilih maks. 2)</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {COMM_MEDIA_OPTIONS.map((m) => {
@@ -591,7 +591,7 @@ export default function InitialProcessPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-navy-900">LAYER 2 – Transformation Priority</h2>
-                  <p className="text-xs text-slate-500">Alokasikan total <span className="font-bold text-amber-600">100 poin</span> ke 5 area pertumbuhan.</p>
+                  <p className="text-xs text-slate-600">Alokasikan total <span className="font-bold text-amber-700">100 poin</span> ke 5 area pertumbuhan.</p>
                 </div>
               </div>
               <Badge
@@ -619,7 +619,7 @@ export default function InitialProcessPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="text-xs font-bold text-navy-900">{item.title}</h4>
-                        <p className="text-[11px] text-slate-500">{item.desc}</p>
+                        <p className="text-xs text-slate-600">{item.desc}</p>
                       </div>
                       <span className="text-sm font-black text-amber-700 bg-white px-3 py-1 rounded-xl border border-amber-200 shadow-2xs">
                         {val}
@@ -681,14 +681,14 @@ export default function InitialProcessPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-navy-900">LAYER 3 – Support Exchange</h2>
-                <p className="text-xs text-slate-500">Kecenderungan Anda memberi & menerima dukungan.</p>
+                <p className="text-xs text-slate-600">Kecenderungan Anda memberi & menerima dukungan.</p>
               </div>
             </div>
 
             {/* Q1: Spontan saat teman kesulitan */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700 block">
-                1. Ketika ada teman yang sedang menghadapi kesulitan, saya biasanya paling spontan... <span className="text-amber-600">(Pilih maks. 3)</span>
+                1. Ketika ada teman yang sedang menghadapi kesulitan, saya biasanya paling spontan... <span className="text-amber-700">(Pilih maks. 3)</span>
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 {SUPPORT_EXCHANGE_OPTIONS.map((opt) => {
@@ -714,7 +714,7 @@ export default function InitialProcessPage() {
             {/* Q2: Harapan saat diri sendiri kesulitan */}
             <div className="space-y-2 pt-4 border-t border-slate-100">
               <label className="text-xs font-bold text-slate-700 block">
-                2. Ketika saya sedang mengalami kesulitan, saya paling berharap Sahabat Safar saya... <span className="text-amber-600">(Pilih maks. 3)</span>
+                2. Ketika saya sedang mengalami kesulitan, saya paling berharap Sahabat Safar saya... <span className="text-amber-700">(Pilih maks. 3)</span>
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 {SUPPORT_EXCHANGE_OPTIONS.map((opt) => {
@@ -760,7 +760,7 @@ export default function InitialProcessPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-navy-900">Journey Preference (Tie-breaker)</h2>
-                <p className="text-xs text-slate-500">Gaya interaksi & ekspektasi pendampingan Sahabat Safar.</p>
+                <p className="text-xs text-slate-600">Gaya interaksi & ekspektasi pendampingan Sahabat Safar.</p>
               </div>
             </div>
 
@@ -946,17 +946,17 @@ export default function InitialProcessPage() {
             </div>
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-navy-900">Profil Sahabat Safar Berhasil Disimpan!</h2>
-              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
                 Data instrumen ini telah masuk ke sistem. Tim binaJourney akan menggunakan profil ini untuk menentukan pairing Sahabat Safar terbaik bagi Anda.
               </p>
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 max-w-md mx-auto text-left text-xs space-y-2">
               <p className="font-bold text-navy-900 border-b border-slate-200 pb-2">Ringkasan Profil Anda:</p>
-              <div className="flex justify-between"><span className="text-slate-500">Gender & Generasi:</span><span className="font-semibold text-navy-900">{layer1.gender || "-"} · {getGenerationLabel(layer1.birthYear) || "-"}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Kota Domisili:</span><span className="font-semibold text-navy-900">{layer1.city || "-"}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Perusahaan:</span><span className="font-semibold text-navy-900">{layer1.company || "-"}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Status Test:</span><span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Terverifikasi Selesai</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">Gender & Generasi:</span><span className="font-semibold text-navy-900">{layer1.gender || "-"} · {getGenerationLabel(layer1.birthYear) || "-"}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">Kota Domisili:</span><span className="font-semibold text-navy-900">{layer1.city || "-"}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">Perusahaan:</span><span className="font-semibold text-navy-900">{layer1.company || "-"}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">Status Test:</span><span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Terverifikasi Selesai</span></div>
             </div>
 
             <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
@@ -978,7 +978,7 @@ export default function InitialProcessPage() {
           </Card>
         )}
 
-      </main>
+      </div>
     </ParticipantLayout>
   );
 }

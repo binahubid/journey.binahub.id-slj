@@ -51,7 +51,8 @@ export function LiveImpactReport() {
         setErrorMsg(formatSupabaseError(monitoring.error, "Metrik operasional belum dapat dimuat."));
       } else {
         setReport(impact.data as GroupImpactReport);
-        setOperations((monitoring.data ?? []).map((row: any) => ({
+        const participantIds = new Set((impact.data as GroupImpactReport).participants.map(row => row.user_id));
+        setOperations((monitoring.data ?? []).filter((row: any) => participantIds.has(row.user_id)).map((row: any) => ({
           userId: row.user_id, journeyStatus: row.journey_status ?? "NOT_ENROLLED", ptpStatus: row.ptp_status ?? "EDITABLE",
           daysInactive: row.days_inactive ?? 0, monthsReviewed: row.months_reviewed ?? 0, needsSupport: row.needs_support === true,
         })));
@@ -65,7 +66,7 @@ export function LiveImpactReport() {
   const availableBatches = batches.filter((batch) => companyId === "all" || batch.companyId === companyId);
   const summary = report ? summarizeGroupImpact(report) : null;
   const completed = operations.filter((row) => row.journeyStatus === "COMPLETED").length;
-  const needSupport = operations.filter((row) => row.needsSupport || row.daysInactive > 5).length;
+  const needSupport = operations.filter((row) => row.journeyStatus !== "COMPLETED" && (row.needsSupport || row.daysInactive > 5)).length;
   const operationalActive = Math.max(0, operations.length - completed - needSupport);
   const reviewed = operations.filter((row) => row.monthsReviewed > 0).length;
   const locked = operations.filter((row) => row.ptpStatus === "LOCKED").length;
@@ -78,49 +79,49 @@ export function LiveImpactReport() {
   const selectedCompany = companies.find((company) => company.id === companyId);
   const score = (value: number | null) => value === null ? "Belum terukur" : `${value}%`;
 
-  if (loading) return <div className="rounded-2xl border border-[#EAE5D9] bg-white p-12 text-center text-sm text-slate-500">Menghitung Methodology v1.0...</div>;
+  if (loading) return <div className="rounded-2xl border border-[#EAE5D9] bg-white p-12 text-center text-sm text-slate-600">Memuat laporan peserta...</div>;
   if (errorMsg) return <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm font-semibold leading-relaxed text-rose-800">{errorMsg}</div>;
   if (!summary || !report) return null;
 
   return (
     <div className="space-y-7">
       <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-[#EAE5D9] bg-white p-4 print:hidden">
-        <label className="space-y-1"><span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Perusahaan</span><select value={companyId} onChange={(event) => { setCompanyId(event.target.value); setBatchId("all"); }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold"><option value="all">Semua Perusahaan</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>
-        <label className="space-y-1"><span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Batch</span><select value={batchId} onChange={(event) => setBatchId(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold"><option value="all">Semua Batch</option>{availableBatches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</select></label>
-        <span className="border-l border-slate-200 pl-4 text-[10px] font-bold uppercase tracking-widest text-emerald-700">Live / Methodology {report.methodology_version}</span>
+        <label className="space-y-1"><span className="block text-xs font-bold uppercase tracking-wider text-slate-600">Perusahaan</span><select value={companyId} onChange={(event) => { setCompanyId(event.target.value); setBatchId("all"); }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold"><option value="all">Semua Perusahaan</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>
+        <label className="space-y-1"><span className="block text-xs font-bold uppercase tracking-wider text-slate-600">Batch</span><select value={batchId} onChange={(event) => setBatchId(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold"><option value="all">Semua Batch</option>{availableBatches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</select></label>
+        <span className="border-l border-slate-200 pl-4 text-xs font-bold uppercase tracking-widest text-emerald-700">Live / Methodology {report.methodology_version}</span>
       </div>
 
       <section className="overflow-hidden rounded-3xl bg-[#0F1E3D] text-white">
         <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.1fr_1.9fr]">
-          <div><span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-amber-400">90-Day Impact Report</span><h2 className="mt-3 text-3xl font-black tracking-tight">{selectedCompany?.name || "Seluruh Ekosistem SLJ"}</h2><p className="mt-3 max-w-sm text-xs leading-relaxed text-blue-200">Skor hanya memakai peserta dengan bukti yang dapat dihitung. Coverage dan denominator ditampilkan agar data yang hilang tidak berubah menjadi performa nol.</p></div>
+          <div><span className="text-xs font-extrabold uppercase tracking-[0.2em] text-amber-400">90-Day Impact Report</span><h2 className="mt-3 text-3xl font-black tracking-tight">{selectedCompany?.name || "Seluruh Ekosistem SLJ"}</h2><p className="mt-3 max-w-sm text-xs leading-relaxed text-blue-200">Setiap skor adalah rata-rata peserta yang memiliki data terukur. Jumlah peserta terukur tercantum pada setiap metrik.</p></div>
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-3">
             {[
               ["Outcome", score(summary.outcome.score), `${summary.outcome.measured}/${summary.participantCount} peserta`],
               ["Baseline (Before)", score(summary.baseline.score), `${summary.baseline.measured}/${summary.baseline.denominator} peserta`],
-              ["Execution", score(summary.execution.score), `${summary.execution.numerator}/${summary.execution.denominator} eksekusi`],
+              ["Pelaksanaan", score(summary.execution.score), `${summary.execution.measured}/${summary.participantCount} peserta`],
               ["Peer Support", score(summary.peerSupport.score), `${summary.peerSupport.numerator}/${summary.peerSupport.denominator} minggu`],
               ["Coach Assessment", score(summary.coachAssessment.score), `${summary.coachAssessment.measured}/${summary.coachAssessment.denominator} dinilai`],
               ["Validated Outcome", score(summary.validatedOutcome.score), `${summary.validatedOutcome.measured}/${summary.validatedOutcome.denominator} tervalidasi`],
-            ].map(([label, value, detail]) => <div key={label} className="bg-[#142747] p-4"><span className="text-[9px] font-bold uppercase tracking-wider text-blue-200">{label}</span><p className="mt-1 text-xl font-black tabular-nums text-amber-400">{value}</p><p className="mt-1 text-[10px] text-blue-200">{detail}</p></div>)}
+            ].map(([label, value, detail]) => <div key={label} className="bg-[#142747] p-4"><span className="text-[9px] font-bold uppercase tracking-wider text-blue-200">{label}</span><p className="mt-1 text-xl font-black tabular-nums text-amber-400">{value}</p><p className="mt-1 text-xs text-blue-200">{detail}</p></div>)}
           </div>
         </div>
       </section>
 
       <section className="rounded-2xl border border-[#EAE5D9] bg-white p-6">
-        <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 h-5 w-5 text-[#C79A3C]" /><div><h3 className="font-extrabold text-[#0F1E3D]">Engagement component coverage</h3><p className="mt-1 text-xs text-slate-500">Komponen dilaporkan terpisah. Tidak ada composite engagement headline.</p></div></div>
+        <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 h-5 w-5 text-[#C79A3C]" /><div><h3 className="font-extrabold text-[#0F1E3D]">Kelengkapan partisipasi</h3><p className="mt-1 text-xs text-slate-600">Lihat jumlah peserta yang sudah menyelesaikan setiap bagian program.</p></div></div>
         <div className="mt-5 grid gap-px overflow-hidden rounded-xl bg-slate-200 sm:grid-cols-5">
-          {Object.entries(summary.engagement).map(([key, component]) => <div key={key} className="bg-[#FAF8F4] p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{key}</p><p className="mt-2 text-2xl font-black tabular-nums text-[#0F1E3D]">{component.coverage}%</p><p className="mt-1 text-[10px] text-slate-500">{component.numerator}/{component.denominator} peserta</p></div>)}
+          {Object.entries(summary.engagement).map(([key, component]) => <div key={key} className="bg-[#FAF8F4] p-4"><p className="text-xs font-bold uppercase tracking-wider text-slate-600">{key}</p><p className="mt-2 text-2xl font-black tabular-nums text-[#0F1E3D]">{component.coverage}%</p><p className="mt-1 text-xs text-slate-600">{component.numerator}/{component.denominator} peserta</p></div>)}
         </div>
       </section>
 
       <section className="rounded-2xl border border-[#EAE5D9] bg-[#FAF8F4] p-6">
-        <div className="mb-5"><h3 className="font-extrabold text-[#0F1E3D]">Operational monitoring</h3><p className="mt-1 text-xs text-slate-500">Status administrasi dan intervensi, terpisah dari skor impact.</p></div>
+        <div className="mb-5"><h3 className="font-extrabold text-[#0F1E3D]">Status pendampingan</h3><p className="mt-1 text-xs text-slate-600">Pantau status program dan peserta yang memerlukan tindak lanjut.</p></div>
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-xl bg-white p-5"><DonutChart segments={segments} totalCount={operations.length} totalLabel="Peserta" /></div>
           <div className="grid grid-cols-2 gap-3">{[
             { label: "Journey selesai", value: completed, icon: CheckCircle2 }, { label: "PTP terkunci", value: locked, icon: Lock },
             { label: "Checkpoint terisi", value: reviewed, icon: Activity }, { label: "Perlu dukungan", value: needSupport, icon: AlertTriangle },
-          ].map((item) => <div key={item.label} className="rounded-xl bg-white p-4"><item.icon className="h-4 w-4 text-[#C79A3C]" /><p className="mt-4 text-2xl font-black tabular-nums text-[#0F1E3D]">{item.value}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.label}</p></div>)}</div>
+          ].map((item) => <div key={item.label} className="rounded-xl bg-white p-4"><item.icon className="h-4 w-4 text-[#C79A3C]" /><p className="mt-4 text-2xl font-black tabular-nums text-[#0F1E3D]">{item.value}</p><p className="mt-1 text-xs font-bold uppercase tracking-wider text-slate-600">{item.label}</p></div>)}</div>
         </div>
       </section>
 

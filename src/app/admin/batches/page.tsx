@@ -215,9 +215,9 @@ export default function BatchesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EAE5D9] pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight">
-            Batches & Access Codes
+            Batch dan kode akses
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">
+          <p className="text-sm text-slate-600 font-medium mt-1">
             Generate kode akses unik per batch untuk dibagikan ke HR / peserta corporate.
           </p>
         </div>
@@ -239,7 +239,7 @@ export default function BatchesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Search */}
         <div className="relative max-w-md w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
           <input
             type="text"
             placeholder="Cari nama batch, kode akses, atau perusahaan..."
@@ -250,7 +250,7 @@ export default function BatchesPage() {
         </div>
 
         {/* Company Dropdown Filter */}
-        <select
+        <select aria-label="Perusahaan"
           value={selectedCompanyFilter}
           onChange={(e) => setSelectedCompanyFilter(e.target.value)}
           className="px-4 py-2.5 rounded-xl border border-[#EAE5D9] bg-white text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
@@ -266,10 +266,10 @@ export default function BatchesPage() {
 
       {/* Batches Table / Cards */}
       <div className="bg-white rounded-2xl border border-[#EAE5D9] overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
+        <div tabIndex={0} role="region" aria-label="Tabel data program" className="overflow-x-auto">
           <table className="w-full min-w-[54rem] text-left text-xs">
             <thead>
-              <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-400 font-bold">
+              <tr className="bg-[#FAF8F4] border-b border-[#EAE5D9] text-slate-600 font-bold">
                 <th className="p-4 font-semibold">Perusahaan (Company)</th>
                 <th className="p-4 font-semibold">Nama Batch</th>
                 <th className="p-4 font-semibold">Access Code</th>
@@ -283,13 +283,13 @@ export default function BatchesPage() {
             <tbody className="divide-y divide-[#EAE5D9]">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-600">
                     Memuat data batch...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-xs text-slate-600">
                     Tidak ada batch ditemukan.
                   </td>
                 </tr>
@@ -317,7 +317,7 @@ export default function BatchesPage() {
                   <td className="p-4 font-bold text-[#071A33]">{b.participantCount} Peserta</td>
                   <td className="p-4">
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                         b.status === "Active"
                           ? "bg-emerald-50 text-emerald-700"
                           : b.status === "Upcoming"
@@ -331,7 +331,7 @@ export default function BatchesPage() {
                   <td className="p-4">
                     <button
                       onClick={() => { setAutoLockBatch(b); setShowAutoLockModal(true); }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-[11px] font-bold transition-all"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold transition-all"
                       title="Atur jadwal auto-lock PTP"
                     >
                       <CalendarClock className="h-3 w-3 text-purple-600" />
@@ -341,11 +341,11 @@ export default function BatchesPage() {
                   <td className="p-4 text-right space-x-2">
                     <button
                       onClick={() => handleCopyCode(b.accessCode)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#0B2C6B]/20 bg-white hover:bg-[#FAF8F4] text-[#071A33] text-[11px] font-bold transition-all"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#0B2C6B]/20 bg-white hover:bg-[#FAF8F4] text-[#071A33] text-xs font-bold transition-all"
                     >
                       {copiedCode === b.accessCode ? (
                         <>
-                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          <Check className="h-3.5 w-3.5 text-emerald-700" />
                           <span className="text-emerald-700">Tersalin!</span>
                         </>
                       ) : (
@@ -358,7 +358,7 @@ export default function BatchesPage() {
 
                     <button
                       onClick={() => setSelectedLockBatch(b)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold transition-all"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-all"
                       title="Kunci seluruh PTP peserta pada batch ini sekarang"
                     >
                       <Lock className="h-3.5 w-3.5 text-amber-600" />
@@ -378,14 +378,14 @@ export default function BatchesPage() {
           <div className="bg-white rounded-2xl border border-[#EAE5D9] p-6 max-w-lg w-full space-y-5 shadow-2xl relative">
             <button
               onClick={() => setShowAddModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+              className="absolute right-4 top-4 text-slate-600 hover:text-slate-600"
             >
               <X className="h-5 w-5" />
             </button>
 
             <div>
               <h3 className="text-lg font-extrabold text-[#071A33]">Buat Batch & Generate Access Code</h3>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-slate-600 font-medium">
                 Pilih perusahaan entitas untuk membuat rombongan (batch) dan kode akses unik.
               </p>
             </div>
@@ -393,7 +393,7 @@ export default function BatchesPage() {
             <form onSubmit={handleCreateBatch} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#071A33] mb-1">Perusahaan (Company)</label>
-                <select
+                <select aria-label="Perusahaan"
                   value={companyId}
                   onChange={(e) => handleCompanyChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs font-bold text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
@@ -442,7 +442,7 @@ export default function BatchesPage() {
 
               <div>
                 <label className="block text-xs font-bold text-[#071A33] mb-1">Alokasi Associate</label>
-                <select
+                <select aria-label="Coach pendamping"
                   value={coachId}
                   onChange={(e) => setCoachId(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
@@ -458,7 +458,7 @@ export default function BatchesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#071A33] mb-1">
-                    <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 text-emerald-600" /> Tanggal Mulai</span>
+                    <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 text-emerald-700" /> Tanggal Mulai</span>
                   </label>
                   <input
                     type="date"
@@ -467,7 +467,7 @@ export default function BatchesPage() {
                     onChange={(e) => setStartDate(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Kode akses baru bisa dipakai mulai tanggal ini.</p>
+                  <p className="text-xs text-slate-600 mt-1">Kode akses baru bisa dipakai mulai tanggal ini.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#071A33] mb-1">
@@ -480,7 +480,7 @@ export default function BatchesPage() {
                     onChange={(e) => setEndDate(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-[#C79A3C]"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Setelah tanggal ini, kode tidak bisa dipakai.</p>
+                  <p className="text-xs text-slate-600 mt-1">Setelah tanggal ini, kode tidak bisa dipakai.</p>
                 </div>
               </div>
 
@@ -494,7 +494,7 @@ export default function BatchesPage() {
                   onChange={(e) => setFormAutoLockAt(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#EAE5D9] text-xs text-[#071A33] focus:outline-none focus:border-purple-400"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Jika diisi, PTP peserta akan otomatis terkunci pada waktu yang ditentukan.</p>
+                <p className="text-xs text-slate-600 mt-1">Jika diisi, PTP peserta akan otomatis terkunci pada waktu yang ditentukan.</p>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-3">
@@ -524,7 +524,7 @@ export default function BatchesPage() {
           <div className="bg-white rounded-2xl border border-amber-300 p-6 max-w-md w-full space-y-4 shadow-2xl relative">
             <button
               onClick={() => setSelectedLockBatch(null)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+              className="absolute right-4 top-4 text-slate-600 hover:text-slate-600"
             >
               <X className="h-5 w-5" />
             </button>
@@ -543,7 +543,7 @@ export default function BatchesPage() {
               <p className="font-semibold">
                 🔒 Apakah Anda yakin ingin mengunci seluruh dokumen PTP peserta pada batch ini?
               </p>
-              <p className="text-[11px] text-amber-900/80">
+              <p className="text-xs text-amber-900/80">
                 Setelah dikunci, peserta pada batch ini tidak lagi dapat mengubah Target Utama, Area Transformasi, dan Action Plan mereka.
               </p>
             </div>
@@ -574,7 +574,7 @@ export default function BatchesPage() {
       {showAutoLockModal && autoLockBatch && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-purple-200 p-6 max-w-md w-full space-y-4 shadow-2xl relative">
-            <button onClick={() => { setShowAutoLockModal(false); setAutoLockBatch(null); }} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
+            <button onClick={() => { setShowAutoLockModal(false); setAutoLockBatch(null); }} className="absolute right-4 top-4 text-slate-600 hover:text-slate-600">
               <X className="h-5 w-5" />
             </button>
 
@@ -590,7 +590,7 @@ export default function BatchesPage() {
 
             <div className="bg-purple-50/80 border border-purple-200/80 p-3.5 rounded-xl space-y-2 text-xs text-purple-950 leading-relaxed">
               <p className="font-semibold">📅 Tentukan tanggal & jam PTP akan otomatis terkunci</p>
-              <p className="text-[11px] text-purple-900/80">Setelah waktu yang ditentukan, peserta tidak dapat mengubah dokumen PTP mereka.</p>
+              <p className="text-xs text-purple-900/80">Setelah waktu yang ditentukan, peserta tidak dapat mengubah dokumen PTP mereka.</p>
             </div>
 
             <div>

@@ -59,24 +59,24 @@ export default function AdminSettingsPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[#071A33] tracking-tight flex items-center gap-2">
           <Settings className="h-7 w-7 text-[#C79A3C]" /> System & Security Settings
         </h1>
-        <p className="text-sm text-slate-500 font-medium mt-1">Pengaturan global yang dipakai workflow enrollment dan monitoring SLJ.</p>
+        <p className="text-sm text-slate-600 font-medium mt-1">Pengaturan global yang dipakai workflow enrollment dan monitoring SLJ.</p>
       </div>
 
       {saved && <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">Pengaturan berhasil disimpan ke database.</div>}
       {errorMsg && <div role="alert" className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">{errorMsg}</div>}
 
       {loading ? (
-        <div className="rounded-2xl border border-[#EAE5D9] bg-white p-8 text-xs text-slate-500">Memuat pengaturan sistem...</div>
+        <div className="rounded-2xl border border-[#EAE5D9] bg-white p-8 text-xs text-slate-600">Memuat pengaturan sistem...</div>
       ) : (
         <form onSubmit={handleSave} className="bg-white rounded-2xl border border-[#EAE5D9] p-6 space-y-6 shadow-2xs">
           <div className="space-y-4">
             <h2 className="text-base font-extrabold text-[#071A33] border-b border-[#EAE5D9] pb-3">Keamanan Access Code & Sign Up</h2>
             <label className="flex items-start justify-between gap-4 py-2 cursor-pointer">
-              <span><strong className="block text-xs text-[#071A33]">Wajibkan Access Code saat Registrasi Peserta</strong><span className="text-xs text-slate-500">Enrollment hanya dapat aktif melalui kode batch resmi.</span></span>
+              <span><strong className="block text-xs text-[#071A33]">Wajibkan Access Code saat Registrasi Peserta</strong><span className="text-xs text-slate-600">Enrollment hanya dapat aktif melalui kode batch resmi.</span></span>
               <input type="checkbox" checked={requireAccessCode} onChange={(e) => setRequireAccessCode(e.target.checked)} className="h-4 w-4 rounded accent-[#0B2C6B]" />
             </label>
             <label className="flex items-start justify-between gap-4 py-2 border-t border-[#EAE5D9] cursor-pointer">
-              <span><strong className="block text-xs text-[#071A33]">Otomatiskan Penugasan Coach via Access Code</strong><span className="text-xs text-slate-500">Coach dari batch dipakai sebagai assignment canonical peserta.</span></span>
+              <span><strong className="block text-xs text-[#071A33]">Otomatiskan Penugasan Coach via Access Code</strong><span className="text-xs text-slate-600">Coach dari batch dipakai sebagai assignment canonical peserta.</span></span>
               <input type="checkbox" checked={autoAssignCoach} onChange={(e) => setAutoAssignCoach(e.target.checked)} className="h-4 w-4 rounded accent-[#0B2C6B]" />
             </label>
           </div>
@@ -84,7 +84,7 @@ export default function AdminSettingsPage() {
           <div className="space-y-4 pt-4 border-t border-[#EAE5D9]">
             <h2 className="text-base font-extrabold text-[#071A33] border-b border-[#EAE5D9] pb-3">Monitoring & Privacy</h2>
             <label className="flex items-start justify-between gap-4 py-2 cursor-pointer">
-              <span><strong className="block text-xs text-[#071A33]">Enforce Absolute Journal Privacy</strong><span className="text-xs text-slate-500">Jurnal privat tidak dibuka ke dashboard HR.</span></span>
+              <span><strong className="block text-xs text-[#071A33]">Enforce Absolute Journal Privacy</strong><span className="text-xs text-slate-600">Jurnal privat tidak dibuka ke dashboard HR.</span></span>
               <input type="checkbox" checked={journalPrivacy} onChange={(e) => setJournalPrivacy(e.target.checked)} className="h-4 w-4 rounded accent-emerald-600" />
             </label>
             <label className="block space-y-2 border-t border-[#EAE5D9] pt-4">

@@ -8,6 +8,13 @@ import {
 } from "./program-timeline";
 
 describe("program timeline", () => {
+  it.each([
+    ["Asia/Riyadh", 31],
+    ["America/New_York", 30],
+  ])("uses the participant calendar for month boundaries in %s", (timeZone, expectedDay) => {
+    expect(getProgramDay("2026-10-15", new Date("2026-11-13T22:30:00Z"), timeZone)).toBe(expectedDay);
+  });
+
   it("represents dates before the program as day 0", () => {
     expect(getProgramDay("2026-08-04", new Date(2026, 7, 3))).toBe(0);
     expect(getProgramDay("2026-08-04", new Date(2026, 6, 1))).toBe(0);

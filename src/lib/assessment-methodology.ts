@@ -51,7 +51,7 @@ export type IndicatorDefinition = {
 };
 
 export type IndicatorValidationError = {
-  code: "indicator_count" | "duplicate_type" | "required_label" | "required_unit" | "invalid_baseline" | "invalid_target" | "equal_baseline_target" | "invalid_actual_source" | "invalid_quality_rubric";
+  code: "indicator_count" | "duplicate_type" | "required_label" | "required_unit" | "invalid_baseline" | "invalid_target" | "equal_baseline_target" | "invalid_direction_target" | "invalid_actual_source" | "invalid_quality_rubric";
   area: string;
   indicatorKey?: string;
   message: string;
@@ -140,6 +140,11 @@ export function validateAreaIndicators(indicators: IndicatorDefinition[], area =
     if (Number.isFinite(indicator.baseline) && Number.isFinite(indicator.target) && indicator.baseline === indicator.target) {
       errors.push({ code: "equal_baseline_target", area, indicatorKey: indicator.key, message: `${context}: kondisi saat ini dan target 90 hari tidak boleh sama.` });
     }
+    if (!["higher_is_better", "lower_is_better"].includes(indicator.direction)
+      || (indicator.direction === "higher_is_better" && indicator.target < indicator.baseline)
+      || (indicator.direction === "lower_is_better" && indicator.target > indicator.baseline)) {
+      errors.push({ code: "invalid_direction_target", area, indicatorKey: indicator.key, message: `${context}: target harus ${indicator.direction === "lower_is_better" ? "lebih rendah" : "lebih tinggi"} dari kondisi awal sesuai arah keberhasilan.` });
+    }
     if (indicator.actualSource && !["action_plan", "self_report", "external", "coach"].includes(indicator.actualSource)) {
       errors.push({ code: "invalid_actual_source", area, indicatorKey: indicator.key, message: `${context}: sumber data capaian tidak valid.` });
     }
@@ -162,10 +167,11 @@ export function calculateIndicatorOutcome(input: {
   direction: IndicatorDirection;
 }): AssessmentMetric {
   const { baseline, target, actual, direction } = input;
-  const denominator = Math.abs(target - baseline);
-  if (![baseline, target, actual].every(Number.isFinite) || denominator === 0) return metric(null, 0, 1, { denominator });
+  const denominator = direction === "higher_is_better" ? target - baseline : baseline - target;
+  if (![baseline, target, actual].every(value => Number.isFinite(value) && value >= 0)
+    || !["higher_is_better", "lower_is_better"].includes(direction) || denominator <= 0) return metric(null, 0, 1, { denominator });
   const numerator = direction === "higher_is_better" ? actual - baseline : baseline - actual;
-  return metric((numerator / (direction === "higher_is_better" ? target - baseline : baseline - target)) * 100, 1, 0, { numerator, denominator });
+  return metric(numerator / denominator * 100, 1, 0, { numerator, denominator });
 }
 
 export function calculateIndicatorOutcomes(indicators: IndicatorDefinition[], actuals: Record<string, number | undefined>) {

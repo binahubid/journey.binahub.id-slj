@@ -172,7 +172,7 @@ export function ParticipantLayout({
       <Link
         href="/terms"
         onClick={() => setMenuOpen(false)}
-        className="flex min-h-11 items-center px-3 text-xs text-slate-500"
+        className="flex min-h-11 items-center px-3 text-xs text-slate-600"
       >
         Syarat & privasi
       </Link>
@@ -236,7 +236,7 @@ export function ParticipantLayout({
                   <p className="mb-1 break-words px-3 text-sm font-semibold">
                     {userName}
                   </p>
-                  <p className="mb-6 px-3 text-xs text-slate-500">
+                  <p className="mb-6 px-3 text-xs text-slate-600">
                     {isTrial
                       ? "Uji coba spiritual · 14 hari"
                       : "Spiritual Leadership Journey"}
@@ -303,7 +303,7 @@ export function ParticipantLayout({
           {children}
         </main>
         {!hideFooter && (
-          <footer className="hidden items-center justify-between gap-3 border-t border-slate-200 px-8 py-5 text-xs text-slate-500 lg:flex">
+          <footer className="hidden items-center justify-between gap-3 border-t border-slate-200 px-8 py-5 text-xs text-slate-600 lg:flex">
             <span>© {new Date().getFullYear()} BinaHub</span>
             <Link href="/panduan" className="underline underline-offset-4">
               Panduan penggunaan
@@ -321,7 +321,7 @@ export function ParticipantLayout({
               key={item.href}
               href={item.href}
               aria-current={current === item.href ? "page" : undefined}
-              className={`flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] ${current === item.href ? "font-semibold text-navy-900" : "text-slate-500"}`}
+              className={`flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] ${current === item.href ? "font-semibold text-navy-900" : "text-slate-600"}`}
             >
               <span
                 className={`flex h-7 w-12 items-center justify-center rounded-full ${current === item.href ? "bg-blue-50" : ""}`}

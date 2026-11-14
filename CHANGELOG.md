@@ -6,6 +6,12 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 
 ## [Unreleased]
 
+### Web app SLJ
+- Beranda mempertahankan hero adaptif di HP. Jam, visual, dan hitung mundur salat mengikuti zona waktu peserta. Setelah Isya, hitung mundur memakai jadwal Subuh esok hari.
+- Alur awal peserta, penyimpanan checklist, monitoring, ruang coach, dan tampilan admin dirapikan untuk layar kecil, navigasi keyboard, serta status kosong dan gagal.
+- Skor pelaksanaan memberi bobot yang sama untuk setiap kebiasaan dalam satu area dan setiap area terukur. Capaian target, pelaksanaan, dan partisipasi ditampilkan terpisah.
+- SQL34 menyelaraskan kalender program dan perhitungan laporan. SQL35 membatasi laporan kelompok pada peserta program pendampingan yang memiliki perjalanan. Terapkan keduanya berurutan.
+
 ### Changed
 - Struktur, copy, urutan section, hero, dan empat kartu pricing landing SLJ dikembalikan ke versi sebelumnya.
 - Hierarki landing dirapikan melalui skala judul, kontras label, ukuran deskripsi HP, dan penyelarasan konten. Delapan ikon ilustrasi khusus ImageGen dipakai pada tahapan, pendampingan, manfaat, dan peserta.

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { summarizeGroupImpact, type GroupImpactReport } from "./assessment-report";
+import { averageMeasuredScore, summarizeGroupImpact, type GroupImpactReport } from "./assessment-report";
 
 describe("summarizeGroupImpact", () => {
+  it("excludes missing measurements while retaining a genuinely measured zero", () => {
+    expect(averageMeasuredScore([null, undefined, 80, 0])).toBe(40);
+    expect(averageMeasuredScore([null, undefined])).toBeNull();
+  });
   it("reads engagement objects from their met property", () => {
     const report: GroupImpactReport = {
       methodology_version: "1.0",

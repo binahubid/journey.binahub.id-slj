@@ -137,7 +137,7 @@ export default function TrialAdminPage() {
         </p>
       )}
       {loading ? (
-        <p role="status" className="py-8 text-sm text-slate-500">
+        <p role="status" className="py-8 text-sm text-slate-600">
           Memuat peserta trial…
         </p>
       ) : (
@@ -175,7 +175,7 @@ export default function TrialAdminPage() {
                   onChange={(event) => setDeadline(event.target.value)}
                   disabled={busy}
                 />
-                <p className="mt-2 text-xs leading-6 text-slate-500">
+                <p className="mt-2 text-xs leading-6 text-slate-600">
                   Kosongkan untuk tetap membuka pendaftaran. Waktu mengikuti
                   zona perangkat Anda. Menutup pendaftaran tidak memotong masa
                   trial peserta yang sudah aktif.
@@ -197,13 +197,13 @@ export default function TrialAdminPage() {
                 <h2 className="text-lg font-semibold">Ringkasan peserta</h2>
                 <dl className="mt-6 grid grid-cols-2 gap-5">
                   <div>
-                    <dt className="text-sm text-slate-500">Sedang trial</dt>
+                    <dt className="text-sm text-slate-600">Sedang trial</dt>
                     <dd className="mt-2 text-4xl font-semibold tabular-nums">
                       {data.active}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-sm text-slate-500">Pernah memulai</dt>
+                    <dt className="text-sm text-slate-600">Pernah memulai</dt>
                     <dd className="mt-2 text-4xl font-semibold tabular-nums">
                       {data.total}
                     </dd>
@@ -226,13 +226,13 @@ export default function TrialAdminPage() {
             </div>
             <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
               <h2 className="text-lg font-semibold">Peserta trial</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-600">
                 {data.total > 50
                   ? "Menampilkan 50 peserta yang terakhir memulai trial."
                   : "Peserta yang sudah mengaktifkan trial, termasuk yang masa aksesnya berakhir."}
               </p>
               {!data.participants?.length ? (
-                <p className="py-12 text-center text-sm text-slate-500">
+                <p className="py-12 text-center text-sm text-slate-600">
                   Belum ada peserta yang memulai trial.
                 </p>
               ) : (
@@ -246,7 +246,7 @@ export default function TrialAdminPage() {
                         <h3 className="break-words text-sm font-semibold">
                           {participant.full_name}
                         </h3>
-                        <p className="mt-1 text-xs leading-6 text-slate-500">
+                        <p className="mt-1 text-xs leading-6 text-slate-600">
                           Mulai {format(participant.starts_at)}
                           <br />
                           Berakhir {format(participant.expires_at)}

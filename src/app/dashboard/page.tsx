@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -23,11 +23,12 @@ import { QuranTracker } from "@/components/domain/QuranTracker";
 import { DailyHadithWidget } from "@/components/domain/DailyHadithWidget";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeTransformationArea } from "@/lib/transformation-areas";
+import { calculateExecution } from "@/lib/execution";
 import AreaProgressGraph from "@/components/AreaProgressGraph";
 import { composeJournalContent, getCanonicalJournalDate, parseJournalContent } from "@/lib/journal";
 import { getActiveProgramMonth, getProgramDay } from "@/lib/program-timeline";
-import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalizeHabitFrequency, resolveParticipantTimeZone, getTimeZoneLabel } from "@/lib/local-date";
-import { prayerTimesUrl } from "@/lib/prayer-times";
+import { DEFAULT_TIME_ZONE, addCalendarDays, getHabitOccurrenceKey, getLocalDateString, getLocalDateRange, normalizeHabitFrequency, resolveParticipantTimeZone, getTimeZoneLabel } from "@/lib/local-date";
+import { getUpcomingPrayer, prayerTimesUrl, readPrayerSchedule } from "@/lib/prayer-times";
 import { detectHabitCategory, getPrayerKeyFromHabitTitle } from "@/lib/habit-tracking";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import {
@@ -65,8 +66,6 @@ export default function DashboardPage() {
   const [userLocation, setUserLocation] = useState("Jakarta");
   const [userTimeZone, setUserTimeZone] = useState(DEFAULT_TIME_ZONE);
   const [dayCount, setDayCount] = useState(1);
-  const [journeyStatus, setJourneyStatus] = useState<string>("ONBOARDING");
-  const [progressPercent, setProgressPercent] = useState(0);
 
   // Journal state
   const [journalContent, setJournalContent] = useState("");
@@ -90,6 +89,10 @@ export default function DashboardPage() {
   const [habitPercentage, setHabitPercentage] = useState(0);
   const [prayerLogsMap, setPrayerLogsMap] = useState<Record<string, boolean>>({});
   const [habitSaveError, setHabitSaveError] = useState<string | null>(null);
+  const habitWrites = useRef(new Set<string>());
+  const [savingHabits, setSavingHabits] = useState<string[]>([]);
+  const [refresh, setRefresh] = useState(0);
+  const [nextStep, setNextStep] = useState<{ href: string; label: string; description: string } | null>(null);
   const [habitTab, setHabitTab] = useState<"daily" | "weekly">("daily");
 
   // Modals
@@ -108,7 +111,7 @@ export default function DashboardPage() {
 
   // Quran analytics data
   const [quranAnalytics, setQuranAnalytics] = useState<{
-    totalDays: number; totalPages: number; streak: number;
+    totalDays: number; totalAyat: number; streak: number;
   } | null>(null);
 
   // Hadith analytics data
@@ -118,8 +121,6 @@ export default function DashboardPage() {
 
   // Real stats
   const [accountCreatedDate, setAccountCreatedDate] = useState<string>("");
-  const [streakDays, setStreakDays] = useState(1);
-  const [completedTotalLogsCount, setCompletedTotalLogsCount] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [safarRemindedToday, setSafarRemindedToday] = useState(false);
@@ -127,7 +128,7 @@ export default function DashboardPage() {
   const [safarRemindLoading, setSafarRemindLoading] = useState(false);
   const [safarRemindError, setSafarRemindError] = useState<string | null>(null);
   const [isScreenSaver, setIsScreenSaver] = useState(false);
-  const [areaChartData, setAreaChartData] = useState<{ day: string; avg: number }[]>([]);
+  const [areaChartData, setAreaChartData] = useState<{ day: string; avg: number | null }[]>([]);
 
   // Welcome modal
   const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
@@ -143,31 +144,45 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Live Clock & Next Prayer
-  const [heroClockMain, setHeroClockMain] = useState<string>("--:--");
-  const [heroClockSeconds, setHeroClockSeconds] = useState<string>("00");
-  const [heroDate, setHeroDate] = useState<string>("");
-  const [timeZoneStr, setTimeZoneStr] = useState<string>("WIB");
-  const [nextPrayerInfo, setNextPrayerInfo] = useState<{
-    name: string;
-    time: string;
-    text: string;
-    isGracePeriod?: boolean;
-    graceMessage?: string;
-  }>({
-    name: "Subuh",
-    time: "--:--",
-    text: "Menghitung...",
-    isGracePeriod: false,
-    graceMessage: "",
-  });
-  const [nextPrayerProgress, setNextPrayerProgress] = useState(0);
-  const [prayerTimingsData, setPrayerTimingsData] = useState<
-    { name: string; time: string; secs: number }[] | null
-  >(null);
+  const [clock, setClock] = useState<Date | null>(null);
+  const [prayerSchedule, setPrayerSchedule] = useState<{
+    city: string;
+    zone: string;
+    date: string;
+    today: ReturnType<typeof readPrayerSchedule>;
+    tomorrow: ReturnType<typeof readPrayerSchedule>;
+  } | null>(null);
+  const [prayerLoadFailed, setPrayerLoadFailed] = useState(false);
+  const [prayerRetry, setPrayerRetry] = useState(0);
+  const heroPrayerDate = clock ? getLocalDateString(clock, userTimeZone) : "";
+  const [hour, minute, second] = clock
+    ? new Intl.DateTimeFormat("en-GB", { timeZone: userTimeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(clock).split(":")
+    : ["--", "--", "00"];
+  const localHour = Number(hour);
+  const heroClockMain = `${hour}:${minute}`;
+  const heroClockSeconds = second;
+  const timeZoneStr = getTimeZoneLabel(userTimeZone);
+  const heroDate = clock?.toLocaleDateString("id-ID", {
+    timeZone: userTimeZone, weekday: "long", day: "numeric", month: "long", year: "numeric",
+  }) || "";
+  const totalMinutes = localHour * 60 + Number(minute);
+  const adaptiveHeroBgImage = totalMinutes >= 240 && totalMinutes < 360 ? "/fajar.webp"
+    : totalMinutes >= 360 && totalMinutes < 660 ? "/pagi.webp"
+    : totalMinutes >= 660 && totalMinutes < 900 ? "/siang.webp"
+    : totalMinutes >= 900 && totalMinutes < 1080 ? "/sore.webp"
+    : totalMinutes >= 1080 && totalMinutes < 1170 ? "/petang.webp"
+    : "/malam.webp";
 
-  // Adaptive WebP background image for Hero
-  const [adaptiveHeroBgImage, setAdaptiveHeroBgImage] = useState<string>("/malam.webp");
+  // A schedule from a previous location or local date must not drive the timer.
+  const matchingSchedule = prayerSchedule?.city === userLocation && prayerSchedule.zone === userTimeZone
+    ? prayerSchedule
+    : null;
+  const localSeconds = totalMinutes * 60 + Number(second);
+  const nextPrayerInfo = matchingSchedule?.date === heroPrayerDate
+    ? getUpcomingPrayer(matchingSchedule.today, matchingSchedule.tomorrow, localSeconds)
+    : matchingSchedule && addCalendarDays(matchingSchedule.date, 1) === heroPrayerDate
+      ? getUpcomingPrayer(matchingSchedule.tomorrow, [], localSeconds)
+      : null;
 
   // Map prayer name to custom WebP icon
   const prayerIconMap: Record<string, string> = {
@@ -179,170 +194,42 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    const updateTime = () => {
-      const d = new Date();
-      const clockParts = new Intl.DateTimeFormat("en-GB", { timeZone: userTimeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(d);
-      const part = (type: string) => clockParts.find(value => value.type === type)?.value || "00";
-      const hour = Number(part("hour"));
-      const minute = Number(part("minute"));
-      const second = Number(part("second"));
-
-      // Format clock: main = HH:mm, seconds separate
-      const hh = part("hour");
-      const mm = part("minute");
-      const ss = part("second");
-      setHeroClockMain(`${hh}:${mm}`);
-      setHeroClockSeconds(ss);
-
-      setHeroDate(
-        d.toLocaleDateString("id-ID", {
-          timeZone: userTimeZone,
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })
-      );
-
-      setTimeZoneStr(getTimeZoneLabel(userTimeZone));
-
-      // Adaptive BG Image based on total minutes
-      const totalMins = hour * 60 + minute;
-      if (totalMins >= 240 && totalMins < 360) {
-        setAdaptiveHeroBgImage("/fajar.webp"); // 04:00 - 06:00
-      } else if (totalMins >= 360 && totalMins < 660) {
-        setAdaptiveHeroBgImage("/pagi.webp"); // 06:00 - 11:00
-      } else if (totalMins >= 660 && totalMins < 900) {
-        setAdaptiveHeroBgImage("/siang.webp"); // 11:00 - 15:00
-      } else if (totalMins >= 900 && totalMins < 1080) {
-        setAdaptiveHeroBgImage("/sore.webp"); // 15:00 - 18:00
-      } else if (totalMins >= 1080 && totalMins < 1170) {
-        setAdaptiveHeroBgImage("/petang.webp"); // 18:00 - 19:30
-      } else {
-        setAdaptiveHeroBgImage("/malam.webp"); // 19:30 - 04:00
-      }
-
-      // Live Prayer Times & Circular Progress Calculation (with 3-minute grace period)
-      if (prayerTimingsData && prayerTimingsData.length > 0) {
-        const currSecs = hour * 3600 + minute * 60 + second;
-        const list = prayerTimingsData;
-
-        let found = false;
-
-        // Check if currently within 3-minute grace period (180s) after any prayer time
-        for (let i = 0; i < list.length; i++) {
-          const p = list[i];
-          if (currSecs >= p.secs && currSecs < p.secs + 180) {
-            setNextPrayerInfo({
-              name: p.name,
-              time: p.time,
-              text: "Sholat",
-              isGracePeriod: true,
-              graceMessage: `Selamat menunaikan ibadah sholat ${p.name}`,
-            });
-            setNextPrayerProgress(100);
-            found = true;
-            break;
-          }
-        }
-
-        // If not in 3-minute grace period, find next upcoming prayer
-        if (!found) {
-          for (let i = 0; i < list.length; i++) {
-            const p = list[i];
-            if (p.secs > currSecs) {
-              const leftSecs = p.secs - currSecs;
-              const hrs = Math.floor(leftSecs / 3600);
-              const m = Math.floor((leftSecs % 3600) / 60);
-              const text = hrs > 0 ? `${hrs}j ${m}m` : `${m}m`;
-
-              // Prev prayer: if i == 0, prev prayer was Isya of previous day
-              const prevSecs = i > 0 ? list[i - 1].secs : list[4].secs - 24 * 3600;
-              const totalGap = p.secs - prevSecs;
-              const remainingPct =
-                totalGap > 0
-                  ? Math.min(100, Math.max(0, Math.round((leftSecs / totalGap) * 100)))
-                  : 0;
-
-              setNextPrayerInfo({
-                name: p.name,
-                time: p.time,
-                text,
-                isGracePeriod: false,
-                graceMessage: "",
-              });
-              setNextPrayerProgress(remainingPct);
-              found = true;
-              break;
-            }
-          }
-        }
-
-        if (!found) {
-          const fajrSecs = list[0].secs;
-          const leftSecs = 24 * 3600 - currSecs + fajrSecs;
-          const hrs = Math.floor(leftSecs / 3600);
-          const m = Math.floor((leftSecs % 3600) / 60);
-
-          const isyaSecs = list[4].secs;
-          const totalGap = 24 * 3600 - isyaSecs + fajrSecs;
-          const remainingPct =
-            totalGap > 0
-              ? Math.min(100, Math.max(0, Math.round((leftSecs / totalGap) * 100)))
-              : 0;
-
-          setNextPrayerInfo({
-            name: "Subuh",
-            time: list[0].time,
-            text: `${hrs}j ${m}m`,
-            isGracePeriod: false,
-            graceMessage: "",
-          });
-          setNextPrayerProgress(remainingPct);
-        }
-      }
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+    const tick = () => setClock(new Date());
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [prayerTimingsData, userTimeZone]);
+  }, []);
 
-  const heroPrayerDate = getLocalDateString(new Date(), userTimeZone);
-
-  // Fetch Prayer Times for Main Header Next Prayer
   useEffect(() => {
-    async function fetchHeroPrayerTimes() {
-      try {
-        const res = await fetch(
-          prayerTimesUrl(userLocation || "Jakarta", heroPrayerDate, userTimeZone)
-        );
-        const data = await res.json();
-        if (data?.data?.timings) {
-          const t = data.data.timings;
-          const parseSecs = (str: string) => {
-            const [h, m] = str
-              .replace(/\s*\(.*\)/, "")
-              .split(":")
-              .map(Number);
-            return h * 3600 + m * 60;
-          };
+    if (!heroPrayerDate) return;
+    const controller = new AbortController();
+    setPrayerLoadFailed(false);
 
-          const list = [
-            { name: "Subuh", time: t.Fajr.replace(/\s*\(.*\)/, ""), secs: parseSecs(t.Fajr) },
-            { name: "Dzuhur", time: t.Dhuhr.replace(/\s*\(.*\)/, ""), secs: parseSecs(t.Dhuhr) },
-            { name: "Ashar", time: t.Asr.replace(/\s*\(.*\)/, ""), secs: parseSecs(t.Asr) },
-            { name: "Maghrib", time: t.Maghrib.replace(/\s*\(.*\)/, ""), secs: parseSecs(t.Maghrib) },
-            { name: "Isya", time: t.Isha.replace(/\s*\(.*\)/, ""), secs: parseSecs(t.Isha) },
-          ];
-          setPrayerTimingsData(list);
-        }
-      } catch (e) {
-        console.error("Gagal load hero prayer times:", e);
-      }
+    async function getSchedule(date: string) {
+      const response = await fetch(prayerTimesUrl(userLocation, date, userTimeZone), {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error("Jadwal salat belum tersedia.");
+      const result = await response.json();
+      return readPrayerSchedule(result?.data?.timings);
     }
-    fetchHeroPrayerTimes();
-  }, [userLocation, userTimeZone, heroPrayerDate]);
+
+    void Promise.allSettled([
+      getSchedule(heroPrayerDate),
+      getSchedule(addCalendarDays(heroPrayerDate, 1)),
+    ]).then(([today, tomorrow]) => {
+      if (controller.signal.aborted) return;
+      setPrayerLoadFailed(today.status === "rejected" || tomorrow.status === "rejected");
+      setPrayerSchedule({
+        city: userLocation,
+        zone: userTimeZone,
+        date: heroPrayerDate,
+        today: today.status === "fulfilled" ? today.value : [],
+        tomorrow: tomorrow.status === "fulfilled" ? tomorrow.value : [],
+      });
+    });
+    return () => controller.abort();
+  }, [userLocation, userTimeZone, heroPrayerDate, prayerRetry]);
 
   // Fetch sholat analytics data when modal opens
   useEffect(() => {
@@ -350,13 +237,7 @@ export default function DashboardPage() {
     (async () => {
       try {
         const supabase = createClient();
-        const today = new Date();
-        const dates: string[] = [];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(today);
-          d.setDate(d.getDate() - i);
-          dates.push(d.toISOString().split("T")[0]);
-        }
+        const dates = getLocalDateRange(7, userTimeZone).map(day => day.dateStr);
         const { data: logs } = await supabase
           .from("prayer_logs")
           .select("date, prayer_name, is_completed")
@@ -389,7 +270,7 @@ export default function DashboardPage() {
         setSholatAnalytics({ wajibDays: 0, sunnahCount: 0, streak: 0, totalDays: 7 });
       }
     })();
-  }, [sholatAnalyticsOpen, userId]);
+  }, [sholatAnalyticsOpen, userId, userTimeZone]);
 
   // Fetch quran analytics data when modal opens
   useEffect(() => {
@@ -397,27 +278,21 @@ export default function DashboardPage() {
     (async () => {
       try {
         const supabase = createClient();
-        const today = new Date();
-        const dates: string[] = [];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(today);
-          d.setDate(d.getDate() - i);
-          dates.push(d.toISOString().split("T")[0]);
-        }
+        const dates = getLocalDateRange(7, userTimeZone).map(day => day.dateStr);
         const { data: logs } = await supabase
           .from("quran_logs")
-          .select("date, pages_read")
+          .select("date, total_ayat")
           .eq("user_id", userId)
           .in("date", dates);
 
         const dayMap = new Map<string, number>();
         (logs || []).forEach((r: any) => {
-          dayMap.set(r.date, (dayMap.get(r.date) || 0) + (r.pages_read || 1));
+          dayMap.set(r.date, (dayMap.get(r.date) || 0) + (Number(r.total_ayat) || 0));
         });
 
         const totalDays = dayMap.size;
-        let totalPages = 0;
-        dayMap.forEach((v) => { totalPages += v; });
+        let totalAyat = 0;
+        dayMap.forEach((v) => { totalAyat += v; });
 
         let streak = 0;
         for (let i = dates.length - 1; i >= 0; i--) {
@@ -425,12 +300,12 @@ export default function DashboardPage() {
           else break;
         }
 
-        setQuranAnalytics({ totalDays, totalPages, streak });
+        setQuranAnalytics({ totalDays, totalAyat, streak });
       } catch {
-        setQuranAnalytics({ totalDays: 0, totalPages: 0, streak: 0 });
+        setQuranAnalytics({ totalDays: 0, totalAyat: 0, streak: 0 });
       }
     })();
-  }, [quranAnalyticsOpen, userId]);
+  }, [quranAnalyticsOpen, userId, userTimeZone]);
 
   // Fetch hadith analytics data when modal opens
   useEffect(() => {
@@ -438,13 +313,7 @@ export default function DashboardPage() {
     (async () => {
       try {
         const supabase = createClient();
-        const today = new Date();
-        const dates: string[] = [];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(today);
-          d.setDate(d.getDate() - i);
-          dates.push(d.toISOString().split("T")[0]);
-        }
+        const dates = getLocalDateRange(7, userTimeZone).map(day => day.dateStr);
         const { data: logs } = await supabase
           .from("hadith_logs")
           .select("date, is_read")
@@ -464,7 +333,7 @@ export default function DashboardPage() {
         setHadithAnalytics({ totalRead: 0, streak: 0 });
       }
     })();
-  }, [hadithAnalyticsOpen, userId]);
+  }, [hadithAnalyticsOpen, userId, userTimeZone]);
 
   // Load Dashboard Data
   useEffect(() => {
@@ -540,13 +409,23 @@ export default function DashboardPage() {
           .maybeSingle();
         if (journeyError) throw journeyError;
 
+        const [{ data: preparation }, { data: baseline }] = await Promise.all([
+          supabase.from("sahabat_safar_profiles").select("is_completed").eq("user_id", user.id).maybeSingle(),
+          supabase.from("baseline_assessments").select("completed").eq("user_id", user.id).eq("completed", true).limit(1).maybeSingle(),
+        ]);
+        setNextStep(!preparation?.is_completed
+          ? { href: "/initial-process", label: "Lengkapi persiapan perjalanan", description: "Ceritakan kebutuhan Anda agar pendampingan dan Sahabat Safar lebih sesuai." }
+          : !baseline?.completed
+          ? { href: "/baseline", label: "Kenali kondisi awal Anda", description: "Isi refleksi awal untuk membantu memilih fokus perubahan." }
+          : !journey?.ptp_published_at
+          ? { href: "/journey", label: "Susun rencana perubahan", description: "Pilih fokus, tentukan target, lalu terapkan rencana kebiasaan Anda." }
+          : null);
+
         if (journey || profile?.start_date) {
-          setJourneyStatus(journey?.status || "ACTIVE");
           const startDateVal = profile?.start_date || journey?.start_date || journey?.created_at;
           if (startDateVal) {
-            const currentDay = Math.min(90, getProgramDay(startDateVal));
+            const currentDay = Math.min(90, getProgramDay(startDateVal, new Date(), resolveParticipantTimeZone(profile?.timezone, profile?.timezone_mode || "AUTO")));
             setDayCount(currentDay);
-            setProgressPercent(Math.min(100, Math.round((Math.min(90, currentDay) / 90) * 100)));
           }
         }
 
@@ -629,6 +508,9 @@ export default function DashboardPage() {
               quantity: ap.quantity || ap.target || (match ? (match.quantity || match.target) : 1) || 1,
               frequency: canonicalFrequency,
               area_category: ap.area_category || ap.category || (match ? (match.area_category || match.category) : null) || "Spiritual Growth",
+              is_archived: match?.is_archived,
+              frequency_kind: match?.frequency_kind,
+              custom_schedule: match?.custom_schedule,
               effective_from: match?.effective_from || null,
               effective_until: match?.effective_until || null,
             };
@@ -645,6 +527,9 @@ export default function DashboardPage() {
               quantity: h.quantity || h.target || 1,
               frequency: normalizeHabitFrequency(h.frequency),
               area_category: h.area_category || h.category || "Spiritual Growth",
+              is_archived: h.is_archived,
+              frequency_kind: h.frequency_kind,
+              custom_schedule: h.custom_schedule,
               effective_from: h.effective_from || null,
               effective_until: h.effective_until || null,
             };
@@ -754,91 +639,19 @@ export default function DashboardPage() {
           dailyHabits.length > 0 ? Math.round((totalScore / dailyHabits.length) * 100) : 0
         );
 
-        // 3b. Area Progress Chart — cumulative average score from transformation areas
-        try {
-          const rawAreas: string[] = Array.isArray(journey?.area_transformasi)
-            ? journey!.area_transformasi
-            : [];
-          const areas = rawAreas.map(normalizeTransformationArea);
-          const startDateVal = profile?.start_date || journey?.start_date;
-
-          if (areas.length > 0 && startDateVal) {
-            const startD = new Date(startDateVal);
-            const endD = new Date(todayStr);
-            const numDays = Math.min(90, Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / 86400000) + 1));
-
-            const dateRange: string[] = [];
-            for (let i = 0; i < numDays; i++) {
-              const d = new Date(startD);
-              d.setDate(d.getDate() + i);
-              dateRange.push(d.toISOString().split("T")[0]);
-            }
-
-            const apAreaMap: Record<string, string> = {};
-            (actionPlansData || []).forEach((ap: any) => {
-              apAreaMap[ap.id] = normalizeTransformationArea(ap.area_category || ap.category || "Spiritual Growth");
-            });
-
-            const habitsWithArea = userHabits.map((h: any) => ({
-              id: h.id,
-              area: h.area_category ? normalizeTransformationArea(h.area_category) : (apAreaMap[h.action_plan_id] || "Spiritual Growth"),
-              qty: h.quantity || 1,
-              frequency: normalizeHabitFrequency(h.frequency),
-              effectiveFrom: h.effective_from || null,
-              effectiveUntil: h.effective_until || null,
-            }));
-
-            const { data: rangeLogs } = await supabase
-              .from("habit_logs").select("habit_id,date,completed,completed_count")
-              .eq("user_id", user.id).gte("date", dateRange[0]).lte("date", dateRange[dateRange.length - 1]);
-
-            const calcScore = (area: string, dateStr: string, logsForDay: any[]) => {
-              const areaHabits = habitsWithArea.filter(h =>
-                h.area === area &&
-                (!h.effectiveFrom || h.effectiveFrom <= dateStr) &&
-                (!h.effectiveUntil || h.effectiveUntil >= dateStr) &&
-                (h.frequency === "daily" || getHabitOccurrenceKey("weekly", new Date(`${dateStr}T12:00:00Z`), profileTimeZone) === dateStr)
-              );
-              if (areaHabits.length === 0) return 0;
-              const w = areaHabits.reduce((t, h) => {
-                const log = logsForDay.find((l: any) => l.habit_id === h.id);
-                const cnt = log ? (log.completed_count || (log.completed ? h.qty : 0)) : 0;
-                return t + Math.min(1, cnt / h.qty);
-              }, 0);
-              return Number((w / areaHabits.length).toFixed(2));
-            };
-
-            const running: Record<string, number> = Object.fromEntries(areas.map(a => [a, 0]));
-            const started: Record<string, boolean> = Object.fromEntries(areas.map(a => [a, false]));
-            const chart: { day: string; avg: number }[] = [];
-
-            dateRange.forEach(dateStr => {
-              const logsForDay = (rangeLogs || []).filter((l: any) => l.date === dateStr);
-              let sum = 0;
-              areas.forEach(area => {
-                const activeH = habitsWithArea.filter(h =>
-                  h.area === area && (!h.effectiveFrom || h.effectiveFrom <= dateStr) && (!h.effectiveUntil || h.effectiveUntil >= dateStr)
-                );
-                if (activeH.length === 0) { sum += running[area]; return; }
-                const scheduledToday = activeH.filter(h => h.frequency === "daily" || getHabitOccurrenceKey("weekly", new Date(`${dateStr}T12:00:00Z`), profileTimeZone) === dateStr);
-                if (scheduledToday.length === 0) { sum += running[area]; return; }
-                const done = logsForDay.some((l: any) => scheduledToday.some(h => h.id === l.habit_id) && (l.completed || (l.completed_count || 0) > 0));
-                if (done) started[area] = true;
-                const change = done ? calcScore(area, dateStr, logsForDay) : started[area] ? -1 : 0;
-                running[area] = Number((running[area] + change).toFixed(2));
-                sum += running[area];
-              });
-              const avg = Number((sum / areas.length).toFixed(2));
-              const dObj = new Date(dateStr);
-              const label = numDays <= 7
-                ? dObj.toLocaleDateString("id-ID", { weekday: "short" })
-                : `${dObj.getDate()}/${dObj.getMonth() + 1}`;
-              chart.push({ day: label, avg });
-            });
-
-            setAreaChartData(chart);
-          }
-        } catch { /* ignore area chart errors */ }
+        // Use the same scheduled-occurrence calculation as Monitoring and the impact report.
+        const areas = (Array.isArray(journey?.area_transformasi) ? journey.area_transformasi : []).map(normalizeTransformationArea);
+        const start = profile?.start_date || journey?.created_at;
+        if (areas.length && start) {
+          const startDate = getLocalDateString(new Date(start), profileTimeZone);
+          const { data: logs, error } = await supabase.from("habit_logs").select("habit_id,date,activity_date,completed,completed_count")
+            .eq("user_id",user.id).eq("is_canonical_occurrence",true).gte("date",getHabitOccurrenceKey("weekly",new Date(`${startDate}T12:00:00Z`),"UTC")).lte("date",todayStr);
+          if (error) throw error;
+          const execution = calculateExecution({ startDate,endDate:todayStr,areas,
+            habits: userHabits.filter(h => !h.is_archived).map(h => ({ id:h.id,area:normalizeTransformationArea(h.area_category),quantity:h.quantity,
+              frequency:h.frequency_kind || h.frequency,weekdays:h.custom_schedule?.weekdays,effectiveFrom:h.effective_from,effectiveUntil:h.effective_until })), logs:logs || [] });
+          setAreaChartData(execution.timeline.map(point => ({day:point.date,avg:point.score})));
+        }
 
         // 4. Load All Journals & Last Journal
         const { data: journalsData, error: journalsError } = await supabase
@@ -886,7 +699,7 @@ export default function DashboardPage() {
       }
     }
     loadDashboard();
-  }, [supabase]);
+  }, [supabase, refresh]);
 
   // Welcome modal: check for unread welcome notification → show after 3 seconds
   useEffect(() => {
@@ -1028,7 +841,9 @@ export default function DashboardPage() {
   const toggleHabitToday = async (habitId: string) => {
     const todayStr = getLocalDateString(new Date(), userTimeZone);
     const target = habits.find((h) => h.id === habitId);
-    if (!target) return;
+    if (!target || habitWrites.current.size > 0) return;
+    habitWrites.current.add(habitId);
+    setSavingHabits([habitId]);
     const occurrenceKey = getHabitOccurrenceKey(target.frequency, new Date(), userTimeZone);
     setHabitSaveError(null);
 
@@ -1127,13 +942,15 @@ export default function DashboardPage() {
         });
         if (error) throw error;
       }
+      setRefresh(value => value + 1);
     } catch (err) {
       console.error("Gagal menyimpan checklist habit:", err);
       setHabitSaveError("Checklist gagal disimpan. Periksa koneksi lalu coba lagi.");
       setHabits(habits);
-      const totalScore = habits.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
-      setCompletedTodayCount(habits.filter((h) => h.completedToday).length);
-      setHabitPercentage(habits.length > 0 ? Math.round((totalScore / habits.length) * 100) : 0);
+      updateHabitSummary(habits);
+    } finally {
+      habitWrites.current.delete(habitId);
+      setSavingHabits([]);
     }
   };
 
@@ -1153,10 +970,7 @@ export default function DashboardPage() {
     );
     setHabits(updated);
 
-    const totalScore = updated.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
-    const doneCount = updated.filter((h) => h.completedToday).length;
-    setCompletedTodayCount(doneCount);
-    setHabitPercentage(updated.length > 0 ? Math.round((totalScore / updated.length) * 100) : 0);
+    updateHabitSummary(updated);
 
     try {
       const { data: existingHL } = await supabase
@@ -1181,13 +995,15 @@ export default function DashboardPage() {
         });
         if (error) throw error;
       }
+      setRefresh(value => value + 1);
     } catch (err) {
       console.error("Gagal simpan sub-step:", err);
       setHabitSaveError("Progress habit gagal disimpan. Periksa koneksi lalu coba lagi.");
       setHabits(habits);
-      const totalScore = habits.reduce((acc, h) => acc + Math.min(1, h.completedCount / h.quantity), 0);
-      setCompletedTodayCount(habits.filter((h) => h.completedToday).length);
-      setHabitPercentage(habits.length > 0 ? Math.round((totalScore / habits.length) * 100) : 0);
+      updateHabitSummary(habits);
+    } finally {
+      habitWrites.current.delete(habitId);
+      setSavingHabits([]);
     }
   };
 
@@ -1315,7 +1131,7 @@ export default function DashboardPage() {
       <div className="space-y-7 max-w-6xl w-full mx-auto pb-10 md:pb-0">
         {/* ─── UNIFIED 16:9 HERO BANNER ─── */}
         <div
-          className="relative rounded-3xl overflow-hidden text-white p-3.5 sm:p-8 lg:p-10 shadow-lg border border-white/15 transition-all duration-700 aspect-auto lg:aspect-[16/9] w-full flex flex-col justify-between bg-cover bg-center min-h-[260px] sm:min-h-[360px] md:min-h-[440px]"
+          data-testid="adaptive-journey-hero" role="region" aria-label="Ringkasan hari ini dan jadwal salat" className="relative rounded-3xl overflow-hidden text-white p-4 sm:p-8 lg:p-10 shadow-sm border border-white/15 aspect-auto lg:aspect-[16/9] w-full flex flex-col justify-between bg-cover bg-center min-h-[400px] sm:min-h-[440px]"
           style={{ backgroundImage: `url('${adaptiveHeroBgImage}')` }}
         >
           {/* Dark Gradient Overlay */}
@@ -1326,15 +1142,15 @@ export default function DashboardPage() {
             {/* Left: Day badge (TOP) & Assalamu'alaikum Greeting (BOTTOM) */}
             <div className="space-y-1.5 min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-amber-900 font-extrabold bg-amber-400/90 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs shadow-2xs whitespace-nowrap">
-                  Hari ke-{dayCount} dari 90
+                <span className="text-amber-900 font-extrabold bg-amber-400/90 px-2.5 py-0.5 rounded-full text-xs sm:text-xs shadow-2xs whitespace-nowrap">
+                  {dayCount > 0 ? `Hari ke-${dayCount} dari 90` : "Program belum dimulai"}
                 </span>
                 <button
                   type="button"
                   onClick={handleRemindSafar}
                   disabled={!safarPartnerName || safarRemindedToday || safarRemindLoading}
-                  title={safarRemindedToday ? "Pengingat sudah terkirim" : safarPartnerName ? `Kirim pengingat kepada ${safarPartnerName}` : "Sahabat Safar belum ditetapkan"}
-                  className={`inline-flex items-center justify-center h-7 w-7 rounded-full transition-all shadow-sm ${
+                  aria-label="Ingatkan Sahabat Safar" title={safarRemindedToday ? "Pengingat sudah terkirim" : safarPartnerName ? `Kirim pengingat kepada ${safarPartnerName}` : "Sahabat Safar belum ditetapkan"}
+                  className={`inline-flex items-center justify-center h-11 w-11 rounded-full transition-colors ${
                     safarRemindedToday
                       ? "bg-emerald-500/90 text-white border border-emerald-300"
                       : !safarPartnerName
@@ -1354,8 +1170,8 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsScreenSaver(true)}
-                  className="inline-flex items-center justify-center p-1.5 rounded-full text-white/70 hover:text-amber-300 hover:bg-white/10 transition-all cursor-pointer"
-                  title="Aktifkan Mode Fullscreen"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white/80 hover:text-amber-300 hover:bg-white/10 transition-colors"
+                  aria-label="Buka jam layar penuh" title="Aktifkan Mode Fullscreen"
                 >
                   <Maximize2 className="h-4 w-4" />
                 </button>
@@ -1364,88 +1180,52 @@ export default function DashboardPage() {
               {safarRemindError && (
                 <p
                   role="alert"
-                  className="max-w-md rounded-md border border-rose-300/30 bg-rose-950/70 px-2.5 py-1.5 text-[11px] font-semibold text-rose-100"
+                  className="max-w-md rounded-md border border-rose-300/30 bg-rose-950/70 px-2.5 py-1.5 text-xs font-semibold text-rose-100"
                 >
                   {safarRemindError}
                 </p>
               )}
 
-              <h1 className="text-lg sm:text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-md leading-tight pt-0.5">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-white tracking-tight leading-tight pt-0.5">
                 Assalamu&apos;alaikum, {userName.split(" ")[0]}!
               </h1>
             </div>
 
-            {/* Right: Next Prayer Card (Desktop Only: inside Hero top-right) */}
-            <div className={`hidden lg:flex p-2.5 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-md transition-all duration-500 w-auto sm:min-w-[240px] lg:min-w-[260px] sm:max-w-[280px] ${
-              nextPrayerInfo.isGracePeriod
-                ? "bg-emerald-950/80 border border-emerald-400/60 shadow-emerald-950/40 p-4"
-                : "bg-black/20 border border-white/15"
-            }`}>
-              {/* Left: Prayer Icon (Only when NOT grace period) */}
-              {!nextPrayerInfo.isGracePeriod && (
-                <div className="h-10 sm:h-14 md:h-16 w-auto shrink-0 flex items-center justify-center">
+            {/* Next prayer sits below the greeting on mobile. */}
+            <div className="flex min-h-[72px] w-full items-center gap-3 rounded-2xl border border-white/20 bg-black/35 p-3 backdrop-blur-md lg:w-64 lg:shrink-0" aria-label="Jadwal salat berikutnya" role="region">
+              {nextPrayerInfo ? (
+                <>
                   <img
                     src={prayerIconMap[nextPrayerInfo.name] || "/icon_subuh.webp"}
-                    alt={nextPrayerInfo.name}
-                    className="h-10 sm:h-14 md:h-16 w-auto object-contain drop-shadow-xl"
+                    alt=""
+                    className="h-11 w-8 shrink-0 object-contain sm:h-14 sm:w-10"
                   />
-                </div>
-              )}
-
-              {/* Center: Prayer Details */}
-              {nextPrayerInfo.isGracePeriod ? (
-                <div className="min-w-0 flex-1 space-y-1">
-                  <span className="text-[11px] sm:text-xs font-black text-emerald-300 uppercase tracking-wider flex items-center gap-1 leading-none animate-pulse">
-                    <Sparkles className="h-3 w-3 text-amber-300" /> Waktu Sholat Tiba
-                  </span>
-                  <span className="text-xs sm:text-sm font-extrabold text-white block leading-snug">
-                    Selamat Menunaikan Ibadah Sholat {nextPrayerInfo.name}
-                  </span>
-                </div>
-              ) : (
-                <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
-                  <span className="text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider block leading-none">
-                    Sholat Berikutnya
-                  </span>
-                  <span className="text-sm sm:text-xl font-black text-white block leading-tight truncate">
-                    {nextPrayerInfo.name}
-                  </span>
-                  <span className="text-xs sm:text-sm font-mono font-bold text-amber-300 block leading-none">
-                    {nextPrayerInfo.time}
-                  </span>
-                </div>
-              )}
-
-              {/* Right: Circular Progress with Countdown (Only when NOT grace period) */}
-              {!nextPrayerInfo.isGracePeriod && (
-                <div className="flex flex-col items-center shrink-0 gap-0.5">
-                  <div className="relative h-11 w-11 sm:h-14 sm:w-14">
-                    <svg className="h-full w-full -rotate-90" viewBox="0 0 64 64">
-                      <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="5" />
-                      <circle
-                        cx="32" cy="32" r="28"
-                        fill="none"
-                        stroke="url(#prayerGrad)"
-                        strokeWidth="5"
-                        strokeLinecap="round"
-                        strokeDasharray={`${2 * Math.PI * 28}`}
-                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - nextPrayerProgress / 100)}`}
-                        className="transition-all duration-1000"
-                      />
-                      <defs>
-                        <linearGradient id="prayerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#FBBF24" />
-                          <stop offset="100%" stopColor="#F59E0B" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[10px] sm:text-xs font-black text-amber-300 leading-none text-center px-0.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-white/85">{nextPrayerInfo.isGracePeriod ? "Waktu salat tiba" : "Salat berikutnya"}</p>
+                    <p className="mt-0.5 text-base font-semibold text-white sm:text-lg">{nextPrayerInfo.name}</p>
+                    <p className="text-sm font-semibold tabular-nums text-amber-200">{nextPrayerInfo.time}</p>
+                  </div>
+                  {!nextPrayerInfo.isGracePeriod && (
+                    <div className="relative flex shrink-0 flex-col items-end justify-center sm:size-14 sm:items-center">
+                      <svg aria-hidden="true" className="absolute inset-0 hidden -rotate-90 sm:block" viewBox="0 0 64 64">
+                        <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+                        <circle cx="32" cy="32" r="28" fill="none" stroke="#FBBF24" strokeWidth="4" strokeLinecap="round"
+                          strokeDasharray={2 * Math.PI * 28} strokeDashoffset={2 * Math.PI * 28 * (1 - nextPrayerInfo.progress / 100)} />
+                      </svg>
+                      <span className="relative whitespace-nowrap text-sm font-semibold leading-tight tabular-nums text-amber-100 sm:px-1 sm:text-center sm:text-xs">
                         {nextPrayerInfo.text}
                       </span>
+                      <span className="mt-0.5 text-xs leading-tight text-white/85 sm:sr-only">sisa waktu</span>
                     </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <div>
+                    <p className="text-xs font-medium text-white/85">Salat berikutnya</p>
+                    <p role="status" className="mt-1 text-sm font-medium">{prayerLoadFailed ? "Jadwal belum tersedia" : "Memuat jadwal salat"}</p>
                   </div>
-                  <span className="text-[10px] font-semibold text-slate-300 hidden sm:inline">sisa waktu</span>
+                  {prayerLoadFailed && <button type="button" onClick={() => setPrayerRetry(retry => retry + 1)} className="min-h-11 text-sm font-semibold text-amber-200 underline underline-offset-4">Coba lagi</button>}
                 </div>
               )}
             </div>
@@ -1455,51 +1235,61 @@ export default function DashboardPage() {
           <div className="relative z-10 flex flex-row items-end justify-between gap-2 lg:gap-6 mt-auto pt-3">
             {/* Left: Big Clock + small seconds/WIB beside it */}
             <div className="space-y-0.5 sm:space-y-1.5 pb-0.5 min-w-0 flex-1">
-              <div className="flex items-baseline gap-1.5 sm:gap-3">
-                <h2 className="text-3xl sm:text-7xl lg:text-8xl xl:text-9xl font-black text-white font-mono tracking-tighter drop-shadow-lg leading-none">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:gap-x-3">
+                <span className="text-[2.5rem] min-[375px]:text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-semibold text-white font-mono tracking-tighter leading-none">
                   {heroClockMain}
-                </h2>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-[10px] sm:text-sm font-mono font-bold text-white/60">:{heroClockSeconds}</span>
-                  <span className="text-[9px] sm:text-xs font-bold text-white/50">{timeZoneStr}</span>
+                </span>
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-1">
+                  <span className="text-xs sm:text-sm font-mono font-bold text-white/80">:{heroClockSeconds}</span>
+                  <span className="text-xs font-medium text-white/90">{timeZoneStr}</span>
                 </div>
               </div>
-              <span className="text-xs sm:text-base font-bold text-amber-200/90 truncate block">{heroDate}</span>
+              <span className="text-xs sm:text-base font-medium text-amber-100 block">{heroDate}</span>
             </div>
 
             {/* Right: Compact Progress Card */}
-            <div className="bg-black/20 px-3 py-2 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/15 backdrop-blur-md shrink-0 w-32 lg:w-auto lg:min-w-[200px] lg:max-w-xs shadow-md">
-              <div className="flex items-center justify-between">
-                <div className="flex items-baseline space-x-1 sm:space-x-2 min-w-0">
-                  <span className="text-base sm:text-2xl font-black text-white">
-                    {completedTodayCount}
-                  </span>
-                  <span className="text-[10px] sm:text-sm text-slate-300 font-bold">
-                    / {dailyHabits.length} harian
-                  </span>
+            <div className="bg-black/35 px-3 py-3 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/15 backdrop-blur-md shrink-0 w-[116px] sm:w-40 lg:w-auto lg:min-w-[200px] lg:max-w-xs shadow-md">
+              <div className="flex items-center justify-between gap-1">
+                <div className="min-w-0">
+                  <p className="whitespace-nowrap text-base font-semibold leading-tight tabular-nums text-white sm:text-xl">
+                    {completedTodayCount}/{dailyHabits.length}
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium leading-tight text-slate-200">harian</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setTodayTasksModalOpen(true)}
-                  className="p-0.5 sm:p-1 rounded-md sm:rounded-lg bg-white/15 hover:bg-white/30 text-white transition-all border border-white/20 cursor-pointer"
-                  title="Lihat Selengkapnya"
+                  className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-white/80 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
+                  aria-label="Lihat aktivitas harian"
                 >
-                  <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <ArrowUpRight aria-hidden="true" className="size-4" />
                 </button>
               </div>
 
               {/* Area Progress Line Graph */}
-              <div className="h-10 sm:h-14 w-full mt-1.5 sm:mt-2">
+              <div className="h-10 sm:h-14 w-full mt-2">
                 <AreaProgressGraph data={areaChartData} className="w-full h-full" />
               </div>
             </div>
           </div>
         </div>
 
+        {nextStep && (
+          <section aria-label="Langkah berikutnya" className="flex flex-col gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-navy-900">{nextStep.label}</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-700">{nextStep.description}</p>
+            </div>
+            <Link href={nextStep.href} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white">Lanjutkan <ArrowRight aria-hidden className="size-4" /></Link>
+          </section>
+        )}
+
         {/* ─── BARIS 1: 3 CARDS BENTO (JADWAL SHOLAT, HABITS HARI INI, HADITS HARI INI) ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
           {/* Card 1: Jadwal Sholat Hari Ini */}
           <PrayerTimesWidget
             location={userLocation}
+            timeZone={userTimeZone}
           />
 
           {/* Card 2: Habits Hari Ini (Participant PTP Habits) */}
@@ -1507,14 +1297,14 @@ export default function DashboardPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-1">
                 <h3 className="font-extrabold text-navy-900 text-xs tracking-wider uppercase flex items-center gap-1.5">
-                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  <Sparkles className="h-4 w-4 text-amber-700" />
                   Habit PTP
                 </h3>
               </div>
 
               {habits.length === 0 ? (
                 <div className="py-8 text-center space-y-3 border border-dashed border-warm-border rounded-xl p-4 bg-warm-bg/40">
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
                     Belum ada kebiasaan yang ditentukan di PTP.
                   </p>
                   <Link href="/journey" className="inline-block">
@@ -1543,14 +1333,14 @@ export default function DashboardPage() {
                     <TabsContent value="weekly" className="mt-3">
                       <div className="rounded-xl bg-amber-50/70 p-3">
                         <span className="text-xs font-bold text-navy-900">{completedWeeklyUnits}/{totalWeeklyUnits} pelaksanaan minggu ini</span>
-                        <p className="mt-1 text-[10px] text-slate-500">Periode Senin-Minggu. Tidak wajib selesai pada hari tertentu.</p>
+                        <p className="mt-1 text-xs text-slate-600">Periode Senin-Minggu. Tidak wajib selesai pada hari tertentu.</p>
                         <Progress value={totalWeeklyUnits > 0 ? Math.round(completedWeeklyUnits / totalWeeklyUnits * 100) : 0} className="mt-2 h-1.5 bg-amber-100" />
                       </div>
                     </TabsContent>
                   </Tabs>
 
                   {habitSaveError && (
-                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
+                    <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
                       {habitSaveError}
                     </div>
                   )}
@@ -1571,22 +1361,22 @@ export default function DashboardPage() {
                           <span className="truncate flex-1">{h.title}</span>
                           {h.frequency === "weekly" ? (
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.completedToday ? "bg-emerald-200 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{h.completedCount}/{h.quantity} kali</span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${h.completedToday ? "bg-emerald-200 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{h.completedCount}/{h.quantity} kali</span>
                               {!h.completedToday && (
                                 <button onClick={() => h.category === "general" ? incrementHabitCount(h.id) : toggleHabitToday(h.id)} className="h-5 w-5 rounded-full bg-amber-500 text-white font-bold" title={`Tambah pelaksanaan (${h.completedCount + 1}/${h.quantity})`}>+</button>
                               )}
                             </div>
                           ) : isMultiStep ? (
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                                 h.completedToday ? "bg-emerald-200 text-emerald-800" : "bg-slate-200 text-slate-600"
                               }`}>
                                 {h.completedCount}/{h.quantity}
                               </span>
                               {!h.completedToday && (
                                 <button
-                                  onClick={() => incrementHabitCount(h.id)}
-                                  className="h-5 w-5 rounded-full bg-amber-400 text-white flex items-center justify-center hover:bg-amber-500 transition-colors font-bold text-xs"
+                                  disabled={savingHabits.length>0} aria-busy={savingHabits.includes(h.id)} onClick={() => incrementHabitCount(h.id)}
+                                  className="size-11 rounded-xl bg-amber-100 text-navy-900 flex items-center justify-center hover:bg-amber-500 transition-colors font-bold text-xs"
                                   title={`Tandai +1 (${h.completedCount+1}/${h.quantity})`}
                                 >
                                   +
@@ -1597,7 +1387,8 @@ export default function DashboardPage() {
                           ) : (
                             <button
                               onClick={() => toggleHabitToday(h.id)}
-                              className={`h-4 w-4 rounded-full flex items-center justify-center shrink-0 ml-2 ${
+                              aria-label={`${h.completedToday ? "Batalkan" : "Tandai selesai"}: ${h.title}`} aria-pressed={h.completedToday} disabled={savingHabits.length>0} aria-busy={savingHabits.includes(h.id)}
+                              className={`size-11 rounded-xl flex items-center justify-center shrink-0 ml-2 ${
                                 h.completedToday
                                   ? "bg-emerald-600 text-white"
                                   : "border border-slate-300 bg-white hover:border-amber-400"
@@ -1627,11 +1418,8 @@ export default function DashboardPage() {
           </Card>
 
           {/* Card 3: Hadits Hari Ini (Clickable to open Analytics) */}
-          <div
-            onClick={() => setHadithAnalyticsOpen(true)}
-            className="cursor-pointer group relative transition-all hover:scale-[1.005]"
-            title="Klik untuk membuka Analitik & Tadabbur Hadits"
-          >
+          <div className="relative">
+            <button type="button" aria-label="Lihat ringkasan baca hadits" onClick={() => setHadithAnalyticsOpen(true)} className="absolute right-3 top-3 z-20 flex size-11 items-center justify-center rounded-xl bg-white text-slate-600 hover:bg-slate-100"><BarChart3 aria-hidden className="size-4" /></button>
             <DailyHadithWidget userId={userId} timeZone={userTimeZone} />
           </div>
         </div>
@@ -1642,8 +1430,8 @@ export default function DashboardPage() {
           <div className="relative group">
             <button
               onClick={() => setSholatAnalyticsOpen(true)}
-              title="Buka Analitik Sholat"
-              className="absolute top-5 right-4 z-20 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer p-1"
+              aria-label="Lihat ringkasan catatan salat" title="Buka Analitik Sholat"
+              className="absolute top-5 right-4 z-20 text-slate-600 hover:text-amber-700 transition-colors cursor-pointer p-1"
             >
               <Maximize2 className="h-4 w-4" />
             </button>
@@ -1657,11 +1445,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 2: Tilawah Al-Qur'an (Clickable to open Analytics) */}
-          <div
-            onClick={() => setQuranAnalyticsOpen(true)}
-            className="relative group cursor-pointer transition-all hover:scale-[1.005]"
-            title="Klik untuk membuka Analitik Tilawah Al-Qur'an"
-          >
+          <div className="relative">
+            <button type="button" aria-label="Lihat ringkasan bacaan Al-Qur’an" onClick={() => setQuranAnalyticsOpen(true)} className="absolute right-3 top-3 z-20 flex size-11 items-center justify-center rounded-xl bg-white text-slate-600 hover:bg-slate-100"><BarChart3 aria-hidden className="size-4" /></button>
             <QuranTracker userId={userId} timeZone={userTimeZone} onQuranLogged={handleQuranLoggedFromTracker} />
           </div>
         </div>
@@ -1674,13 +1459,13 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
                 <div>
                      <h3 className="font-extrabold text-navy-900 text-sm">
-                     Progress journey
+                     Periode program
                   </h3>
-                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                   <p className="text-xs text-slate-600 font-medium mt-0.5">
                      Perjalanan 90 hari yang sedang Anda jalani
                   </p>
                 </div>
-                 <Badge className="bg-amber-50 text-amber-800 border-amber-200 font-bold text-[10px]">
+                 <Badge className="bg-amber-50 text-amber-800 border-amber-200 font-bold text-xs">
                    {Math.max(0, 90 - dayCount)} hari lagi
                 </Badge>
               </div>
@@ -1691,19 +1476,19 @@ export default function DashboardPage() {
                    <span className="text-4xl font-black tracking-tight text-navy-900 tabular-nums sm:text-5xl">
                     {Math.max(0, 90 - dayCount)}
                   </span>
-                  <span className="text-xs text-slate-500 font-bold">
+                  <span className="text-xs text-slate-600 font-bold">
                      hari tersisa
                    </span>
                  </div>
-                 <span className="shrink-0 text-right text-[11px] font-semibold text-slate-500">Hari ke-{dayCount}<br />dari 90</span>
+                 <span className="shrink-0 text-right text-xs font-semibold text-slate-600">Hari ke-{dayCount}<br />dari 90</span>
               </div>
 
               {/* Progress Bar */}
               <div className="space-y-1">
                  <Progress value={Math.min(100, Math.round((Math.min(90, dayCount) / 90) * 100))} className="h-2.5 bg-slate-100" indicatorClassName="bg-amber-500" />
-                <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium pt-1">
-                  <span>Hari 1 (Start)</span>
-                  <span className="font-bold text-amber-700">Hari 90 (Finish)</span>
+                <div className="flex items-center justify-between text-xs text-slate-600 font-medium pt-1">
+                  <span>Hari 1</span>
+                  <span className="font-bold text-amber-700">Hari 90</span>
                 </div>
               </div>
 
@@ -1711,23 +1496,23 @@ export default function DashboardPage() {
                <div className="grid grid-cols-1 gap-2 pt-2 text-left sm:grid-cols-3 sm:text-center">
                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                    <span className="text-lg font-black text-navy-900 block tabular-nums">{dayCount} hari</span>
-                  <span className="text-[10px] text-slate-500 font-bold block leading-tight">
-                    berturut-turut berjalan
+                  <span className="text-xs text-slate-600 font-bold block leading-tight">
+                    hari program berjalan
                   </span>
                 </div>
                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-lg font-black text-navy-900 block">
                      {completedTodayCount}/{dailyHabits.length}
                   </span>
-                  <span className="text-[10px] text-slate-500 font-bold block leading-tight">
-                    Checklist Selesai Hari Ini
+                  <span className="text-xs text-slate-600 font-bold block leading-tight">
+                    Kebiasaan selesai hari ini
                   </span>
                 </div>
                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <span className="text-lg font-black text-emerald-700 block">
                      Bulan {getActiveProgramMonth(dayCount)}
                   </span>
-                  <span className="text-[10px] text-slate-500 font-bold block leading-tight">
+                  <span className="text-xs text-slate-600 font-bold block leading-tight">
                      checkpoint aktif
                   </span>
                 </div>
@@ -1742,10 +1527,10 @@ export default function DashboardPage() {
                   className="w-full justify-between text-xs font-bold text-navy-900 border-warm-border hover:bg-warm-bg rounded-xl py-2.5"
                 >
                   <span className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-amber-600" />
+                    <BarChart3 className="h-4 w-4 text-amber-700" />
                     Lihat Analitik Lengkap
                   </span>
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                  <ChevronRight className="h-4 w-4 text-slate-600" />
                 </Button>
               </Link>
             </div>
@@ -1760,15 +1545,15 @@ export default function DashboardPage() {
                     <BookOpen className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">Ruang hening</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Ruang hening</p>
                     <h3 className="mt-0.5 truncate text-sm font-extrabold text-navy-900">Journal refleksi</h3>
-                    <p className="mt-0.5 text-[11px] font-medium text-slate-500">Catat satu hal yang bermakna hari ini</p>
+                    <p className="mt-0.5 text-xs font-medium text-slate-600">Catat satu hal yang bermakna hari ini</p>
                   </div>
                 </div>
                 <Button
                   size="sm"
                    onClick={openQuickJournal}
-                  className="shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-amber-300 shadow-sm transition-transform hover:bg-slate-800 active:scale-[.98]"
+                  className="shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 text-xs font-bold text-amber-300 shadow-sm transition-transform hover:bg-slate-800 active:scale-[.98]"
                 >
                   Tulis
                 </Button>
@@ -1778,20 +1563,20 @@ export default function DashboardPage() {
               {journalLast ? (
                 <div className="relative overflow-hidden rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50 to-white p-4 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
                       Catatan terakhir
                     </span>
-                    <span className="text-[10px] font-medium text-slate-400">
+                    <span className="text-xs font-medium text-slate-600">
                       {journalLastDate}
                     </span>
                     {pinnedIds.includes(userJournals[0]?.id) && (
-                      <Pin className="h-3.5 w-3.5 shrink-0 fill-amber-600 text-amber-600" />
+                      <Pin className="h-3.5 w-3.5 shrink-0 fill-amber-600 text-amber-700" />
                     )}
                   </div>
                   <p className="text-sm leading-6 text-navy-900 font-serif italic line-clamp-3">
                     &ldquo;{journalPreview}&rdquo;
                   </p>
-                  <span className="block text-[10px] font-semibold text-amber-700">Buka Journal untuk membaca seluruh catatan</span>
+                  <span className="block text-xs font-semibold text-amber-700">Buka Journal untuk membaca seluruh catatan</span>
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center space-y-2">
@@ -1799,8 +1584,8 @@ export default function DashboardPage() {
                     <BookOpen className="h-5 w-5" />
                   </div>
                   <p className="text-xs font-semibold text-slate-600">Belum ada catatan refleksi</p>
-                  <p className="mx-auto max-w-[220px] text-[11px] leading-relaxed text-slate-400">Mulai dari satu kalimat. Tidak perlu menunggu hari yang sempurna.</p>
-                   <button type="button" onClick={openQuickJournal} className="pt-1 text-[11px] font-bold text-amber-700 hover:text-amber-800">
+                  <p className="mx-auto max-w-[220px] text-xs leading-relaxed text-slate-600">Mulai dari satu kalimat. Tidak perlu menunggu hari yang sempurna.</p>
+                   <button type="button" onClick={openQuickJournal} className="pt-1 text-xs font-bold text-amber-700 hover:text-amber-800">
                     Tulis refleksi pertama
                   </button>
                 </div>
@@ -1815,10 +1600,10 @@ export default function DashboardPage() {
                   className="w-full justify-between rounded-xl border-slate-200 text-xs font-bold text-navy-900 hover:bg-slate-50 py-2.5"
                 >
                   <span className="flex items-center gap-2">
-                    <BookMarked className="h-4 w-4 text-amber-600" />
+                    <BookMarked className="h-4 w-4 text-amber-700" />
                     Buka Halaman Journal ({userJournals.length} catatan)
                   </span>
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                  <ChevronRight className="h-4 w-4 text-slate-600" />
                 </Button>
               </Link>
             </div>
@@ -1835,7 +1620,7 @@ export default function DashboardPage() {
               <p className="text-xs sm:text-sm text-navy-900 font-serif italic font-semibold leading-relaxed">
                 &ldquo;Dan barang siapa bertakwa kepada Allah, niscaya Dia akan menjadikan baginya jalan keluar.&rdquo;
               </p>
-              <span className="text-[11px] font-bold text-slate-500 block">
+              <span className="text-xs font-bold text-slate-600 block">
                 (QS. At-Talaq: 2) &bull; &ldquo;Amalan yang paling dicintai Allah adalah amalan yang kontinyu meskipun sedikit.&rdquo; (HR. Muslim)
               </span>
             </div>
@@ -1850,7 +1635,7 @@ export default function DashboardPage() {
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-6">
           <DialogHeader className="pb-3 border-b border-warm-border">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
-              <BookMarked className="h-5 w-5 text-amber-600" />
+              <BookMarked className="h-5 w-5 text-amber-700" />
               Semua Catatan Journal Refleksi
             </DialogTitle>
           </DialogHeader>
@@ -1858,7 +1643,7 @@ export default function DashboardPage() {
           {/* Search bar */}
           <div className="py-3 flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="h-4 w-4 absolute left-3 top-3 text-slate-400" />
+              <Search className="h-4 w-4 absolute left-3 top-3 text-slate-600" />
               <Input
                 value={journalSearch}
                 onChange={(e) => setJournalSearch(e.target.value)}
@@ -1880,7 +1665,7 @@ export default function DashboardPage() {
           {/* List of journal cards */}
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {filteredJournals.length === 0 ? (
-              <div className="py-12 text-center space-y-2 text-slate-400 text-xs italic">
+              <div className="py-12 text-center space-y-2 text-slate-600 text-xs italic">
                 Belum ada jurnal yang tersimpan.
               </div>
             ) : (
@@ -1897,7 +1682,7 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center justify-between border-b border-warm-border/50 pb-2 mb-2">
                       <span className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-amber-600" />
+                        <Calendar className="h-3.5 w-3.5 text-amber-700" />
                         {new Date(item.date).toLocaleDateString("id-ID", {
                           weekday: "long",
                           day: "numeric",
@@ -1910,7 +1695,7 @@ export default function DashboardPage() {
                         className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${
                           isPinned
                             ? "bg-amber-200 text-amber-900 font-bold"
-                            : "text-slate-400 hover:text-navy-900 hover:bg-warm-bg"
+                            : "text-slate-600 hover:text-navy-900 hover:bg-warm-bg"
                         }`}
                         title={isPinned ? "Lepas Pin" : "Sematkan Journal"}
                       >
@@ -1948,7 +1733,7 @@ export default function DashboardPage() {
         <DialogContent className="max-w-md p-6">
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-600" />
+              <Sparkles className="h-5 w-5 text-amber-700" />
               Detail Habits Aktif
             </DialogTitle>
           </DialogHeader>
@@ -1990,9 +1775,9 @@ export default function DashboardPage() {
                   >
                     <span className="flex-1 min-w-0">{h.title}</span>
                     {h.frequency === "weekly" ? (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] text-amber-800">{h.completedCount}/{h.quantity} kali</span>
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-800">{h.completedCount}/{h.quantity} kali</span>
                     ) : isMultiStep && !h.completedToday ? (
-                      <span className="shrink-0 rounded-full bg-slate-200 px-2 py-1 text-[10px] text-slate-700">{h.completedCount}/{h.quantity} +</span>
+                      <span className="shrink-0 rounded-full bg-slate-200 px-2 py-1 text-xs text-slate-700">{h.completedCount}/{h.quantity} +</span>
                     ) : (
                       <div className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${h.completedToday ? "bg-emerald-600 text-white" : "border border-slate-300 bg-white"}`}>
                         {h.completedToday && <Check className="h-3 w-3 stroke-[3]" />}
@@ -2020,14 +1805,14 @@ export default function DashboardPage() {
         <DialogContent className="max-w-lg p-6 space-y-4">
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-600" />
+              <Sparkles className="h-5 w-5 text-amber-700" />
               Pepatah & Hadits Tentang Konsistensi
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 space-y-2">
-              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-widest block">
+              <span className="text-xs font-bold text-amber-800 uppercase tracking-widest block">
                 AL-QUR&apos;AN SURAH AT-TALAQ AYAT 2-3
               </span>
               <p className="text-sm font-serif italic text-navy-900 leading-relaxed">
@@ -2036,13 +1821,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="bg-warm-bg p-4 rounded-xl border border-warm-border space-y-2">
-              <span className="text-[10px] font-bold text-navy-900 uppercase tracking-widest block">
+              <span className="text-xs font-bold text-navy-900 uppercase tracking-widest block">
                 HADITS RIWAYAT MUSLIM
               </span>
               <p className="text-xs font-serif italic text-slate-800 leading-relaxed">
                 &ldquo;Amalan yang paling dicintai oleh Allah Ta&apos;ala adalah amalan yang berkelanjutan (istiqamah) meskipun sedikit.&rdquo;
               </p>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-600">
                 Prinsip ini menjadi dasar metode SLJ: membangun kebiasaan kecil yang konsisten setiap hari selama 90 hari.
               </p>
             </div>
@@ -2069,7 +1854,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <DialogTitle className="text-base font-extrabold text-navy-900">Refleksi hari ini</DialogTitle>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">Tuliskan apa yang terasa penting, tanpa perlu merapikan kata-kata.</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">Tuliskan apa yang terasa penting, tanpa perlu merapikan kata-kata.</p>
               </div>
             </div>
           </DialogHeader>
@@ -2085,7 +1870,7 @@ export default function DashboardPage() {
               placeholder="Apa yang kamu syukuri, pelajari, atau ingin perbaiki hari ini?"
               className="min-h-[180px] resize-none rounded-xl border-slate-200 p-4 font-serif text-sm leading-6 focus:border-amber-500"
             />
-            <div className="flex items-center justify-between text-[10px] text-slate-400">
+            <div className="flex items-center justify-between text-xs text-slate-600">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={journalIsPrivate} onChange={(e) => setJournalIsPrivate(e.target.checked)} />
                 <Lock className="h-3 w-3" />
@@ -2120,7 +1905,7 @@ export default function DashboardPage() {
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-amber-900 font-extrabold bg-amber-400 px-3.5 py-1 rounded-full text-xs shadow-md">
-                Hari ke-{dayCount} dari 90
+                {dayCount > 0 ? `Hari ke-${dayCount} dari 90` : "Program belum dimulai"}
               </span>
               <span className="text-xs sm:text-sm font-bold text-slate-300 hidden sm:inline">
                 Spiritual Leadership Journey
@@ -2132,7 +1917,7 @@ export default function DashboardPage() {
               className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 border border-white/30 text-white px-4 py-2 rounded-full text-xs font-extrabold backdrop-blur-md transition-all shadow-lg cursor-pointer"
             >
               <Minimize2 className="h-4 w-4 text-amber-300" />
-              <span>Keluar Screen Saver (ESC)</span>
+              <span>Tutup jam layar penuh</span>
             </button>
           </div>
 
@@ -2148,38 +1933,20 @@ export default function DashboardPage() {
               </span>
             </div>
             <p className="text-sm sm:text-xl text-slate-200 font-semibold pt-2">
-              📅 {heroDate}
+              {heroDate}
             </p>
           </div>
 
-          {/* Bottom Bar: Prayer Info & Ticker */}
-          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/20 pt-6">
-            <div className="flex items-center gap-3">
-              <img
-                src={prayerIconMap[nextPrayerInfo.name] || "/icon_subuh.webp"}
-                alt={nextPrayerInfo.name}
-                className="h-12 w-12 object-contain drop-shadow-xl"
-              />
-              <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                  {nextPrayerInfo.isGracePeriod ? "Waktu Sholat" : "Sholat Berikutnya"}
-                </span>
-                <span className="text-lg sm:text-2xl font-black text-white">
-                  {nextPrayerInfo.name} ({nextPrayerInfo.time})
-                </span>
-              </div>
-            </div>
-
-            {nextPrayerInfo.isGracePeriod ? (
-              <div className="bg-emerald-500/90 border border-emerald-300 text-white font-black text-sm px-5 py-2.5 rounded-2xl shadow-xl animate-pulse">
-                🤲 {nextPrayerInfo.graceMessage}
-              </div>
-            ) : (
-              <div className="text-right">
-                <span className="text-xs font-bold text-slate-400 uppercase block">Menghitung Mundur</span>
-                <span className="text-xl sm:text-3xl font-black font-mono text-amber-300">{nextPrayerInfo.text}</span>
-              </div>
-            )}
+          <div className="relative z-10 flex justify-between gap-4 border-t border-white/20 pt-6 text-sm sm:text-base">
+            {nextPrayerInfo ? (
+              <>
+                <div>
+                  <p className="text-xs text-white/85">{nextPrayerInfo.isGracePeriod ? "Waktu salat tiba" : "Salat berikutnya"}</p>
+                  <p className="mt-1 text-lg font-semibold">{nextPrayerInfo.name} · {nextPrayerInfo.time}</p>
+                </div>
+                {!nextPrayerInfo.isGracePeriod && <p className="font-mono text-lg font-semibold text-amber-200">{nextPrayerInfo.text}</p>}
+              </>
+            ) : <p>{prayerLoadFailed ? "Jadwal salat belum tersedia" : "Memuat jadwal salat"}</p>}
           </div>
         </div>
       )}
@@ -2189,7 +1956,7 @@ export default function DashboardPage() {
         <DialogContent className="max-w-lg p-6 space-y-4">
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-amber-600" />
+              <Clock className="h-5 w-5 text-amber-700" />
               Analitik Khusus Sholat (Wajib & Sunnah)
             </DialogTitle>
           </DialogHeader>
@@ -2200,19 +1967,19 @@ export default function DashboardPage() {
                 <span className="text-xl font-black text-amber-900 block">
                   {sholatAnalytics ? `${sholatAnalytics.wajibDays}/7` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Sholat Wajib Lengkap</span>
+                <span className="text-xs text-slate-600 font-bold block">Sholat Wajib Lengkap</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
                 <span className="text-xl font-black text-navy-900 block">
                   {sholatAnalytics ? `${sholatAnalytics.sunnahCount}` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Sholat Sunnah (7 Hari)</span>
+                <span className="text-xs text-slate-600 font-bold block">Sholat Sunnah (7 Hari)</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
                 <span className="text-xl font-black text-emerald-700 block">
                   {sholatAnalytics ? `${sholatAnalytics.streak} hari` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Streak Beruntun</span>
+                <span className="text-xs text-slate-600 font-bold block">Streak Beruntun</span>
               </div>
             </div>
 
@@ -2248,7 +2015,7 @@ export default function DashboardPage() {
         <DialogContent className="max-w-lg p-6 space-y-4">
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-amber-600" />
+              <BookOpen className="h-5 w-5 text-amber-700" />
               Analitik Khusus Tilawah Al-Qur&apos;an
             </DialogTitle>
           </DialogHeader>
@@ -2257,21 +2024,21 @@ export default function DashboardPage() {
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
                 <span className="text-xl font-black text-amber-900 block">
-                  {quranAnalytics ? `${quranAnalytics.totalPages} Hal` : "--"}
+                  {quranAnalytics ? `${quranAnalytics.totalAyat} Ayat` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Total Tilawah (7 Hari)</span>
+                <span className="text-xs text-slate-600 font-bold block">Total Tilawah (7 Hari)</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
                 <span className="text-xl font-black text-navy-900 block">
                   {quranAnalytics ? `${quranAnalytics.totalDays} Hari` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Aktif Tilawah</span>
+                <span className="text-xs text-slate-600 font-bold block">Aktif Tilawah</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
                 <span className="text-xl font-black text-emerald-700 block">
                   {quranAnalytics ? `${quranAnalytics.streak} Hari` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Streak Berturut</span>
+                <span className="text-xs text-slate-600 font-bold block">Streak Berturut</span>
               </div>
             </div>
 
@@ -2305,7 +2072,7 @@ export default function DashboardPage() {
         <DialogContent className="max-w-lg p-6 space-y-4">
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-600" />
+              <Sparkles className="h-5 w-5 text-amber-700" />
               Analitik Khusus Baca & Tadabbur Hadits
             </DialogTitle>
           </DialogHeader>
@@ -2316,19 +2083,19 @@ export default function DashboardPage() {
                 <span className="text-xl font-black text-amber-900 block">
                   {hadithAnalytics ? `${hadithAnalytics.totalRead} Hari` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Telah Dibaca (7 Hari)</span>
+                <span className="text-xs text-slate-600 font-bold block">Telah Dibaca (7 Hari)</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
                 <span className="text-xl font-black text-navy-900 block">
                   {hadithAnalytics ? `${hadithAnalytics.streak} Hari` : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Streak Berturut</span>
+                <span className="text-xs text-slate-600 font-bold block">Streak Berturut</span>
               </div>
               <div className="bg-warm-bg border border-warm-border p-3 rounded-xl">
                 <span className="text-xl font-black text-emerald-700 block">
                   {hadithAnalytics && hadithAnalytics.totalRead >= 5 ? "Konsisten" : hadithAnalytics ? "Aktif" : "--"}
                 </span>
-                <span className="text-[10px] text-slate-500 font-bold block">Status Pekan Ini</span>
+                <span className="text-xs text-slate-600 font-bold block">Status Pekan Ini</span>
               </div>
             </div>
 
@@ -2373,7 +2140,7 @@ export default function DashboardPage() {
                 <DialogTitle className="max-w-xs pt-7 text-2xl font-bold leading-tight tracking-[-0.02em] text-[#0F1E3D]">
                   Selamat Datang, {userName}!
                 </DialogTitle>
-                <p className="pt-2.5 text-sm leading-relaxed text-slate-500">
+                <p className="pt-2.5 text-sm leading-relaxed text-slate-600">
                   Perjalanan 90 hari Anda dimulai.
                 </p>
               </DialogHeader>
@@ -2388,7 +2155,7 @@ export default function DashboardPage() {
                 <Button
                   onClick={handleDismissWelcome}
                   variant="ghost"
-                  className="h-10 w-full rounded-lg text-xs font-semibold text-slate-500 transition-colors hover:bg-[#FAF8F4] hover:text-[#0F1E3D] active:scale-[0.98]"
+                  className="h-10 w-full rounded-lg text-xs font-semibold text-slate-600 transition-colors hover:bg-[#FAF8F4] hover:text-[#0F1E3D] active:scale-[0.98]"
                 >
                   Nanti saja
                 </Button>

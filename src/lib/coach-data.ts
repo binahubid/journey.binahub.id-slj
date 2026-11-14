@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { coachParticipants, type CoachParticipant } from "@/lib/coach-mock-data";
+import { getProgramDay } from "@/lib/program-timeline";
+import { JourneyStatus } from "@/types/slj";
 
 export type CoachDataMode = "live" | "preview";
 export type CoachViewer = { name: string; role: "coach" | "admin" };
@@ -119,9 +121,19 @@ function normalizeIndicators(input: JsonRecord): CoachIndicator[] {
 }
 
 function normalizeAreaMetrics(input: JsonRecord): CoachAreaMetric[] {
-  const rows = input.area_metrics ?? input.per_area ?? input.metrics?.per_area ?? input.metrics?.areas ?? [];
-  if (!Array.isArray(rows)) return [];
-  return rows.map((row: JsonRecord) => {
+  const combined = input.area_metrics ?? input.per_area ?? input.metrics?.per_area ?? input.metrics?.areas;
+  let rows: JsonRecord[] = Array.isArray(combined) ? combined : [];
+  if (!Array.isArray(combined)) {
+    const outcomes = new Map<string, JsonRecord>((input.metrics?.outcome?.areas ?? []).map((row: JsonRecord) => [row.area, row]));
+    const executions = new Map<string, JsonRecord>((input.metrics?.execution?.areas ?? []).map((row: JsonRecord) => [row.area, row]));
+    rows = [...new Set([...outcomes.keys(), ...executions.keys()])].map((area) => ({
+      ...outcomes.get(area),
+      area,
+      outcome: outcomes.get(area),
+      execution: executions.get(area),
+    }));
+  }
+  return rows.map((row) => {
     const outcome = row.outcome || {};
     const execution = row.execution || {};
     const indicatorCoverage = row.indicator_coverage || row.indicatorCoverage || {};
@@ -144,10 +156,24 @@ function normalizeParticipant(input: JsonRecord): CoachPortalParticipant {
   const journey = input.journey || {};
   const name = text(input.full_name ?? input.fullName ?? profile.full_name ?? profile.fullName, "Peserta");
   const participantUserId = text(input.participant_user_id ?? input.user_id ?? profile.user_id ?? input.id);
-  const status = text(input.journey_status ?? input.journeyStatus ?? journey.status, "ACTIVE") as CoachParticipant["journeyStatus"];
+  const rawStatus = text(input.journey_status ?? input.journeyStatus ?? journey.status).toUpperCase();
+  const status = Object.values(JourneyStatus).find((value) => value === rawStatus) ?? null;
   const checkpoints = (input.checkpoints || input.monthly_reviews || []) as CoachParticipant["checkpoints"];
   const latestCheckpoint = checkpoints[checkpoints.length - 1];
-  const baseline = (input.baseline || input.baseline_scores || {}) as Record<string, number>;
+  const baselineData = input.baseline ?? input.baseline_scores ?? {};
+  const baselineEntries: [string, unknown][] = Array.isArray(baselineData.areas)
+    ? baselineData.areas.map((row: JsonRecord) => [text(row.area), row.score])
+    : Object.entries(baselineData);
+  const baseline = Object.fromEntries(baselineEntries.flatMap(([area, score]) =>
+    area && typeof score === "number" && Number.isFinite(score) ? [[area, score]] : []
+  ));
+  const explicitDay = nullableNumber(input.day_count ?? input.dayCount);
+  const startDate = text(input.period?.start_date);
+  const dayCount = explicitDay ?? (startDate ? Math.min(90, getProgramDay(startDate, new Date(), text(input.period?.timezone) || undefined)) : null);
+  const lastActive = new Date(text(input.last_active_at));
+  const lastActiveLabel = Number.isNaN(lastActive.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "Asia/Jakarta" }).format(lastActive);
 
   return {
     id: participantUserId,
@@ -162,12 +188,12 @@ function normalizeParticipant(input: JsonRecord): CoachPortalParticipant {
     company: text(input.company_name ?? input.company ?? profile.company_name, "-"),
     batch: text(input.batch_name ?? input.batch ?? profile.batch_name, "-"),
     city: text(input.city ?? input.location ?? profile.location, "-"),
-    dayCount: number(input.day_count ?? input.dayCount),
+    dayCount,
     journeyStatus: status,
-    habitCompletionPercent: number(input.habit_completion_percent ?? input.habitCompletionPercent),
+    habitCompletionPercent: nullableNumber(input.habit_completion_percent ?? input.habitCompletionPercent ?? input.metrics?.execution?.score),
     streak: number(input.streak),
-    lastActive: text(input.last_active_label ?? input.lastActive, "Belum tersedia"),
-    lastActiveDaysAgo: number(input.last_active_days_ago ?? input.lastActiveDaysAgo),
+    lastActive: text(input.last_active_label ?? input.lastActive, lastActiveLabel),
+    lastActiveDaysAgo: number(input.last_active_days_ago ?? input.lastActiveDaysAgo ?? input.days_inactive),
     lastHabitLogDaysAgo: number(input.last_habit_log_days_ago ?? input.lastHabitLogDaysAgo),
     checkpointOpenDaysAgo: nullableNumber(input.checkpoint_open_days_ago ?? input.checkpointOpenDaysAgo) ?? undefined,
     lastCheckpointStatus: (input.last_checkpoint_status ?? input.lastCheckpointStatus ?? latestCheckpoint?.status ?? "NOT_FILLED") as CoachParticipant["lastCheckpointStatus"],
@@ -245,10 +271,31 @@ export async function loadParticipantAssessment(participantUserId: string): Prom
   const assessmentRow = payload.assessment || payload.coach_assessment || metrics.coach_assessment || {};
   const rawScores = payload.rubric_scores || assessmentRow.rubric_scores || assessmentRow.scores || [];
   const scores = ["evidence", "consistency", "target", "sustainability"].map((key, index) => {
-    if (Array.isArray(rawScores)) return number(rawScores.find((item: JsonRecord) => item.rubric_key === key)?.score ?? rawScores[index]?.score, 3);
-    return number(rawScores[key], 3);
+    const score = Array.isArray(rawScores)
+      ? rawScores.find((item: JsonRecord) => item?.rubric_key === key)?.score
+        ?? (typeof rawScores[index] === "number" ? rawScores[index] : undefined)
+      : rawScores[key];
+    return number(score, 0);
   });
-  const participant = normalizeParticipant({ ...(payload.participant || payload), ...(payload.journey ? { journey: payload.journey } : {}), indicators: payload.indicators ?? payload.ptp_indicators, area_metrics: payload.area_metrics ?? payload.per_area ?? metrics.per_area ?? metrics.areas, metrics, methodology_version: payload.methodology_version });
+  const { data: reviews, error: reviewsError } = await supabase.from("monthly_reviews")
+    .select("month_number, status, participant_note, coach_note, first_submitted_at")
+    .eq("user_id", participantUserId)
+    .order("month_number");
+  if (reviewsError) throw reviewsError;
+  const checkpoints = (reviews || []).map(review => ({
+    month: review.month_number,
+    status: review.status,
+    participantNote: review.participant_note,
+    coachNote: review.coach_note,
+    date: review.first_submitted_at,
+  }));
+  const participant = normalizeParticipant({
+    ...payload,
+    ...payload.participant,
+    indicators: payload.indicators ?? payload.ptp_indicators,
+    checkpoints,
+    metrics,
+  });
   participant.participantOutcome = nullableNumber(payload.participant_outcome ?? outcomeMetric.score ?? assessmentRow.participant_outcome ?? participant.participantOutcome);
   return {
     data: {

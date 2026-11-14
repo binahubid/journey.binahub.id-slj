@@ -9,7 +9,7 @@ export interface MonitoringRow {
   batchName: string;
   coachId: string;
   coachName: string;
-  habitAvgPercent: number;
+  habitAvgPercent: number | null;
   daysInactive: number;
   needsSupport: boolean;
   monthsReviewed: number;
@@ -68,7 +68,7 @@ export function mapMonitoringRow(r: RawMonitoringRow): MonitoringRow {
     batchName: r.batch_name || "",
     coachId: r.coach_id || "",
     coachName: r.coach_name || "",
-    habitAvgPercent: r.habit_avg_percent ?? 0,
+    habitAvgPercent: r.habit_avg_percent,
     daysInactive: r.days_inactive ?? 0,
     needsSupport: r.needs_support === true,
     monthsReviewed: r.months_reviewed ?? 0,

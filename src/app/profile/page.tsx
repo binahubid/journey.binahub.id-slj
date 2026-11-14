@@ -5,6 +5,8 @@ import { User, MapPin, Calendar, Building2, Layers, HeartHandshake, Mail, Shield
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getSljAccess, getTrialProgress } from "@/lib/program-access";
+import { getProgramDay } from "@/lib/program-timeline";
+import { resolveParticipantTimeZone } from "@/lib/local-date";
 import Grainient from "@/components/Grainient";
 
 interface UserProfileData {
@@ -47,9 +49,9 @@ function InfoSection({
     <section className="py-1">
       <div className="flex items-center gap-2 pb-3">
         <span className="text-accent">{icon}</span>
-        <h3 className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-500">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
           {title}
-        </h3>
+        </h2>
       </div>
       <div className="divide-y divide-slate-200/60">
         {children}
@@ -69,8 +71,8 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-3 min-w-0">
-      <span className="text-[11px] text-slate-500 flex items-center gap-2 font-medium shrink-0">
-        <span className="text-slate-400">{icon}</span>
+      <span className="text-xs text-slate-600 flex items-center gap-2 font-medium shrink-0">
+        <span className="text-slate-600">{icon}</span>
         {label}
       </span>
       <span className="text-[13px] font-semibold text-navy-900 text-right min-w-0 truncate">{value}</span>
@@ -87,7 +89,7 @@ function StatusPill({ status }: { status: string }) {
   };
   const c = config[status] || { dot: "bg-slate-400", label: status, cls: "bg-slate-400/15 text-slate-300 border-slate-300/25" };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${c.cls}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${c.cls}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
       {c.label}
     </span>
@@ -201,9 +203,7 @@ export default function ProfilePage() {
         let dayNumber = 1;
         let progressPct = 0;
         if (userProfile?.start_date) {
-          const start = new Date(userProfile.start_date);
-          const diff = Math.floor((Date.now() - start.getTime()) / 86400000);
-          dayNumber = Math.max(1, Math.min(90, diff + 1));
+          dayNumber = Math.min(90, getProgramDay(userProfile.start_date, new Date(), resolveParticipantTimeZone(userProfile.timezone, userProfile.timezone_mode || "AUTO")));
           progressPct = Math.min(100, Math.round((dayNumber / 90) * 100));
         }
 
@@ -259,7 +259,7 @@ export default function ProfilePage() {
   return (
     <ParticipantLayout activePath="/profile" pageTitle="Profil Saya • Detail Peserta SLJ">
 
-      <main className="max-w-wizard mx-auto pt-6 pb-24 space-y-5">
+      <div className="max-w-wizard mx-auto pt-6 pb-24 space-y-5">
         {errorMsg && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{errorMsg}</div>}
 
         {/* ─── HERO: DIGITAL PASSPORT ─────────────────────────────────────── */}
@@ -298,7 +298,7 @@ export default function ProfilePage() {
           <div className="relative z-10 p-6 sm:p-8">
             {/* ID badge — top right */}
             <div className="flex justify-end">
-              <span className="font-mono text-[11px] font-bold text-amber-200 bg-white/10 border border-white/15 px-2.5 py-1 rounded-md tracking-wider">
+              <span className="font-mono text-xs font-bold text-amber-200 bg-white/10 border border-white/15 px-2.5 py-1 rounded-md tracking-wider">
                 ID {profile.displayId}
               </span>
             </div>
@@ -309,10 +309,10 @@ export default function ProfilePage() {
                 {profile.fullName.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight truncate">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight truncate">
                   {profile.fullName}
-                </h2>
-                <p className="text-[11px] sm:text-xs text-blue-200/75 mt-0.5">{profile.role}</p>
+                </h1>
+                <p className="text-xs sm:text-xs text-blue-200/75 mt-0.5">{profile.role}</p>
                 <div className="mt-2.5">
                   <StatusPill status={profile.status} />
                 </div>
@@ -321,7 +321,7 @@ export default function ProfilePage() {
 
             {/* Journey progress */}
             <div className="mt-7 pt-5 border-t border-white/10">
-              <div className="flex items-baseline justify-between text-[11px] mb-2">
+              <div className="flex items-baseline justify-between text-xs mb-2">
                 <span className="font-semibold text-blue-100/90">
                   Hari ke-{profile.dayNumber} <span className="text-blue-200/50 font-normal">dari {duration}</span>
                 </span>
@@ -333,7 +333,7 @@ export default function ProfilePage() {
                   style={{ width: `${profile.progressPct}%` }}
                 />
               </div>
-              <div className="mt-2 flex items-center justify-between text-[10px] text-blue-200/55 font-medium">
+              <div className="mt-2 flex items-center justify-between text-xs text-blue-200/55 font-medium">
                 <span>{profile.startDate}</span>
                 <span>{profile.endDate}</span>
               </div>
@@ -364,11 +364,11 @@ export default function ProfilePage() {
               label="Sahabat Safar"
               value={
                 profile.sahabatSafarName ? (
-                  <span className="text-amber-900 bg-amber-100 font-bold px-2.5 py-0.5 rounded-full text-[11px] border border-amber-300">
+                  <span className="text-amber-900 bg-amber-100 font-bold px-2.5 py-0.5 rounded-full text-xs border border-amber-300">
                     {profile.sahabatSafarName}
                   </span>
                 ) : (
-                  <span className="text-slate-400 font-normal italic text-[11px]">Belum dipasangkan</span>
+                  <span className="text-slate-600 font-normal italic text-xs">Belum dipasangkan</span>
                 )
               }
             />
@@ -382,7 +382,7 @@ export default function ProfilePage() {
               <InfoRow icon={<Sparkles className="h-3.5 w-3.5" />} label="Pengalaman Umrah" value={profile.umrahExperience} />
             )}
             {!profile.sahabatSafarName && !profile.commTime && !profile.commMedia && !profile.umrahExperience && (
-              <p className="text-[11px] text-slate-400 italic py-2">Belum ada data koneksi.</p>
+              <p className="text-xs text-slate-600 italic py-2">Belum ada data koneksi.</p>
             )}
           </InfoSection>
 
@@ -400,13 +400,13 @@ export default function ProfilePage() {
           {/* Area Transformasi */}
           <InfoSection title="Area Transformasi (PTP)" icon={<Sparkles className="h-3.5 w-3.5" />}>
             {profile.areaTransformasi.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic py-2">Belum ada area transformasi terpilih.</p>
+              <p className="text-xs text-slate-600 italic py-2">Belum ada area transformasi terpilih.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {profile.areaTransformasi.map((area, idx) => (
                   <span
                     key={idx}
-                    className="text-[11px] font-semibold text-navy-900 bg-navy-50 border border-navy-100 px-2.5 py-1 rounded-lg"
+                    className="text-xs font-semibold text-navy-900 bg-navy-50 border border-navy-100 px-2.5 py-1 rounded-lg"
                   >
                     {area}
                   </span>
@@ -415,7 +415,7 @@ export default function ProfilePage() {
             )}
           </InfoSection>
         </div>
-      </main>
+      </div>
     </ParticipantLayout>
   );
 }

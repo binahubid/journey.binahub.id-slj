@@ -93,7 +93,7 @@ export default function AdminLayout({
     >
       {groups.map((group) => (
         <div key={group.title}>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-600">
             {group.title}
           </p>
           <div className="space-y-0.5">

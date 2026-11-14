@@ -43,6 +43,11 @@ export type GroupImpactReport = {
 
 export type GroupMetric = AssessmentMetric & { measured: number };
 
+export function averageMeasuredScore(values: (number | null | undefined)[]): number | null {
+  const measured = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return measured.length ? Math.round(measured.reduce((sum, value) => sum + value, 0) / measured.length) : null;
+}
+
 export function summarizeGroupImpact(report: GroupImpactReport) {
   const participants = report.participants ?? [];
   const metric = (select: (row: ParticipantAssessment) => AssessmentMetric): GroupMetric => {

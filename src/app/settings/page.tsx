@@ -274,7 +274,8 @@ export default function SettingsPage() {
   return (
     <ParticipantLayout activePath="/settings" pageTitle="Pengaturan • Lokasi & Notifikasi">
 
-      <main className="max-w-wizard mx-auto pt-6 pb-24 space-y-6">
+      <div className="max-w-wizard mx-auto pt-6 pb-24 space-y-6">
+        <h1 className="mb-6 text-2xl font-semibold text-navy-900">Pengaturan</h1>
         {errorMsg && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{errorMsg}</div>}
         <form onSubmit={handleSave} className="space-y-6">
           <Tabs defaultValue="notifikasi">
@@ -302,7 +303,7 @@ export default function SettingsPage() {
                       placeholder="Jakarta, Makkah, Madinah…"
                     />
                     <datalist id="settings-prayer-cities"><option value="Jakarta" /><option value="Makkah" /><option value="Madinah" /><option value="Jeddah" /></datalist>
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-xs text-gray-500">
                       Pilih kota Anda. Jadwal untuk Makkah dan Madinah mengikuti pengaturan Arab Saudi.
                     </p>
                   </div>
@@ -326,7 +327,7 @@ export default function SettingsPage() {
                        <option value="Australia/Adelaide">Australia Tengah (Adelaide)</option>
                        <option value="Australia/Sydney">Australia Timur (Sydney)</option>
                     </select>
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-xs text-gray-500">
                       Digunakan untuk tanggal catatan, jadwal salat, dan pengingat Anda.
                     </p>
                   </div>
@@ -367,7 +368,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={() => setDateFormat("full")}
-                        className={`py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold border transition-all text-center leading-tight ${
+                        className={`py-2 px-2 sm:px-3 rounded-lg text-xs sm:text-xs font-bold border transition-all text-center leading-tight ${
                           dateFormat === "full"
                             ? "bg-navy-900 text-white border-navy-900"
                             : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
@@ -378,7 +379,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={() => setDateFormat("short")}
-                        className={`py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold border transition-all text-center leading-tight ${
+                        className={`py-2 px-2 sm:px-3 rounded-lg text-xs sm:text-xs font-bold border transition-all text-center leading-tight ${
                           dateFormat === "short"
                             ? "bg-navy-900 text-white border-navy-900"
                             : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
@@ -398,7 +399,7 @@ export default function SettingsPage() {
                   {!isTrial && (<div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
                       <span className="text-xs font-semibold text-navy-900 block">Pengingat Habit Harian</span>
-                      <span className="text-[11px] text-gray-500">Pengingat utama pukul 20.00 jika habit hari ini belum selesai.</span>
+                      <span className="text-xs text-gray-500">Pengingat utama pukul 20.00 jika habit hari ini belum selesai.</span>
                     </div>
                     <Switch aria-label="Pengingat habit harian" checked={habitNotif} onCheckedChange={setHabitNotif} />
                   </div>)}
@@ -406,34 +407,34 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
                       <span className="text-xs font-semibold text-navy-900 block">Pengingat Jurnal Harian</span>
-                      <span className="text-[11px] text-gray-500">Pengingat utama pukul 21.00 jika jurnal hari ini belum ditulis.</span>
+                      <span className="text-xs text-gray-500">Pengingat utama pukul 21.00 jika jurnal hari ini belum ditulis.</span>
                     </div>
                     <Switch aria-label="Pengingat jurnal harian" checked={journalNotif} onCheckedChange={setJournalNotif} />
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-2">
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Waktu Sholat</span><span className="text-[11px] text-gray-500">Opsional, pengingat waktu sholat.</span></div>
+                      <div><span className="text-xs font-semibold text-navy-900 block">Waktu Sholat</span><span className="text-xs text-gray-500">Opsional, pengingat waktu sholat.</span></div>
                       <Switch aria-label="Pengingat salat" checked={prayerNotif} onCheckedChange={setPrayerNotif} />
                     </div>
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Tilawah Al-Qur&apos;an</span><span className="text-[11px] text-gray-500">Opsional, pukul 06.30 waktu lokal.</span></div>
+                      <div><span className="text-xs font-semibold text-navy-900 block">Tilawah Al-Qur&apos;an</span><span className="text-xs text-gray-500">Opsional, pukul 06.30 waktu lokal.</span></div>
                       <Switch aria-label="Pengingat Al-Qur’an" checked={quranNotif} onCheckedChange={setQuranNotif} />
                     </div>
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Hadits Hari Ini</span><span className="text-[11px] text-gray-500">Opsional, pukul 07.00 waktu lokal.</span></div>
+                      <div><span className="text-xs font-semibold text-navy-900 block">Hadits Hari Ini</span><span className="text-xs text-gray-500">Opsional, pukul 07.00 waktu lokal.</span></div>
                       <Switch aria-label="Pengingat hadits" checked={hadithNotif} onCheckedChange={setHadithNotif} />
                     </div>
                     {!isTrial && (<div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Checkpoint Program</span><span className="text-[11px] text-gray-500">H-3, H-1, dan hari checkpoint.</span></div>
+                      <div><span className="text-xs font-semibold text-navy-900 block">Checkpoint Program</span><span className="text-xs text-gray-500">H-3, H-1, dan hari checkpoint.</span></div>
                       <Switch aria-label="Pengingat evaluasi program" checked={checkpointNotif} onCheckedChange={setCheckpointNotif} />
                     </div>)}
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Coach & Sahabat Safar</span><span className="text-[11px] text-gray-500">Respons coach dan pengingat pasangan.</span></div>
+                      <div><span className="text-xs font-semibold text-navy-900 block">Coach & Sahabat Safar</span><span className="text-xs text-gray-500">Respons coach dan pengingat pasangan.</span></div>
                       <Switch aria-label="Notifikasi pendamping" checked={socialNotif} onCheckedChange={setSocialNotif} />
                     </div>
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Pengingat Tidak Aktif</span><span className="text-[11px] text-gray-500">Dikirim setelah 3 hari tanpa aktivitas.</span></div>
+                      <div><span className="text-xs font-semibold text-navy-900 block">Pengingat Tidak Aktif</span><span className="text-xs text-gray-500">Dikirim setelah 3 hari tanpa aktivitas.</span></div>
                       <Switch aria-label="Pengingat saat tidak aktif" checked={inactivityNotif} onCheckedChange={setInactivityNotif} />
                     </div>
                   </div>
@@ -446,7 +447,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between gap-4 rounded-md border border-warm-border bg-warm-bg/30 p-4">
                     <div>
                       <span className="block text-xs font-semibold text-navy-900">Tampilkan pengingat di layar HP</span>
-                      <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+                      <span className="mt-1 block text-xs leading-relaxed text-gray-500">
                         Aktifkan agar pengingat juga muncul di layar HP Anda, termasuk saat aplikasi sedang ditutup.
                         {pushPermission === "denied" ? " Izin saat ini diblokir oleh browser." : ""}
                       </span>
@@ -458,7 +459,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   {pushPermission === "unsupported" && (
-                    <p className="text-[11px] font-medium text-amber-800">Browser/perangkat ini belum mendukung Web Push. Notifikasi akun tetap tersedia.</p>
+                    <p className="text-xs font-medium text-amber-800">Browser/perangkat ini belum mendukung Web Push. Notifikasi akun tetap tersedia.</p>
                   )}
                 </div>
 
@@ -472,7 +473,7 @@ export default function SettingsPage() {
                       <span className="block text-xs font-semibold text-navy-900">
                         {isInstalled ? "SLJ sudah terpasang" : "Pasang SLJ di HP"}
                       </span>
-                      <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+                      <span className="mt-1 block text-xs leading-relaxed text-gray-500">
                         Buka SLJ langsung dari ikon di Home Screen tanpa masuk ke browser terlebih dahulu.
                       </span>
                     </div>
@@ -486,18 +487,18 @@ export default function SettingsPage() {
                         <Download className="mr-1.5 h-3.5 w-3.5" /> Pasang di HP
                       </Button>
                     ) : isIos ? (
-                      <p className="max-w-xs text-[11px] font-medium leading-relaxed text-slate-600">
+                      <p className="max-w-xs text-xs font-medium leading-relaxed text-slate-600">
                         Di iPhone/iPad: buka menu <strong>Bagikan</strong> di Safari, lalu pilih <strong>Tambahkan ke Layar Utama</strong>.
                       </p>
                     ) : (
-                      <p className="max-w-xs text-[11px] font-medium leading-relaxed text-slate-600">
+                      <p className="max-w-xs text-xs font-medium leading-relaxed text-slate-600">
                         Buka menu browser, lalu pilih <strong>Install app</strong> atau <strong>Tambahkan ke layar utama</strong>.
                       </p>
                     )}
                   </div>
 
                   {installMsg && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
                       {installMsg}
                     </div>
                   )}
@@ -514,7 +515,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
                       <span className="text-xs font-semibold text-navy-900 block">Jurnal Selalu Privat secara Default</span>
-                      <span className="text-[11px] text-gray-500">Hanya dibagikan ke coach jika Anda mengaktifkan tombol berbagi secara manual per entri.</span>
+                      <span className="text-xs text-gray-500">Hanya dibagikan ke coach jika Anda mengaktifkan tombol berbagi secara manual per entri.</span>
                     </div>
                     <Switch checked={journalPrivacy} onCheckedChange={setJournalPrivacy} />
                   </div>
@@ -543,11 +544,11 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between gap-3 min-w-0">
                         <div className="min-w-0">
                           <span className="text-xs font-bold text-navy-900 block">Metode Login: Google OAuth</span>
-                          <span className="text-[11px] text-slate-600 line-clamp-2">
+                          <span className="text-xs text-slate-600 line-clamp-2">
                             {hasPassword ? "Fitur password aktif (Anda dapat merubah password akun Anda)" : "Anda terdaftar dengan Google. Set password di bawah untuk mengaktifkan fitur ganti password."}
                           </span>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold uppercase shrink-0">
                           Google Login
                         </span>
                       </div>
@@ -579,7 +580,7 @@ export default function SettingsPage() {
                       <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
                         <div>
                           <span className="text-xs font-bold text-navy-900 block">Email Terdaftar</span>
-                          <span className="text-[11px] text-slate-500">{userEmail}</span>
+                          <span className="text-xs text-slate-600">{userEmail}</span>
                         </div>
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <Input
@@ -604,7 +605,7 @@ export default function SettingsPage() {
                       <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
                         <div>
                           <span className="text-xs font-bold text-navy-900 block">Password Akun</span>
-                          <span className="text-[11px] text-slate-500">Ubah password akun email Anda.</span>
+                          <span className="text-xs text-slate-600">Ubah password akun email Anda.</span>
                         </div>
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <Input
@@ -648,19 +649,19 @@ export default function SettingsPage() {
           <div className="py-4">
             <div className="flex items-center gap-2 pb-3">
               <Lock className="h-3.5 w-3.5 text-accent" />
-              <h3 className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-500">
+              <h2 className="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-600">
                 Legal & Kebijakan
-              </h3>
+              </h2>
             </div>
             <div className="flex items-center justify-between py-3">
               <div>
                 <p className="text-[13px] font-semibold text-navy-900">Syarat &amp; Ketentuan</p>
-                <p className="text-[11px] text-slate-500">Dokumen legal Platform BinaJourney — versi 1.1</p>
+                <p className="text-xs text-slate-600">Dokumen legal Platform BinaJourney — versi 1.1</p>
               </div>
               <Link
                 href="/terms"
                 target="_blank"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-navy-900 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B6724] hover:text-navy-900 transition-colors"
               >
                 Baca
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -669,7 +670,7 @@ export default function SettingsPage() {
               </Link>
             </div>
           </div>
-      </main>
+      </div>
     </ParticipantLayout>
   );
 }

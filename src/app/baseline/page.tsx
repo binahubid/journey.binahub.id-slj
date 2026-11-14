@@ -463,7 +463,7 @@ export default function BaselinePage() {
 
   return (
     <ParticipantLayout activePath="/baseline" pageTitle="Baseline Self-Discovery">
-      <main className="max-w-7xl w-full mx-auto pt-6 pb-20 font-sans text-slate-800 space-y-6">
+      <div className="max-w-7xl w-full mx-auto pt-6 pb-20 font-sans text-slate-800 space-y-6">
         {errorMessage && (
           <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
             <span className="flex-1">{errorMessage}</span>
@@ -488,14 +488,14 @@ export default function BaselinePage() {
                     <div className="space-y-4 max-w-md">
                       {/* Icon + Title Aligned Horizontally */}
                       <div className="flex items-start gap-3.5">
-                        <div className="h-12 w-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 border border-amber-100/80 shadow-2xs mt-0.5">
+                        <div className="h-12 w-12 bg-amber-50 text-amber-700 rounded-2xl flex items-center justify-center shrink-0 border border-amber-100/80 shadow-2xs mt-0.5">
                           <Brain className="h-6 w-6" />
                         </div>
                         <div className="space-y-1">
                           <h1 className="text-2xl sm:text-3xl font-black text-[#071A33] tracking-tight leading-tight">
                             Baseline<br />Self-Discovery
                           </h1>
-                          <p className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider">
+                          <p className="text-xs font-extrabold text-amber-700 uppercase tracking-wider">
                             TAHAP MUHASABAH • KONDISI DIRI SAAT INI
                           </p>
                         </div>
@@ -512,7 +512,7 @@ export default function BaselinePage() {
                           <p className="text-slate-700 italic font-serif leading-relaxed">
                             &ldquo;Wahai orang-orang yang beriman, bertakwalah kepada Allah dan hendaklah setiap diri memperhatikan apa yang telah diperbuatnya untuk hari esok (akhirat).&rdquo;
                           </p>
-                          <p className="text-[10px] font-bold text-amber-800 font-sans">
+                          <p className="text-xs font-bold text-amber-800 font-sans">
                             — QS. Al-Hasyr: 18
                           </p>
                         </div>
@@ -536,10 +536,10 @@ export default function BaselinePage() {
                       <BarChart2 className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-extrabold text-[#071A33]">
+                      <h2 className="text-sm font-extrabold text-[#071A33]">
                         Skala Penilaian (1–10)
-                      </h3>
-                      <p className="text-xs text-slate-500">
+                      </h2>
+                      <p className="text-xs text-slate-600">
                         Pilih angka yang paling menggambarkan kondisimu saat ini.
                       </p>
                     </div>
@@ -552,7 +552,7 @@ export default function BaselinePage() {
                       <div className="h-9 w-9 rounded-full bg-rose-50 border-2 border-rose-400 text-rose-600 font-extrabold text-xs flex items-center justify-center shadow-xs">
                         1
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-600 leading-tight">
+                      <span className="text-xs font-semibold text-slate-600 leading-tight">
                         Sangat jauh dari harapan
                       </span>
                     </div>
@@ -562,7 +562,7 @@ export default function BaselinePage() {
                       <div className="h-9 px-3 rounded-full bg-amber-50 border-2 border-amber-400 text-amber-800 font-extrabold text-xs flex items-center justify-center shadow-xs">
                         2 – 3
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-600 leading-tight">
+                      <span className="text-xs font-semibold text-slate-600 leading-tight">
                         Masih perlu banyak perhatian
                       </span>
                     </div>
@@ -572,7 +572,7 @@ export default function BaselinePage() {
                       <div className="h-9 px-3 rounded-full bg-amber-50 border-2 border-amber-300 text-amber-900 font-extrabold text-xs flex items-center justify-center shadow-xs">
                         4 – 5
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-600 leading-tight">
+                      <span className="text-xs font-semibold text-slate-600 leading-tight">
                         Mulai berkembang, belum konsisten
                       </span>
                     </div>
@@ -582,7 +582,7 @@ export default function BaselinePage() {
                       <div className="h-9 px-3 rounded-full bg-emerald-50 border-2 border-emerald-400 text-emerald-800 font-extrabold text-xs flex items-center justify-center shadow-xs">
                         6 – 7
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-600 leading-tight">
+                      <span className="text-xs font-semibold text-slate-600 leading-tight">
                         Sudah cukup baik sebagian besar
                       </span>
                     </div>
@@ -592,17 +592,17 @@ export default function BaselinePage() {
                       <div className="h-9 px-3 rounded-full bg-emerald-50 border-2 border-emerald-500 text-emerald-900 font-extrabold text-xs flex items-center justify-center shadow-xs">
                         8 – 9
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-600 leading-tight">
+                      <span className="text-xs font-semibold text-slate-600 leading-tight">
                         Sudah jadi kebiasaan konsisten
                       </span>
                     </div>
 
                     {/* Item 6 */}
                     <div className="flex flex-col items-center space-y-2 p-2 rounded-2xl bg-emerald-100/40 border border-emerald-200">
-                      <div className="h-9 w-9 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                      <div className="h-9 w-9 rounded-full bg-emerald-700 text-white font-black text-xs flex items-center justify-center shadow-xs">
                         10
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-700 leading-tight">
+                      <span className="text-xs font-semibold text-slate-700 leading-tight">
                         Kekuatan utama yang dijaga
                       </span>
                     </div>
@@ -618,7 +618,7 @@ export default function BaselinePage() {
                         <Clock className="h-4 w-4" />
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400 font-medium block leading-none">Estimasi waktu</span>
+                        <span className="text-xs text-slate-600 font-medium block leading-none">Estimasi waktu</span>
                         <span className="text-xs font-black text-[#071A33]">10–15 Menit</span>
                       </div>
                     </div>
@@ -629,7 +629,7 @@ export default function BaselinePage() {
                         <ListOrdered className="h-4 w-4" />
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400 font-medium block leading-none">Jumlah pertanyaan</span>
+                        <span className="text-xs text-slate-600 font-medium block leading-none">Jumlah pertanyaan</span>
                         <span className="text-xs font-black text-[#071A33]">50 Pernyataan</span>
                       </div>
                     </div>
@@ -640,7 +640,7 @@ export default function BaselinePage() {
                         <Calendar className="h-4 w-4" />
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400 font-medium block leading-none">Durasi program</span>
+                        <span className="text-xs text-slate-600 font-medium block leading-none">Durasi program</span>
                         <span className="text-xs font-black text-[#071A33]">90 Hari Perjalanan</span>
                       </div>
                     </div>
@@ -667,9 +667,9 @@ export default function BaselinePage() {
                     <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-100">
                       <Lightbulb className="h-4 w-4" />
                     </div>
-                    <h3 className="text-sm font-extrabold text-[#071A33]">
+                    <h2 className="text-sm font-extrabold text-[#071A33]">
                       Sebelum memulai
-                    </h3>
+                    </h2>
                   </div>
 
                   <div className="space-y-4">
@@ -679,8 +679,8 @@ export default function BaselinePage() {
                         <User className="h-4 w-4" />
                       </div>
                       <div className="space-y-0.5">
-                        <h4 className="text-xs font-bold text-[#071A33]">Jujur pada diri sendiri</h4>
-                        <p className="text-[11px] text-slate-500 leading-snug">
+                        <h3 className="text-xs font-bold text-[#071A33]">Jujur pada diri sendiri</h3>
+                        <p className="text-xs text-slate-600 leading-snug">
                           Jawabanmu tidak dinilai benar atau salah. Ini untuk dirimu sendiri.
                         </p>
                       </div>
@@ -692,8 +692,8 @@ export default function BaselinePage() {
                         <Clock className="h-4 w-4" />
                       </div>
                       <div className="space-y-0.5">
-                        <h4 className="text-xs font-bold text-[#071A33]">Luangkan waktu tenang</h4>
-                        <p className="text-[11px] text-slate-500 leading-snug">
+                        <h3 className="text-xs font-bold text-[#071A33]">Luangkan waktu tenang</h3>
+                        <p className="text-xs text-slate-600 leading-snug">
                           Cari waktu terbaik agar kamu bisa muhasabah dengan fokus.
                         </p>
                       </div>
@@ -705,8 +705,8 @@ export default function BaselinePage() {
                         <Rocket className="h-4 w-4" />
                       </div>
                       <div className="space-y-0.5">
-                        <h4 className="text-xs font-bold text-[#071A33]">Mulai perjalanan perubahan</h4>
-                        <p className="text-[11px] text-slate-500 leading-snug">
+                        <h3 className="text-xs font-bold text-[#071A33]">Mulai perjalanan perubahan</h3>
+                        <p className="text-xs text-slate-600 leading-snug">
                           Hasil muhasabah ini akan menjadi peta transformasi 90 hari ke depan.
                         </p>
                       </div>
@@ -721,9 +721,9 @@ export default function BaselinePage() {
                       <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-100">
                         <Gift className="h-4 w-4" />
                       </div>
-                      <h3 className="text-sm font-extrabold text-[#071A33]">
+                      <h2 className="text-sm font-extrabold text-[#071A33]">
                         Apa yang akan kamu dapatkan?
-                      </h3>
+                      </h2>
                     </div>
 
                     <div className="space-y-2.5">
@@ -770,7 +770,7 @@ export default function BaselinePage() {
                 <h1 className="text-xl sm:text-2xl font-black text-navy-900">
                   Ringkasan Skor Baseline Self-Discovery
                 </h1>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-600 mt-0.5">
                   Titik awal kondisi diri Anda sebelum memasuki Personal Transformation Project.
                 </p>
               </div>
@@ -787,7 +787,7 @@ export default function BaselinePage() {
                     <div key={step.areaKey} className="bg-slate-50 p-4 rounded-2xl space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-navy-900 flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-amber-600" />
+                          <Icon className="h-4 w-4 text-amber-700" />
                           {step.title}
                         </span>
                         <span className="text-sm font-black text-navy-900">{score}%</span>
@@ -841,7 +841,7 @@ export default function BaselinePage() {
                 <span className="text-amber-700 uppercase tracking-wider">
                   Langkah {currentStep.stepNum} dari 6: {currentStep.title}
                 </span>
-                <span className="flex items-center gap-2 text-slate-400">
+                <span className="flex items-center gap-2 text-slate-600">
                   {saveStatus === "saving" ? "Menyimpan..." : saveStatus === "saved" ? "Tersimpan" : saveStatus === "error" ? "Belum tersinkron" : "Siap"}
                   <span>Progres: {answeredCount} / 50</span>
                 </span>
@@ -895,12 +895,12 @@ export default function BaselinePage() {
                           50
                         </div>
                         <div className="space-y-1">
-                          <Badge className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px]">
+                          <Badge className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs">
                             Komitmen Akhir
                           </Badge>
-                          <h4 className="text-sm sm:text-base font-extrabold leading-snug text-white">
+                          <h3 className="text-sm sm:text-base font-extrabold leading-snug text-white">
                             {q.text}
-                          </h4>
+                          </h3>
                         </div>
                       </div>
 
@@ -952,7 +952,7 @@ export default function BaselinePage() {
                 return (
                   <Card key={q.id} className="bg-white p-5 rounded-2xl shadow-2xs space-y-3 border-none">
                     <div className="flex items-start gap-3">
-                      <span className="text-xs font-extrabold text-slate-400 font-mono mt-0.5">
+                      <span className="text-xs font-extrabold text-slate-600 font-mono mt-0.5">
                         #{q.id}
                       </span>
                       <p className="text-xs sm:text-sm font-semibold text-navy-900 leading-snug">
@@ -984,7 +984,7 @@ export default function BaselinePage() {
 
                       {/* Dynamic Scale Caption */}
                       {activeCaption && (
-                        <p className="text-[11px] text-amber-700 font-medium pt-0.5 animate-fadeIn">
+                        <p className="text-xs text-amber-700 font-medium pt-0.5 animate-fadeIn">
                           • {activeCaption.title}: {activeCaption.desc}
                         </p>
                       )}
@@ -1029,7 +1029,7 @@ export default function BaselinePage() {
           </div>
         )}
 
-      </main>
+      </div>
     </ParticipantLayout>
   );
 }

@@ -1,3 +1,5 @@
+import { DEFAULT_TIME_ZONE, getLocalDateString } from "./local-date";
+
 const DAY_MS = 86400000;
 
 export type ProgramMonth = 1 | 2 | 3;
@@ -18,16 +20,16 @@ export function getProgramMonthWindow(month: ProgramMonth): ProgramMonthWindow {
   return { startDay, dueDay, graceEndDay, lockDay: graceEndDay + 1 };
 }
 
-function toUtcDay(value: string | Date) {
-  if (value instanceof Date) {
-    return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
-  }
-  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+function toUtcDay(value: string | Date, timeZone: string) {
+  const date = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : getLocalDateString(new Date(value), timeZone);
+  const [year, month, day] = date.split("-").map(Number);
   return Date.UTC(year, month - 1, day);
 }
 
-export function getProgramDay(startDate: string | Date, currentDate = new Date()) {
-  return Math.max(0, Math.floor((toUtcDay(currentDate) - toUtcDay(startDate)) / DAY_MS) + 1);
+export function getProgramDay(startDate: string | Date, currentDate = new Date(), timeZone = DEFAULT_TIME_ZONE) {
+  return Math.max(0, Math.floor((toUtcDay(currentDate, timeZone) - toUtcDay(startDate, timeZone)) / DAY_MS) + 1);
 }
 
 export function getActiveProgramMonth(day: number): ProgramMonth | null {

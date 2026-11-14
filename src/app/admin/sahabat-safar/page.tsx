@@ -535,7 +535,7 @@ export default function AdminSahabatSafarPage() {
               Sahabat Safar Pairing Engine
             </h1>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-600">
             Kalkukator matching otomatis berbasis Initial Process (Sesama Jenis Kelamin & 5 Area Transformasi).
           </p>
         </div>
@@ -558,20 +558,20 @@ export default function AdminSahabatSafarPage() {
       {/* ─── STAT KPI CARDS ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-4 bg-white border-[#EAE5D9] shadow-2xs space-y-1.5">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+          <span className="text-xs font-extrabold uppercase text-slate-600 tracking-wider">
             Total Mengisi Initial Process
           </span>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#071A33]">{filledCount}</span>
-            <span className="text-xs text-slate-500 font-semibold">
+            <span className="text-xs text-slate-600 font-semibold">
               dari {participants.length} Peserta
             </span>
           </div>
-          <p className="text-[11px] text-slate-500">Instrumen profil terdaftar di server.</p>
+          <p className="text-xs text-slate-600">Instrumen profil terdaftar di server.</p>
         </Card>
 
         <Card className="p-4 bg-emerald-50/60 border border-emerald-200 shadow-2xs space-y-1.5">
-          <span className="text-[10px] font-extrabold uppercase text-emerald-800 tracking-wider">
+          <span className="text-xs font-extrabold uppercase text-emerald-800 tracking-wider">
             Sudah Terpasangkan (Paired)
           </span>
           <div className="flex items-baseline justify-between">
@@ -580,18 +580,18 @@ export default function AdminSahabatSafarPage() {
               {filledCount > 0 ? Math.round((pairedCount / filledCount) * 100) : 0}% Terhubung
             </span>
           </div>
-          <p className="text-[11px] text-emerald-700">Tercatat 2-arah di profil & support_team.</p>
+          <p className="text-xs text-emerald-700">Tercatat 2-arah di profil & support_team.</p>
         </Card>
 
         <Card className="p-4 bg-amber-50/60 border border-amber-200 shadow-2xs space-y-1.5">
-          <span className="text-[10px] font-extrabold uppercase text-amber-900 tracking-wider">
+          <span className="text-xs font-extrabold uppercase text-amber-900 tracking-wider">
             Belum Terpasangkan (Unpaired)
           </span>
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-black text-amber-900">{unpairedCount}</span>
             <span className="text-xs font-bold text-amber-800">Perlu Pairing</span>
           </div>
-          <p className="text-[11px] text-amber-800">Siap dicarikan kandidat sesama jenis kelamin.</p>
+          <p className="text-xs text-amber-800">Siap dicarikan kandidat sesama jenis kelamin.</p>
         </Card>
       </div>
 
@@ -654,7 +654,7 @@ export default function AdminSahabatSafarPage() {
               type="button"
               onClick={() => setGenderFilter("ALL")}
               className={`px-2.5 py-1 rounded-lg font-bold ${
-                genderFilter === "ALL" ? "bg-white text-[#071A33] shadow-xs" : "text-slate-500"
+                genderFilter === "ALL" ? "bg-white text-[#071A33] shadow-xs" : "text-slate-600"
               }`}
             >
               Semua
@@ -663,7 +663,7 @@ export default function AdminSahabatSafarPage() {
               type="button"
               onClick={() => setGenderFilter("Pria")}
               className={`px-2.5 py-1 rounded-lg font-bold ${
-                genderFilter === "Pria" ? "bg-blue-600 text-white shadow-xs" : "text-slate-500"
+                genderFilter === "Pria" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600"
               }`}
             >
               👨 Pria
@@ -672,7 +672,7 @@ export default function AdminSahabatSafarPage() {
               type="button"
               onClick={() => setGenderFilter("Wanita")}
               className={`px-2.5 py-1 rounded-lg font-bold ${
-                genderFilter === "Wanita" ? "bg-rose-600 text-white shadow-xs" : "text-slate-500"
+                genderFilter === "Wanita" ? "bg-rose-600 text-white shadow-xs" : "text-slate-600"
               }`}
             >
               👩 Wanita
@@ -680,7 +680,7 @@ export default function AdminSahabatSafarPage() {
           </div>
 
           <div className="relative min-w-[200px]">
-            <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
+            <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-600" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -695,13 +695,13 @@ export default function AdminSahabatSafarPage() {
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center space-y-3">
           <div className="animate-spin h-8 w-8 border-3 border-[#071A33] border-t-transparent rounded-full" />
-          <p className="text-xs text-slate-500 font-medium">Memuat instrumen & data peserta...</p>
+          <p className="text-xs text-slate-600 font-medium">Memuat instrumen & data peserta...</p>
         </div>
       ) : filteredParticipants.length === 0 ? (
         <Card className="p-12 text-center bg-white border-[#EAE5D9] rounded-2xl space-y-3">
           <HeartHandshake className="h-10 w-10 text-slate-300 mx-auto" />
           <h3 className="text-base font-extrabold text-[#071A33]">Tidak Ada Peserta Ditemukan</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          <p className="text-xs text-slate-600 max-w-sm mx-auto">
             {tabView === "UNPAIRED"
               ? "Semua peserta yang mengisi Initial Process sudah terpasangkan sebagai Sahabat Safar."
               : "Belum ada pasangan Sahabat Safar yang dibentuk."}
@@ -736,17 +736,17 @@ export default function AdminSahabatSafarPage() {
                         </div>
                         <div className="text-center">
                           <h3 className="font-extrabold text-sm text-[#071A33] leading-snug">{members.map((p) => p.full_name).join(" + ")}</h3>
-                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">Trio Sahabat Safar</p>
+                          <p className="text-xs text-slate-600 font-medium mt-0.5">Trio Sahabat Safar</p>
                         </div>
-                        <div className="flex flex-wrap justify-center gap-1.5 text-[11px] text-slate-600">
+                        <div className="flex flex-wrap justify-center gap-1.5 text-xs text-slate-600">
                           {members.map((person) => (
                             <span key={person.id} className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-0.5 rounded-lg border border-[#EAE5D9]">
-                              <MapPin className="h-3 w-3 text-slate-400" />{person.safarData?.layer1?.city || person.location || "—"}
+                              <MapPin className="h-3 w-3 text-slate-600" />{person.safarData?.layer1?.city || person.location || "—"}
                             </span>
                           ))}
                         </div>
                         {members[0]?.batch_name && (
-                          <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold">
+                          <div className="flex items-center justify-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold">
                             <Building className="h-3 w-3 text-blue-400" />{members[0].batch_name}
                           </div>
                         )}
@@ -754,8 +754,8 @@ export default function AdminSahabatSafarPage() {
                           {members.map((person) => {
                             const filled = Boolean(person.safarData?.is_completed);
                             return (
-                              <div key={person.id} className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-1 rounded-lg border ${filled ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
-                                {filled ? <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" />}
+                              <div key={person.id} className={`flex items-center gap-1 text-xs font-bold px-1.5 py-1 rounded-lg border ${filled ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
+                                {filled ? <CheckCircle2 className="h-3 w-3 text-emerald-700 shrink-0" /> : <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" />}
                                 <span className="truncate">{person.full_name.split(" ")[0]}</span>
                               </div>
                             );
@@ -763,10 +763,10 @@ export default function AdminSahabatSafarPage() {
                         </div>
                       </div>
                       <div className="pt-3 border-t border-slate-100 flex gap-2">
-                        <Button onClick={() => setUnpairTrioTarget({ trio_id, members })} variant="outline" className="flex-1 text-[11px] font-bold border-amber-200 text-amber-700 hover:bg-amber-50 h-9 rounded-xl gap-1.5">
+                        <Button onClick={() => setUnpairTrioTarget({ trio_id, members })} variant="outline" className="flex-1 text-xs font-bold border-amber-200 text-amber-700 hover:bg-amber-50 h-9 rounded-xl gap-1.5">
                           <UserX className="h-3.5 w-3.5" /> Lepas 1 Orang
                         </Button>
-                        <Button onClick={() => setDissolveTrioTarget({ trio_id, members })} variant="outline" className="flex-1 text-[11px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5">
+                        <Button onClick={() => setDissolveTrioTarget({ trio_id, members })} variant="outline" className="flex-1 text-xs font-bold border-rose-200 text-rose-700 hover:bg-rose-50 h-9 rounded-xl gap-1.5">
                           <UserX className="h-3.5 w-3.5" /> Bubarkan
                         </Button>
                       </div>
@@ -796,33 +796,33 @@ export default function AdminSahabatSafarPage() {
                             <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">{a.full_name.charAt(0).toUpperCase()}</div>
                             <div className="min-w-0">
                               <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{a.full_name}</h3>
-                              <p className="text-[11px] text-slate-500 font-medium truncate">{cityA}</p>
+                              <p className="text-xs text-slate-600 font-medium truncate">{cityA}</p>
                             </div>
                           </div>
                           <HeartHandshake className="h-5 w-5 text-blue-500 shrink-0" />
                           <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
                             <div className="min-w-0 text-right">
                               <h3 className="font-extrabold text-sm text-[#071A33] leading-snug truncate">{b.full_name}</h3>
-                              <p className="text-[11px] text-slate-500 font-medium truncate">{cityB}</p>
+                              <p className="text-xs text-slate-600 font-medium truncate">{cityB}</p>
                             </div>
                             <div className="h-10 w-10 rounded-full bg-[#071A33] text-amber-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">{b.full_name.charAt(0).toUpperCase()}</div>
                           </div>
                         </div>
                         <div className="flex items-center justify-center gap-2">
-                          <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gA.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gA.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>{gA === "Pria" ? "Pria" : gA === "Wanita" ? "Wanita" : "—"}</Badge>
+                          <Badge className={`text-xs font-extrabold px-2 py-0.5 border-none ${gA.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gA.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>{gA === "Pria" ? "Pria" : gA === "Wanita" ? "Wanita" : "—"}</Badge>
                           <span className="text-slate-300 text-xs">·</span>
-                          <Badge className={`text-[10px] font-extrabold px-2 py-0.5 border-none ${gB.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gB.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>{gB === "Pria" ? "Pria" : gB === "Wanita" ? "Wanita" : "—"}</Badge>
+                          <Badge className={`text-xs font-extrabold px-2 py-0.5 border-none ${gB.toLowerCase() === "pria" ? "bg-blue-100 text-blue-900" : gB.toLowerCase() === "wanita" ? "bg-rose-100 text-rose-900" : "bg-slate-100 text-slate-700"}`}>{gB === "Pria" ? "Pria" : gB === "Wanita" ? "Wanita" : "—"}</Badge>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]"><MapPin className="h-3 w-3 text-slate-400 shrink-0" /><span className="truncate">{cityA}</span></div>
-                          <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]"><MapPin className="h-3 w-3 text-slate-400 shrink-0" /><span className="truncate">{cityB}</span></div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]"><MapPin className="h-3 w-3 text-slate-600 shrink-0" /><span className="truncate">{cityA}</span></div>
+                          <div className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-1 rounded-lg border border-[#EAE5D9]"><MapPin className="h-3 w-3 text-slate-600 shrink-0" /><span className="truncate">{cityB}</span></div>
                         </div>
                         {a.batch_name && (
-                          <div className="flex items-center justify-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold"><Building className="h-3 w-3 text-blue-400" />{a.batch_name}</div>
+                          <div className="flex items-center justify-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 font-bold"><Building className="h-3 w-3 text-blue-400" />{a.batch_name}</div>
                         )}
                         <div className="grid grid-cols-2 gap-2">
-                          <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledA ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>{filledA ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}<span className="truncate">{filledA ? "Lengkap" : "Belum Isi"}</span></div>
-                          <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1.5 rounded-xl border ${filledB ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>{filledB ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}<span className="truncate">{filledB ? "Lengkap" : "Belum Isi"}</span></div>
+                          <div className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1.5 rounded-xl border ${filledA ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>{filledA ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}<span className="truncate">{filledA ? "Lengkap" : "Belum Isi"}</span></div>
+                          <div className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1.5 rounded-xl border ${filledB ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>{filledB ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}<span className="truncate">{filledB ? "Lengkap" : "Belum Isi"}</span></div>
                         </div>
                       </div>
                       <div className="pt-3 border-t border-slate-100">
@@ -860,14 +860,14 @@ export default function AdminSahabatSafarPage() {
                         <h3 className="font-extrabold text-sm text-[#071A33] leading-snug">
                           {p.full_name}
                         </h3>
-                        <p className="text-xs text-slate-500 font-medium">
+                        <p className="text-xs text-slate-600 font-medium">
                           {p.company_name || "Perusahaan SLJ"}
                         </p>
                       </div>
                     </div>
 
                     <Badge
-                      className={`text-[10px] font-extrabold px-2.5 py-0.5 border-none ${
+                      className={`text-xs font-extrabold px-2.5 py-0.5 border-none ${
                         gender.toLowerCase() === "pria"
                           ? "bg-blue-100 text-blue-900"
                           : gender.toLowerCase() === "wanita"
@@ -879,9 +879,9 @@ export default function AdminSahabatSafarPage() {
                     </Badge>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+                  <div className="flex flex-wrap gap-1.5 text-xs text-slate-600">
                     <span className="flex items-center gap-1 bg-[#FAF8F4] px-2 py-0.5 rounded-lg border border-[#EAE5D9]">
-                      <MapPin className="h-3 w-3 text-slate-400" />
+                      <MapPin className="h-3 w-3 text-slate-600" />
                       {city}
                     </span>
                     {birthYear && (
@@ -900,7 +900,7 @@ export default function AdminSahabatSafarPage() {
                   <div className="pt-2 border-t border-slate-100">
                     {hasFilled ? (
                       <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 p-2 rounded-xl border border-emerald-200">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
                         <span>Initial Process Terisi Lengkap</span>
                       </div>
                     ) : (
@@ -938,14 +938,14 @@ export default function AdminSahabatSafarPage() {
                 <Sparkles className="h-5 w-5 text-amber-500" />
                 Rekomendasi Sahabat Safar untuk: {selectedTarget.full_name}
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500">
+              <DialogDescription className="text-xs text-slate-600">
                 Sistem secara otomatis memfilter kandidat **SESAMA JENIS KELAMIN ({selectedTarget.safarData?.layer1?.gender || "Pria/Wanita"})** dan mengurutkan berdasarkan persentase kecocokan 5 Area Transformasi & Preferensi.
               </DialogDescription>
             </DialogHeader>
 
             {pairingSuccess && (
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 font-bold flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="h-5 w-5 text-emerald-700 shrink-0" />
                 <span>{pairingSuccess}</span>
               </div>
             )}
@@ -961,7 +961,7 @@ export default function AdminSahabatSafarPage() {
                 <span className="font-extrabold text-[#071A33] block">
                   {selectedTarget.full_name} ({selectedTarget.safarData?.layer1?.gender})
                 </span>
-                <span className="text-slate-500 font-medium">
+                <span className="text-slate-600 font-medium">
                   {selectedTarget.company_name} • {selectedTarget.safarData?.layer1?.city || selectedTarget.location}
                 </span>
               </div>
@@ -981,7 +981,7 @@ export default function AdminSahabatSafarPage() {
                   <p className="text-xs font-bold text-slate-700">
                     Belum Ada Kandidat Sesama {selectedTarget.safarData?.layer1?.gender} yang Belum Dipasangkan
                   </p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-xs text-slate-600">
                     Pastikan peserta lain berjenis kelamin {selectedTarget.safarData?.layer1?.gender} telah mengisi Initial Process.
                   </p>
                 </div>
@@ -1019,7 +1019,7 @@ export default function AdminSahabatSafarPage() {
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-slate-500 font-medium">
+                              <p className="text-xs text-slate-600 font-medium">
                                 {c.company_name} • {cCity} • {cGender}
                               </p>
                             </div>
@@ -1029,7 +1029,7 @@ export default function AdminSahabatSafarPage() {
                             {m.reasons.map((r, rIdx) => (
                               <span
                                 key={rIdx}
-                                className="text-[10px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs"
+                                className="text-xs font-bold text-slate-700 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs"
                               >
                                 {r}
                               </span>
@@ -1114,7 +1114,7 @@ export default function AdminSahabatSafarPage() {
                 {trioStep === 2 && "Buat Trio — Pilih Pasangan"}
                 {trioStep === 3 && "Buat Trio — Konfirmasi"}
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500">
+              <DialogDescription className="text-xs text-slate-600">
                 {trioStep === 1 && "Pilih 1 peserta yang belum memiliki pasangan untuk bergabung dengan pasangan yang sudah ada."}
                 {trioStep === 2 && `Sistem merekomendasikan pasangan paling cocok untuk ${trioTarget?.full_name}.`}
                 {trioStep === 3 && "Konfirmasi pembentukan trio."}
@@ -1123,7 +1123,7 @@ export default function AdminSahabatSafarPage() {
 
             {trioSuccess && (
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 font-bold flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="h-5 w-5 text-emerald-700 shrink-0" />
                 <span>{trioSuccess}</span>
               </div>
             )}
@@ -1158,7 +1158,7 @@ export default function AdminSahabatSafarPage() {
                             </div>
                             <div className="min-w-0">
                               <h4 className="font-extrabold text-sm text-[#071A33] truncate">{p.full_name}</h4>
-                              <p className="text-[11px] text-slate-500 font-medium">{gender} • {city}</p>
+                              <p className="text-xs text-slate-600 font-medium">{gender} • {city}</p>
                             </div>
                           </div>
                         </Card>
@@ -1176,7 +1176,7 @@ export default function AdminSahabatSafarPage() {
                     <span className="font-extrabold text-[#071A33] block">
                       {trioTarget.full_name} ({trioTarget.safarData?.layer1?.gender})
                     </span>
-                    <span className="text-slate-500 font-medium">
+                    <span className="text-slate-600 font-medium">
                       {trioTarget.company_name} • {trioTarget.safarData?.layer1?.city || trioTarget.location}
                     </span>
                   </div>
@@ -1191,7 +1191,7 @@ export default function AdminSahabatSafarPage() {
                     <p className="text-xs font-bold text-slate-700">
                       Belum Ada Pasangan Sesama {trioTarget.safarData?.layer1?.gender} yang Cocok
                     </p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-xs text-slate-600">
                       Pastikan ada pasangan yang sudah terbentuk dengan jenis kelamin yang sama.
                     </p>
                   </div>
@@ -1223,7 +1223,7 @@ export default function AdminSahabatSafarPage() {
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-slate-500 font-medium">
+                              <p className="text-xs text-slate-600 font-medium">
                                 {rec.a.safarData?.layer1?.city || rec.a.location} • {rec.b.safarData?.layer1?.city || rec.b.location}
                               </p>
                             </div>
@@ -1231,7 +1231,7 @@ export default function AdminSahabatSafarPage() {
                           {rec.reasons.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 pt-1">
                               {rec.reasons.map((r, rIdx) => (
-                                <span key={rIdx} className="text-[10px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
+                                <span key={rIdx} className="text-xs font-bold text-slate-700 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
                                   {r}
                                 </span>
                               ))}
@@ -1347,7 +1347,7 @@ export default function AdminSahabatSafarPage() {
                   </div>
                   <div>
                     <p className="text-xs font-extrabold text-[#071A33]">{m.full_name}</p>
-                    <p className="text-[10px] text-slate-500">{m.safarData?.layer1?.city || m.location || "—"}</p>
+                    <p className="text-xs text-slate-600">{m.safarData?.layer1?.city || m.location || "—"}</p>
                   </div>
                 </label>
               ))}

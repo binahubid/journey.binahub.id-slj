@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
+import { getProgramDay } from "@/lib/program-timeline";
+import { resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { TRANSFORMATION_AREAS, getTransformationAreaStyle } from "@/lib/transformation-areas";
 import { indicatorTypes, validateAreaIndicators, indicatorActualSources, getDefaultQualityRubric, type IndicatorDefinition, type IndicatorType, type IndicatorActualSource } from "@/lib/assessment-methodology";
@@ -65,12 +67,12 @@ const AREA_LIST = [
 function getHabitStyle(title: string): { bg: string; iconColor: string; Icon: React.ElementType } {
   const t = title.toLowerCase();
   if (t.includes("tahajud") || t.includes("tahajjud")) return { bg: "bg-indigo-100", iconColor: "text-indigo-600", Icon: Moon };
-  if (t.includes("sholat") || t.includes("salat") || t.includes("dhuha") || t.includes("duha")) return { bg: "bg-amber-100", iconColor: "text-amber-600", Icon: Sun };
+  if (t.includes("sholat") || t.includes("salat") || t.includes("dhuha") || t.includes("duha")) return { bg: "bg-amber-100", iconColor: "text-amber-700", Icon: Sun };
   if (t.includes("quran") || t.includes("qur'an") || t.includes("tilawah") || t.includes("tadarus")) return { bg: "bg-teal-100", iconColor: "text-teal-600", Icon: BookOpen };
   if (t.includes("dzikir") || t.includes("wirid") || t.includes("doa")) return { bg: "bg-purple-100", iconColor: "text-purple-600", Icon: Sparkles };
   if (t.includes("olahraga") || t.includes("gym") || t.includes("lari") || t.includes("senam") || t.includes("ringan")) return { bg: "bg-green-100", iconColor: "text-green-600", Icon: Activity };
   if (t.includes("hadist") || t.includes("hadith") || t.includes("hadis")) return { bg: "bg-orange-100", iconColor: "text-orange-600", Icon: BookOpen };
-  return { bg: "bg-slate-100", iconColor: "text-slate-500", Icon: Star };
+  return { bg: "bg-slate-100", iconColor: "text-slate-600", Icon: Star };
 }
 
 // ─── Tips Data ───────────────────────────────────────────────────
@@ -295,8 +297,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           if (profile.start_date) {
             const startD = new Date(profile.start_date);
             setStartDate(startD.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }));
-            const diff = Math.floor((Date.now() - startD.getTime()) / 86400000);
-            setDayCount(Math.max(1, diff + 1));
+            setDayCount(getProgramDay(profile.start_date, new Date(), resolveParticipantTimeZone(profile.timezone, profile.timezone_mode || "AUTO")));
           }
           if (profile.end_date) {
             setEndDate(new Date(profile.end_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }));
@@ -979,14 +980,14 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               )}
             </div>
             <div>
-              <p className="text-xs text-slate-500 mb-2 font-medium">Tuliskan Muhasabah diri Anda secara jujur dan mendalam.</p>
+              <p className="text-xs text-slate-600 mb-2 font-medium">Tuliskan Muhasabah diri Anda secara jujur dan mendalam.</p>
               <Textarea disabled={locked} value={muhasabah} onChange={e => { setMuhasabah(e.target.value); scheduleAutosave(1); }} placeholder="Tulis di sini..." className="min-h-[180px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={2000} />
-              <div className="text-right text-xs text-slate-400 mt-1">{muhasabah.length} / 2000</div>
+              <div className="text-right text-xs text-slate-600 mt-1">{muhasabah.length} / 2000</div>
             </div>
             <div className="rounded-xl p-3.5 bg-slate-50">
               <div className="flex items-center gap-2 mb-1">
-                <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-xs font-bold text-slate-500">Catatan untuk Coach (opsional)</span>
+                <MessageSquare className="h-3.5 w-3.5 text-slate-600" />
+                <span className="text-xs font-bold text-slate-600">Catatan untuk Coach (opsional)</span>
               </div>
               <Textarea disabled={locked} placeholder="Tulis catatan untuk Coach..." className="min-h-[72px] text-sm resize-none border-slate-200 rounded-lg bg-white text-xs" maxLength={500} />
             </div>
@@ -1020,14 +1021,14 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               )}
             </div>
             <div>
-              <p className="text-xs text-slate-500 mb-2 font-medium">Tulis niat perubahan Anda dengan jelas.</p>
+              <p className="text-xs text-slate-600 mb-2 font-medium">Tulis niat perubahan Anda dengan jelas.</p>
               <Textarea disabled={locked} value={niat} onChange={e => { setNiat(e.target.value); scheduleAutosave(2); }} placeholder="Tulis niat Anda di sini..." className="min-h-[140px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={1000} />
-              <div className="text-right text-xs text-slate-400 mt-1">{niat.length} / 1000</div>
+              <div className="text-right text-xs text-slate-600 mt-1">{niat.length} / 1000</div>
             </div>
             <div>
-              <p className="text-xs text-slate-500 mb-2 font-medium">Mengapa niat ini penting bagi Anda?</p>
+              <p className="text-xs text-slate-600 mb-2 font-medium">Mengapa niat ini penting bagi Anda?</p>
               <Textarea disabled={locked} value={niatAlasan} onChange={e => { setNiatAlasan(e.target.value); scheduleAutosave(2); }} placeholder="Tulis alasan Anda..." className="min-h-[80px] text-sm resize-none border-warm-border focus:border-amber-400 rounded-xl" maxLength={500} />
-              <div className="text-right text-xs text-slate-400 mt-1">{niatAlasan.length} / 500</div>
+              <div className="text-right text-xs text-slate-600 mt-1">{niatAlasan.length} / 500</div>
             </div>
           </div>
         );
@@ -1064,7 +1065,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-extrabold text-navy-900">Pilih 3 fokus perubahan</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">Pilih area yang paling penting untuk 90 hari ke depan.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">Pilih area yang paling penting untuk 90 hari ke depan.</p>
                 </div>
                 <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-amber-700">{selectedAreas.length}/3</span>
               </div>
@@ -1085,14 +1086,14 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       setOpenAreaEditor(area.id);
                     }} className={`relative min-h-24 rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${selected ? "border-transparent shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-amber-400 hover:bg-amber-50/40"} ${isActive ? "ring-2" : ""} ${disabled ? "cursor-not-allowed opacity-35" : "active:scale-[0.98]"}`}
                       style={selected ? { backgroundColor: areaStyle.color, color: "#fff", borderColor: areaStyle.color } : undefined}>
-                      <span className={`mb-3 flex h-8 w-8 items-center justify-center rounded-lg ${selected ? "bg-white/16 text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-4 w-4" /></span>
+                      <span className={`mb-3 flex h-8 w-8 items-center justify-center rounded-lg ${selected ? "bg-white/16 text-white" : "bg-slate-100 text-slate-600"}`}><Icon className="h-4 w-4" /></span>
                       <span className={`block text-xs font-bold leading-tight ${selected ? "text-white" : ""}`}>{area.label}</span>
                       {selected && <Check className="absolute right-2.5 top-2.5 h-4 w-4 text-white/90" />}
                     </button>
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-400">Untuk mengganti area, hapus salah satu area terpilih dari editor di bawah.</p>
+              <p className="text-xs text-slate-600">Untuk mengganti area, hapus salah satu area terpilih dari editor di bawah.</p>
             </section>
 
             {editorArea && targetData ? (
@@ -1105,7 +1106,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       const active = editorAreaId === areaId;
                       const complete = Boolean(areaTargetsMap[areaId]?.mainTarget?.trim()) && validateAreaIndicators(areaTargetsMap[areaId]?.indicators?.length ? areaTargetsMap[areaId].indicators! : legacyIndicators(areaTargetsMap[areaId] || {}), areaId).valid;
                       const areaStyle = getTransformationAreaStyle(areaId);
-                      return <button key={areaId} type="button" onClick={() => setOpenAreaEditor(areaId)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-all ${active ? "shadow-sm" : "text-slate-500 hover:bg-white/70"}`}
+                      return <button key={areaId} type="button" onClick={() => setOpenAreaEditor(areaId)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-all ${active ? "shadow-sm" : "text-slate-600 hover:bg-white/70"}`}
                         style={active ? { backgroundColor: areaStyle.softColor, color: areaStyle.color, boxShadow: `inset 0 0 0 1px ${areaStyle.borderColor}` } : undefined}>{area.label}<span className={`ml-2 inline-block h-1.5 w-1.5 rounded-full ${complete ? "bg-emerald-500" : "bg-amber-400"}`} /></button>;
                     })}
                   </div>
@@ -1116,22 +1117,22 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                     <div className="flex items-start gap-3">
                       <span className="mt-0.5 h-10 w-1 rounded-full shrink-0" style={{ background: `linear-gradient(180deg, ${areaStyle?.color}, ${areaStyle?.color}80)` }} />
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: areaStyle?.color }}>Area aktif</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: areaStyle?.color }}>Area aktif</p>
                         <h3 className="mt-1 text-lg font-extrabold tracking-tight text-navy-900">{editorArea.label}</h3>
                       </div>
                     </div>
-                    {!locked && <button type="button" onClick={() => { toggleArea(editorArea.id); setOpenAreaEditor(""); }} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600">Hapus area</button>}
+                    {!locked && <button type="button" onClick={() => { toggleArea(editorArea.id); setOpenAreaEditor(""); }} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600">Hapus area</button>}
                   </div>
 
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,1fr)]">
-                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Sasaran utama 90 hari</span><Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(editorArea.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah" className="min-h-24 resize-none rounded-xl border-slate-200 bg-white text-sm focus:border-amber-400" maxLength={500} /><span className="block text-[11px] text-slate-400">Tulis satu hasil utama yang spesifik dan realistis.</span></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Sasaran utama 90 hari</span><Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(editorArea.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah" className="min-h-24 resize-none rounded-xl border-slate-200 bg-white text-sm focus:border-amber-400" maxLength={500} /><span className="block text-xs text-slate-600">Tulis satu hasil utama yang spesifik dan realistis.</span></label>
                     <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Mengapa ini penting?</span><Textarea disabled={locked} value={targetData.targetAlasan} onChange={e => updateField(editorArea.id, "targetAlasan", e.target.value)} placeholder="Motivasi utama Anda" className="min-h-24 resize-none rounded-xl border-slate-200 bg-slate-50/60 text-sm focus:border-amber-400" maxLength={300} /></label>
                   </div>
 
                   <div className="space-y-3">
                           <div className="flex items-end justify-between gap-3 border-t pt-5" style={{ borderTopColor: areaStyle?.borderColor || "#E2E8F0" }}>
-                      <div><h4 className="text-sm font-extrabold" style={{ color: areaStyle?.color }}>Bagaimana keberhasilan diukur?</h4><p className="mt-1 text-xs text-slate-500">Cukup mulai dengan satu indikator. Tambahkan hanya jika memang perlu.</p></div>
-                      <span className="shrink-0 text-[11px] font-semibold text-slate-400">{areaIndicators.length}/4</span>
+                      <div><h4 className="text-sm font-extrabold" style={{ color: areaStyle?.color }}>Bagaimana keberhasilan diukur?</h4><p className="mt-1 text-xs text-slate-600">Cukup mulai dengan satu indikator. Tambahkan hanya jika memang perlu.</p></div>
+                      <span className="shrink-0 text-xs font-semibold text-slate-600">{areaIndicators.length}/4</span>
                     </div>
                     {areaIndicators.map((indicator, index) => {
                       const usedTypes = new Set(areaIndicators.filter(item => item.active && item.key !== indicator.key).map(item => item.type));
@@ -1139,35 +1140,35 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       return (
                         <article key={indicator.key} className="rounded-xl bg-[#FAF8F4] p-3 sm:p-4">
                           <div className="mb-3 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-white font-mono text-[11px] font-bold text-navy-900 shadow-xs" style={{ color: areaStyle?.color }}>{index + 1}</span><span className="text-xs font-bold text-slate-700">Indikator</span></div>
-                            {!locked && index > 0 && <button type="button" aria-label="Hapus indikator" onClick={() => { const next = areaIndicators.filter((_, itemIndex) => itemIndex !== index); const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: next } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
+                            <div className="flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-white font-mono text-xs font-bold text-navy-900 shadow-xs" style={{ color: areaStyle?.color }}>{index + 1}</span><span className="text-xs font-bold text-slate-700">Indikator</span></div>
+                            {!locked && index > 0 && <button type="button" aria-label="Hapus indikator" onClick={() => { const next = areaIndicators.filter((_, itemIndex) => itemIndex !== index); const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: next } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="rounded-md p-1.5 text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                           </div>
                           <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Jenis</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(editorArea.id, index, { type, direction: preset.defaultDirection, qualityRubric: type === "quality" ? (indicator.qualityRubric || getDefaultQualityRubric()) : undefined }); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select></label>
-                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Apa yang diukur?</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(editorArea.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-10 rounded-lg border-slate-200 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Jenis</span><select disabled={locked} value={indicator.type} onChange={e => { const type = e.target.value as IndicatorType; const preset = indicatorTypes.find(item => item.key === type)!; updateIndicator(editorArea.id, index, { type, direction: preset.defaultDirection, qualityRubric: type === "quality" ? (indicator.qualityRubric || getDefaultQualityRubric()) : undefined }); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorTypes.map(type => <option key={type.key} value={type.key} disabled={usedTypes.has(type.key)}>{type.label}{usedTypes.has(type.key) ? " (dipakai)" : ""}</option>)}</select></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Apa yang diukur?</span><Input disabled={locked} value={indicator.label} onChange={e => updateIndicator(editorArea.id, index, { label: e.target.value })} placeholder={indicatorTypes.find(type => type.key === indicator.type)?.example} className="h-10 rounded-lg border-slate-200 bg-white text-xs" /></label>
                           </div>
                           <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Nilai awal</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(editorArea.id, index, { baseline: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
-                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Target</span><Input type="number" disabled={locked} value={indicator.target} onChange={e => updateIndicator(editorArea.id, index, { target: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
-                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(editorArea.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-10 bg-white text-xs" /></label>
-                            <label className="space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Arah hasil</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(editorArea.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Nilai awal</span><Input type="number" disabled={locked} value={indicator.baseline} onChange={e => updateIndicator(editorArea.id, index, { baseline: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Target</span><Input type="number" disabled={locked} value={indicator.target} onChange={e => updateIndicator(editorArea.id, index, { target: Number(e.target.value) })} className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Satuan</span><Input disabled={locked} value={indicator.unit || ""} onChange={e => updateIndicator(editorArea.id, index, { unit: e.target.value })} placeholder="kali / menit / Rp" className="h-10 bg-white text-xs" /></label>
+                            <label className="space-y-1.5"><span className="text-xs font-semibold text-slate-600">Arah hasil</span><select disabled={locked} value={indicator.direction} onChange={e => updateIndicator(editorArea.id, index, { direction: e.target.value as IndicatorDefinition["direction"] })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs"><option value="higher_is_better">Naik lebih baik</option><option value="lower_is_better">Turun lebih baik</option></select></label>
                           </div>
                           <details className="group mt-3 border-t pt-3" style={{ borderTopColor: areaStyle?.borderColor }}>
-                            <summary className="cursor-pointer list-none text-[11px] font-bold transition-colors" style={{ color: areaStyle?.color }}>Sumber data & rubrik <ChevronRight className="ml-1 inline h-3 w-3 transition-transform group-open:rotate-90" style={{ color: areaStyle?.color }} /></summary>
+                            <summary className="cursor-pointer list-none text-xs font-bold transition-colors" style={{ color: areaStyle?.color }}>Sumber data & rubrik <ChevronRight className="ml-1 inline h-3 w-3 transition-transform group-open:rotate-90" style={{ color: areaStyle?.color }} /></summary>
                             <div className="mt-3 space-y-3">
-                              <label className="block max-w-sm space-y-1.5"><span className="text-[11px] font-semibold text-slate-500">Sumber capaian</span><select disabled={locked} value={indicator.actualSource || "self_report"} onChange={e => updateIndicator(editorArea.id, index, { actualSource: e.target.value as IndicatorActualSource })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorActualSources.map(source => <option key={source.key} value={source.key}>{source.label}</option>)}</select><span className="block text-[10px] leading-relaxed text-slate-400">{indicatorActualSources.find(source => source.key === (indicator.actualSource || "self_report"))?.description}</span></label>
-                              {indicator.actualSource === "action_plan" && <div className="space-y-2"><span className="text-[11px] font-semibold text-slate-500">Action Plan terhubung</span>{areaPlans.length ? <div className="grid gap-2 sm:grid-cols-2">{areaPlans.map(plan => { const checked = (indicator.linkedActionPlanIds || []).includes(plan.id as string); return <label key={plan.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-xs text-slate-700"><input type="checkbox" disabled={locked} checked={checked} onChange={e => { const current = indicator.linkedActionPlanIds || []; updateIndicator(editorArea.id, index, { linkedActionPlanIds: e.target.checked ? [...current, plan.id as string] : current.filter(id => id !== plan.id) }); }} className="mt-0.5" /><span>{plan.title}</span></label>; })}</div> : <p className="text-[11px] text-slate-400">Action Plan area ini belum dibuat. Anda dapat menghubungkannya setelah Step 4.</p>}</div>}
-                              {indicator.type === "quality" && <div className="space-y-2"><span className="text-[11px] font-semibold text-slate-500">Definisi skor kualitas 1-5</span><div className="grid gap-2">{[1, 2, 3, 4, 5].map(score => <label key={score} className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-2"><span className="font-mono text-xs font-bold text-slate-500">{score}</span><Input disabled={locked} value={(indicator.qualityRubric || {})[score] ?? ""} placeholder={getDefaultQualityRubric()[score]} onChange={e => updateIndicator(editorArea.id, index, { qualityRubric: { ...getDefaultQualityRubric(), ...(indicator.qualityRubric || {}), [score]: e.target.value } })} className="h-9 bg-white text-xs" /></label>)}</div></div>}
+                              <label className="block max-w-sm space-y-1.5"><span className="text-xs font-semibold text-slate-600">Sumber capaian</span><select disabled={locked} value={indicator.actualSource || "self_report"} onChange={e => updateIndicator(editorArea.id, index, { actualSource: e.target.value as IndicatorActualSource })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs">{indicatorActualSources.map(source => <option key={source.key} value={source.key}>{source.label}</option>)}</select><span className="block text-xs leading-relaxed text-slate-600">{indicatorActualSources.find(source => source.key === (indicator.actualSource || "self_report"))?.description}</span></label>
+                              {indicator.actualSource === "action_plan" && <div className="space-y-2"><span className="text-xs font-semibold text-slate-600">Action Plan terhubung</span>{areaPlans.length ? <div className="grid gap-2 sm:grid-cols-2">{areaPlans.map(plan => { const checked = (indicator.linkedActionPlanIds || []).includes(plan.id as string); return <label key={plan.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 text-xs text-slate-700"><input type="checkbox" disabled={locked} checked={checked} onChange={e => { const current = indicator.linkedActionPlanIds || []; updateIndicator(editorArea.id, index, { linkedActionPlanIds: e.target.checked ? [...current, plan.id as string] : current.filter(id => id !== plan.id) }); }} className="mt-0.5" /><span>{plan.title}</span></label>; })}</div> : <p className="text-xs text-slate-600">Action Plan area ini belum dibuat. Anda dapat menghubungkannya setelah Step 4.</p>}</div>}
+                              {indicator.type === "quality" && <div className="space-y-2"><span className="text-xs font-semibold text-slate-600">Definisi skor kualitas 1-5</span><div className="grid gap-2">{[1, 2, 3, 4, 5].map(score => <label key={score} className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-2"><span className="font-mono text-xs font-bold text-slate-600">{score}</span><Input disabled={locked} value={(indicator.qualityRubric || {})[score] ?? ""} placeholder={getDefaultQualityRubric()[score]} onChange={e => updateIndicator(editorArea.id, index, { qualityRubric: { ...getDefaultQualityRubric(), ...(indicator.qualityRubric || {}), [score]: e.target.value } })} className="h-9 bg-white text-xs" /></label>)}</div></div>}
                             </div>
                           </details>
                         </article>
                       );
                     })}
-                    {!locked && areaIndicators.length < 4 && <button type="button" onClick={() => { const usedTypes = new Set(areaIndicators.filter(indicator => indicator.active).map(indicator => indicator.type)); const nextType = indicatorTypes.find(type => !usedTypes.has(type.key))?.key || "quantity"; const usedKeys = new Set(areaIndicators.map(indicator => indicator.key)); let nextIndex = areaIndicators.length; while (usedKeys.has(`indicator-${nextIndex + 1}`)) nextIndex += 1; const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: [...areaIndicators, createIndicator(nextIndex, nextType)] } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:border-amber-400 hover:bg-amber-50/40 hover:text-amber-800" style={{ borderColor: areaStyle?.borderColor, color: areaStyle?.color }}><Plus className="h-3.5 w-3.5" /> Tambah indikator</button>}
+                    {!locked && areaIndicators.length < 4 && <button type="button" onClick={() => { const usedTypes = new Set(areaIndicators.filter(indicator => indicator.active).map(indicator => indicator.type)); const nextType = indicatorTypes.find(type => !usedTypes.has(type.key))?.key || "quantity"; const usedKeys = new Set(areaIndicators.map(indicator => indicator.key)); let nextIndex = areaIndicators.length; while (usedKeys.has(`indicator-${nextIndex + 1}`)) nextIndex += 1; const updated = { ...areaTargetsMap, [editorArea.id]: { ...targetData, indicators: [...areaIndicators, createIndicator(nextIndex, nextType)] } }; setAreaTargetsMap(updated); areaTargetsMapRef.current = updated; scheduleAutosave(3); }} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:border-amber-400 hover:bg-amber-50/40 hover:text-amber-800" style={{ borderColor: areaStyle?.borderColor, color: areaStyle?.color }}><Plus className="h-3.5 w-3.5" /> Tambah indikator</button>}
                   </div>
                 </div>
               </section>
-            ) : <div className="rounded-2xl bg-amber-50/60 px-5 py-8 text-center"><p className="text-sm font-bold text-navy-900">Pilih area pertama untuk mulai menyusun target.</p><p className="mt-1 text-xs text-slate-500">Anda dapat memilih hingga tiga area.</p></div>}
+            ) : <div className="rounded-2xl bg-amber-50/60 px-5 py-8 text-center"><p className="text-sm font-bold text-navy-900">Pilih area pertama untuk mulai menyusun target.</p><p className="mt-1 text-xs text-slate-600">Anda dapat memilih hingga tiga area.</p></div>}
           </div>
         );
       }
@@ -1255,7 +1256,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                     }}
                     className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-amber-300 text-amber-800 font-bold text-xs sm:text-sm rounded-2xl hover:bg-amber-50/70 transition-colors bg-white shadow-2xs"
                   >
-                    <Plus className="h-4 w-4 text-amber-600" />
+                    <Plus className="h-4 w-4 text-amber-700" />
                     <span>Buat Action Plan Custom Baru</span>
                   </button>
                 ) : (
@@ -1265,7 +1266,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       <button
                         type="button"
                         onClick={() => { setShowAddHabit(false); setNewActionTitle(""); }}
-                        className="text-xs text-slate-400 hover:text-slate-600"
+                        className="text-xs text-slate-600 hover:text-slate-600"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -1320,19 +1321,19 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                           >
                             +
                           </button>
-                          <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap pl-1">
+                          <span className="text-xs font-semibold text-slate-600 whitespace-nowrap pl-1">
                             {newActionFreq === "Harian" ? "x/hari" : "x/minggu"}
                           </span>
                         </div>
                         {/* Quick quantity shortcuts directly under Target Kuantitas */}
                         <div className="flex items-center gap-1 pt-2 flex-wrap">
-                          <span className="text-[10px] font-bold text-slate-400">Pilih Cepat:</span>
+                          <span className="text-xs font-bold text-slate-600">Pilih Cepat:</span>
                           {[1, 2, 3, 5, 7].map(num => (
                             <button
                               key={num}
                               type="button"
                               onClick={() => setNewActionQty(num)}
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
+                              className={`text-xs font-bold px-2 py-0.5 rounded-full border transition-all ${
                                 newActionQty === num
                                   ? "bg-amber-500 text-white border-amber-500"
                                   : "bg-white text-slate-600 border-slate-200 hover:border-amber-300"
@@ -1352,7 +1353,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                             type="button"
                             onClick={() => setNewActionFreq("Harian")}
                             className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                              newActionFreq === "Harian" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                              newActionFreq === "Harian" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-600 hover:text-slate-800"
                             }`}
                           >
                             <Sun className="h-3.5 w-3.5" />
@@ -1362,7 +1363,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                             type="button"
                             onClick={() => setNewActionFreq("Pekanan")}
                             className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                              newActionFreq === "Pekanan" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                              newActionFreq === "Pekanan" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-600 hover:text-slate-800"
                             }`}
                           >
                             <Calendar className="h-3.5 w-3.5" />
@@ -1405,7 +1406,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-slate-700">Daftar Action Plan Terdaftar ({actionPlans.length})</p>
                 {actionPlans.length > 0 && (
-                  <Badge variant="success" className="text-[11px] font-bold py-0.5 px-2.5">
+                  <Badge variant="success" className="text-xs font-bold py-0.5 px-2.5">
                     ✓ {actionPlans.length} kebiasaan siap dipantau
                   </Badge>
                 )}
@@ -1417,7 +1418,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                     <Zap className="h-5 w-5 text-amber-500 fill-amber-400" />
                   </div>
                   <p className="text-sm font-bold text-navy-900">Belum ada action plan yang ditambahkan</p>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                  <p className="text-xs text-slate-600 max-w-xs mx-auto">
                     Klik tombol &quot;Buat Action Plan Custom Baru&quot; di atas untuk menambahkan kebiasaan Anda.
                   </p>
                 </div>
@@ -1439,21 +1440,21 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-bold text-navy-900 leading-tight">{ap.title}</p>
                         {locked ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border bg-slate-50 text-slate-700 border-slate-200">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold border bg-slate-50 text-slate-700 border-slate-200">
                             {areaCategory}
                           </span>
                         ) : (
                           <select
                             value={areaCategory}
                             onChange={(event) => updateActionPlanArea(idx, event.target.value)}
-                            className="max-w-[190px] rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-700 focus:border-amber-400 focus:outline-none"
+                            className="max-w-[190px] rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-extrabold text-slate-700 focus:border-amber-400 focus:outline-none"
                             aria-label={`Area transformasi untuk ${ap.title}`}
                           >
                             {selectedAreas.map(area => <option key={area} value={area}>{area}</option>)}
                           </select>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">
+                      <p className="text-xs text-slate-600 mt-1 font-medium">
                         Target: <span className="font-extrabold text-navy-900">{ap.quantity || 1}x</span> {ap.frequency?.toLowerCase() === "pekanan" ? "per minggu (Pekanan)" : "per hari (Harian)"}
                       </p>
                     </div>
@@ -1463,7 +1464,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                         type="button"
                         onClick={() => removeActionPlan(idx)}
                         title="Hapus action plan ini"
-                        className="h-8 w-8 rounded-xl bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 flex items-center justify-center transition-colors border border-slate-100 hover:border-red-200 shrink-0"
+                        className="h-8 w-8 rounded-xl bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-600 flex items-center justify-center transition-colors border border-slate-100 hover:border-red-200 shrink-0"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -1486,16 +1487,16 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       <div className="space-y-4">
         <div className="bg-white border border-warm-border rounded-2xl p-4 shadow-2xs">
           <div className="flex items-center gap-2 mb-3">
-            <div className="h-6 w-6 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><Info className="h-3.5 w-3.5" /></div>
+            <div className="h-6 w-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center"><Info className="h-3.5 w-3.5" /></div>
             <span className="text-sm font-bold text-navy-900">{tips.title}</span>
           </div>
           <ul className="space-y-3">
             {tips.tips.map((tip, i) => (
               <li key={i} className="flex items-start gap-2.5">
-                <div className="h-5 w-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">{i + 1}</div>
+                <div className="h-5 w-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">{i + 1}</div>
                 <div>
                   <p className="text-xs font-bold text-navy-900">{tip.title}</p>
-                  <p className="text-xs text-slate-500 leading-relaxed">{tip.desc}</p>
+                  <p className="text-xs text-slate-600 leading-relaxed">{tip.desc}</p>
                 </div>
               </li>
             ))}
@@ -1505,7 +1506,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           <div className="bg-white border border-warm-border rounded-2xl p-4 shadow-2xs">
             <p className="text-xs font-bold text-navy-900 mb-2">Contoh Muhasabah</p>
             <blockquote className="text-xs text-slate-600 italic leading-relaxed border-l-2 border-amber-300 pl-3">{tips.example}</blockquote>
-            <button className="mt-3 text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1">Lihat Contoh Lain <ChevronRight className="h-3 w-3" /></button>
+            <button className="mt-3 text-xs font-semibold text-amber-700 hover:text-amber-700 flex items-center gap-1">Lihat Contoh Lain <ChevronRight className="h-3 w-3" /></button>
           </div>
         )}
         {sectionNum === 4 && actionPlans.length > 0 && (
@@ -1533,7 +1534,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     <div className="flex items-center gap-1.5">
       {SECTIONS.map(s => (
         <button key={s.num} disabled={!canOpenSection(s.num)} onClick={() => canOpenSection(s.num) && setActiveSection(s.num)}
-          className={`rounded-full transition-all flex items-center justify-center font-bold text-xs disabled:cursor-not-allowed disabled:opacity-45 ${s.num === activeSection ? "h-7 w-7 bg-amber-500 text-white shadow" : isSectionComplete(s.num) ? "h-6 w-6 bg-amber-200 text-amber-700" : "h-5 w-5 bg-slate-200 text-slate-400"}`}>
+          className={`rounded-full transition-all flex items-center justify-center font-bold text-xs disabled:cursor-not-allowed disabled:opacity-45 ${s.num === activeSection ? "h-7 w-7 bg-amber-500 text-white shadow" : isSectionComplete(s.num) ? "h-6 w-6 bg-amber-200 text-amber-700" : "h-5 w-5 bg-slate-200 text-slate-600"}`}>
           {!canOpenSection(s.num) ? <Lock className="h-3 w-3" /> : isSectionComplete(s.num) && s.num !== activeSection ? <Check className="h-3 w-3" /> : s.num}
         </button>
       ))}
@@ -1543,18 +1544,18 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   // ─── Celebration ───────────────────────────────────────────────
   const renderCelebration = () => (
     <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-      <div className="h-16 w-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mb-4 shadow-2xs">
+      <div className="h-16 w-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mb-4 shadow-2xs">
         <Sparkles className="h-8 w-8 text-amber-500" />
       </div>
-      <h2 className="text-2xl font-black text-navy-900 mb-2">Journey Setup Selesai!</h2>
-      <p className="text-slate-500 text-sm mb-5 max-w-xs">Personal Transformation Project perjalanan Anda telah selesai disimpan.</p>
+      <h2 className="text-2xl font-black text-navy-900 mb-2">Rencana perubahan Selesai!</h2>
+      <p className="text-slate-600 text-sm mb-5 max-w-xs">Personal Transformation Project perjalanan Anda telah selesai disimpan.</p>
       <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold mb-2 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700 border border-navy-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
         {ptpStatus === "LOCKED" ? <Lock className="h-3 w-3" /> : <Edit3 className="h-3 w-3" />}
         Status Personal Transformation Project: {ptpStatus}
       </div>
-      {ptpStatus === "EDITABLE" && <p className="text-xs text-slate-400 mb-6 max-w-xs">PTP masih dapat diperbarui hingga Admin mengunci Personal Transformation Project.</p>}
+      {ptpStatus === "EDITABLE" && <p className="text-xs text-slate-600 mb-6 max-w-xs">PTP masih dapat diperbarui hingga Admin mengunci Personal Transformation Project.</p>}
       <div className="w-full max-w-sm bg-white border border-warm-border rounded-2xl p-4 shadow-2xs mb-6 text-left">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ringkasan Personal Transformation Project Anda</p>
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Ringkasan Personal Transformation Project Anda</p>
         <div className="space-y-2.5">
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">4 Bagian</span><span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Selesai</span></div>
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Terakhir diubah</span><span className="text-sm font-semibold text-navy-900">{lastSaved ? `Hari ini, ${lastSaved.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}` : "Baru saja"}</span></div>
@@ -1585,35 +1586,35 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         onClick={() => router.push("/dashboard")}
         className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-navy-900 bg-slate-50 border border-warm-border px-3.5 py-1.5 rounded-full shadow-2xs hover:bg-slate-100 transition-colors shrink-0"
       >
-        <ArrowLeft className="h-3.5 w-3.5 text-amber-600" />
+        <ArrowLeft className="h-3.5 w-3.5 text-amber-700" />
         <span>Kembali ke Home</span>
       </button>
 
       {/* Right side: All Stats Info & Autosave */}
       <div className="flex items-center gap-5 shrink-0 ml-auto">
         <div>
-          <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Progress Journey</span>
+          <span className="text-slate-600 block text-xs uppercase tracking-wider">Progress Journey</span>
           <div className="flex items-baseline gap-1">
             <span className="font-bold text-navy-900">Hari ke-{dayCount}</span>
-            <span className="text-slate-400">dari 90 hari</span>
+            <span className="text-slate-600">dari 90 hari</span>
           </div>
         </div>
         <div className="w-px h-7 bg-warm-border shrink-0" />
         <div>
-          <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Status Personal Transformation Project</span>
-          <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] mt-0.5 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
+          <span className="text-slate-600 block text-xs uppercase tracking-wider">Status Personal Transformation Project</span>
+          <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-xs mt-0.5 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
             {ptpStatus === "LOCKED" ? <Lock className="h-2.5 w-2.5" /> : <Edit3 className="h-2.5 w-2.5" />}{ptpStatus}
           </span>
         </div>
         <div className="w-px h-7 bg-warm-border shrink-0" />
         <div>
-          <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Coach</span>
+          <span className="text-slate-600 block text-xs uppercase tracking-wider">Coach</span>
           <span className="font-semibold text-navy-900 block leading-tight">{coachName}</span>
-          <span className="text-slate-400 block text-[10px]">Ditunjuk oleh Admin</span>
+          <span className="text-slate-600 block text-xs">Ditunjuk oleh Admin</span>
         </div>
         <div className="w-px h-7 bg-warm-border shrink-0" />
         <div>
-          <span className="text-slate-400 block text-[10px] uppercase tracking-wider mb-0.5">Autosave</span>
+          <span className="text-slate-600 block text-xs uppercase tracking-wider mb-0.5">Autosave</span>
           <SaveIndicator />
         </div>
       </div>
@@ -1626,8 +1627,8 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       <div className={`p-4 border-b border-warm-border flex items-center ${desktopNavCollapsed ? "justify-center" : "justify-between"} gap-2`}>
         {!desktopNavCollapsed && (
           <div>
-            <h2 className="text-base font-black text-navy-900 leading-tight">Journey Setup</h2>
-            <p className="text-xs text-slate-400 mt-0.5">PTP 90 Hari</p>
+            <h2 className="text-base font-black text-navy-900 leading-tight">Rencana perubahan</h2>
+            <p className="text-xs text-slate-600 mt-0.5">PTP 90 Hari</p>
           </div>
         )}
         <button
@@ -1644,12 +1645,12 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         <div className="p-4 border-b border-warm-border">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-navy-900">{progressPct}% Selesai</span>
-            {estimatedMinutes > 0 && <span className="text-[11px] text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" />~{estimatedMinutes} mnt</span>}
+            {estimatedMinutes > 0 && <span className="text-xs text-slate-600 flex items-center gap-1"><Clock className="h-3 w-3" />~{estimatedMinutes} mnt</span>}
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">{completedCount} dari {SECTIONS.length} langkah selesai</p>
+          <p className="text-xs text-slate-600 mt-1">{completedCount} dari {SECTIONS.length} langkah selesai</p>
         </div>
       )}
 
@@ -1668,7 +1669,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               }`}
             >
               <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 font-bold text-xs transition-colors ${
-                status === "completed" || isActive ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-400"
+                status === "completed" || isActive ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-600"
               }`}>
                 {!canOpenSection(sec.num) ? <Lock className="h-3.5 w-3.5" /> : status === "completed" ? <Check className="h-4 w-4" /> : sec.num}
               </div>
@@ -1676,7 +1677,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <>
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-bold leading-tight ${isActive ? "text-amber-700" : "text-navy-900"}`}>{sec.title}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{sec.subtitle}</p>
+                    <p className="text-xs text-slate-600 mt-0.5 line-clamp-1">{sec.subtitle}</p>
                   </div>
                   <ChevronRight className={`h-4 w-4 shrink-0 ${isActive ? "text-amber-500" : "text-slate-300"}`} />
                 </>
@@ -1695,7 +1696,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="h-10 w-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-slate-400 text-sm">Memuat Journey...</p>
+            <p className="text-slate-600 text-sm">Memuat Journey...</p>
           </div>
         </div>
       </ParticipantLayout>
@@ -1742,17 +1743,17 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               <div className="px-4 pt-3.5 pb-3">
                 <button
                   onClick={() => router.push("/dashboard")}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-navy-900 mb-2.5 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-navy-900 mb-2.5 transition-colors"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 text-amber-500" />
                   <span>Kembali ke Home</span>
                 </button>
                 <div className="flex items-start justify-between">
                   <div>
-                    <h1 className="text-xl font-black text-navy-900 leading-tight">Journey Setup</h1>
-                    <p className="text-xs text-slate-400 mt-0.5">Personal Transformation Project 90 Hari</p>
+                    <h1 className="text-xl font-black text-navy-900 leading-tight">Rencana perubahan</h1>
+                    <p className="text-xs text-slate-600 mt-0.5">Personal Transformation Project 90 Hari</p>
                   </div>
-                  <span className={`shrink-0 font-bold px-2.5 py-1 rounded-full text-[11px] mt-0.5 inline-flex items-center gap-1 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
+                  <span className={`shrink-0 font-bold px-2.5 py-1 rounded-full text-xs mt-0.5 inline-flex items-center gap-1 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
                     {ptpStatus === "LOCKED" ? <><Lock className="h-3 w-3" />Locked</> : <><Edit3 className="h-3 w-3" />Editable</>}
                   </span>
                 </div>
@@ -1763,7 +1764,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-navy-900">{progressPct}% Selesai</span>
                   {estimatedMinutes > 0 && (
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <span className="text-xs text-slate-600 flex items-center gap-1">
                       <Clock className="h-3 w-3" />~{estimatedMinutes} mnt tersisa
                     </span>
                   )}
@@ -1771,7 +1772,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1.5">{completedCount} dari {SECTIONS.length} langkah selesai · Hari ke-{dayCount} dari 90</p>
+                <p className="text-xs text-slate-600 mt-1.5">{completedCount} dari {SECTIONS.length} langkah selesai · Hari ke-{dayCount} dari 90</p>
               </div>
             </div>
 
@@ -1798,7 +1799,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm transition-all ${
                         isCompleted ? "bg-amber-500 text-white" :
                         isInProgress ? "bg-amber-500 text-white ring-4 ring-amber-100" :
-                        "bg-slate-100 text-slate-400"
+                        "bg-slate-100 text-slate-600"
                       }`}>
                         {!canOpenSection(sec.num) ? <Lock className="h-4 w-4" /> : isCompleted ? <Check className="h-4 w-4" /> : sec.num}
                       </div>
@@ -1806,11 +1807,11 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                         <p className={`text-sm font-bold leading-tight ${
                           isInProgress ? "text-amber-800" : isCompleted ? "text-slate-700" : "text-navy-900"
                         }`}>{sec.title}</p>
-                        <p className="text-xs text-slate-400 mt-0.5 leading-snug line-clamp-1">{sec.subtitle}</p>
+                        <p className="text-xs text-slate-600 mt-0.5 leading-snug line-clamp-1">{sec.subtitle}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {isCompleted && <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">✓</span>}
-                        {isInProgress && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Aktif</span>}
+                        {isCompleted && <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">✓</span>}
+                        {isInProgress && <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Aktif</span>}
                         <ChevronRight className={`h-4 w-4 ${isInProgress ? "text-amber-500" : "text-slate-300"}`} />
                       </div>
                     </button>
@@ -1841,7 +1842,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               {/* Step dots */}
               <div className="bg-slate-50 border-t border-warm-border px-4 py-2.5 flex items-center justify-between">
                 <StepDots />
-                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">STEP {activeSection} OF {SECTIONS.length}</span>
+                <span className="text-xs text-slate-600 font-bold uppercase tracking-wider">STEP {activeSection} OF {SECTIONS.length}</span>
               </div>
             </div>
 
@@ -1849,7 +1850,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             <div className="flex-1 overflow-y-auto p-4 bg-white">
               <div className="mb-4">
                 <h2 className="text-xl font-black text-navy-900">{SECTIONS[activeSection - 1].title}</h2>
-                <p className="text-xs text-slate-500 mt-0.5">{SECTIONS[activeSection - 1].subtitle}</p>
+                <p className="text-xs text-slate-600 mt-0.5">{SECTIONS[activeSection - 1].subtitle}</p>
               </div>
               {renderSectionContent(activeSection)}
               <div className="mt-5 flex justify-center py-2"><SaveIndicator /></div>
@@ -1872,7 +1873,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           <div className="flex flex-col h-full overflow-hidden bg-slate-50">
             <div className="shrink-0 bg-white border-b border-warm-border px-4 py-3 flex items-center justify-between">
               <span className="text-sm font-bold text-navy-900">{SECTION_TIPS[activeSection]?.title}</span>
-              <button onClick={() => setMobileView("editor")} className="h-8 w-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200">
+              <button onClick={() => setMobileView("editor")} className="h-8 w-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1901,7 +1902,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                     <StepDots />
                     <div>
                       <h2 className="text-2xl font-black text-navy-900">{SECTIONS[activeSection - 1].title}</h2>
-                      <p className="text-sm text-slate-500 mt-0.5">{SECTIONS[activeSection - 1].subtitle}</p>
+                      <p className="text-sm text-slate-600 mt-0.5">{SECTIONS[activeSection - 1].subtitle}</p>
                     </div>
                   </div>
                   {renderSectionContent(activeSection)}

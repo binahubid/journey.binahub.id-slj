@@ -1,3 +1,4 @@
+import { averageMeasuredScore } from "./assessment-report";
 import { createClient } from "@/lib/supabase/client";
 
 export type AppErrorKind =
@@ -48,7 +49,7 @@ export interface Company {
   participantCount: number;
   batchCount: number;
   coachCount: number;
-  healthScore: number;
+  healthScore: number | null;
   habitCompletionPercent: number;
   checkpointCompletionPercent: number;
   needSupportCount: number;
@@ -67,7 +68,7 @@ export interface Batch {
   participantCount: number;
   coachId: string;
   coachName: string;
-  healthScore: number;
+  healthScore: number | null;
   createdAt: string;
   autoLockAt?: string | null;
 }
@@ -95,7 +96,7 @@ export interface AdminParticipant {
   coachName: string;
   accessCode: string;
   status: "ONBOARDING" | "ACTIVE" | "COMPLETED" | "NEED_SUPPORT";
-  habitAvgPercent: number;
+  habitAvgPercent: number | null;
   checkpointStatus: "ON_TRACK" | "NEED_SUPPORT" | "NOT_FILLED";
   daysInactive: number;
   joinedAt: string;
@@ -171,10 +172,10 @@ export async function fetchCompaniesFromSupabase(): Promise<Company[]> {
   const { data: batches } = await supabase.from("batches").select("company_id, coach_name");
 
   // Fetch canonical monitoring data to compute real health scores
-  let monitoringRows: { company_id: string; habit_avg_percent: number; needs_support: boolean }[] = [];
+  let monitoringRows: { company_id: string; habit_avg_percent: number | null; needs_support: boolean }[] = [];
   try {
     const { data } = await supabase.rpc("get_admin_monitoring", { p_company_id: null, p_batch_id: null });
-    monitoringRows = (data || []) as { company_id: string; habit_avg_percent: number; needs_support: boolean }[];
+    monitoringRows = (data || []) as { company_id: string; habit_avg_percent: number | null; needs_support: boolean }[];
   } catch {
     // RPC not available yet — health scores stay 0
   }
@@ -190,15 +191,7 @@ export async function fetchCompaniesFromSupabase(): Promise<Company[]> {
     const companyRows = monitoringRows.filter(
       (r) => r.company_id === c.id
     );
-    const total = companyRows.length;
-    const avgHabit = total > 0
-      ? Math.round(companyRows.reduce((sum, r) => sum + (r.habit_avg_percent || 0), 0) / total)
-      : 0;
-    const needSupport = companyRows.filter((r) => r.needs_support).length;
-    const supportRatio = total > 0 ? (needSupport / total) * 100 : 0;
-    const healthScore = total === 0
-      ? 0
-      : Math.min(100, Math.round(avgHabit * 0.6 + (100 - Math.min(supportRatio, 100)) * 0.4));
+    const healthScore = averageMeasuredScore(companyRows.map(row => row.habit_avg_percent));
 
     return {
       id: c.id,
@@ -209,9 +202,9 @@ export async function fetchCompaniesFromSupabase(): Promise<Company[]> {
       batchCount: bCount,
       coachCount: coachSet.size,
       healthScore,
-      habitCompletionPercent: avgHabit,
-      checkpointCompletionPercent: avgHabit,
-      needSupportCount: needSupport,
+      habitCompletionPercent: healthScore ?? 0,
+      checkpointCompletionPercent: 0,
+      needSupportCount: companyRows.filter(row => row.needs_support).length,
       createdAt: c.created_at ? c.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
     };
   });
@@ -239,7 +232,7 @@ export async function createCompanyInSupabase(company: Partial<Company>): Promis
     participantCount: 0,
     batchCount: 0,
     coachCount: 0,
-    healthScore: 100,
+    healthScore: null,
     habitCompletionPercent: 100,
     checkpointCompletionPercent: 100,
     needSupportCount: 0,
@@ -324,7 +317,7 @@ export async function createBatchInSupabase(batch: Partial<Batch>): Promise<Batc
       participantCount: 0,
       coachId: data.coach_id || "",
       coachName: data.coach_name || "Belum ditentukan",
-      healthScore: 100,
+      healthScore: null,
       createdAt: data.created_at ? data.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
       autoLockAt: data.auto_lock_at || null,
     };
@@ -350,7 +343,8 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
     const { data: journeys } = await supabase.from("journeys").select("user_id, status");
     const { data: batches } = await supabase.from("batches").select("*");
     const { data: reviews } = await supabase.from("monthly_reviews").select("user_id, status");
-    const { data: logs } = await supabase.from("habit_logs").select("user_id, completed");
+    const { data: monitoringRows, error: monitoringError } = await supabase.rpc("get_admin_monitoring", { p_limit: 1000, p_offset: 0 });
+    if (monitoringError) throw monitoringError;
 
     const mapped: AdminParticipant[] = profiles.map((p) => {
       const j = (journeys || []).find((j) => j.user_id === p.user_id);
@@ -358,11 +352,7 @@ export async function fetchParticipantsFromSupabase(): Promise<AdminParticipant[
         (b) => b.id === p.batch_id || (p.program_code && b.access_code.toUpperCase() === p.program_code.toUpperCase())
       );
       const userReviews = (reviews || []).filter((r) => r.user_id === p.user_id);
-      const userLogs = (logs || []).filter((l) => l.user_id === p.user_id);
-
-      const totalLogs = userLogs.length;
-      const completedLogs = userLogs.filter((l) => l.completed).length;
-      const habitAvgPercent = totalLogs > 0 ? Math.round((completedLogs / totalLogs) * 100) : 0;
+      const habitAvgPercent = (monitoringRows || []).find((row: { user_id: string }) => row.user_id === p.user_id)?.habit_avg_percent ?? null;
 
       const hasNeedSupportReview = userReviews.some((r) => r.status === "NEED_SUPPORT");
       const checkpointStatus = hasNeedSupportReview
@@ -522,7 +512,7 @@ export async function verifyAccessCodeAsync(code: string): Promise<{ valid: bool
         participantCount: 0,
         coachId: batch.coach_id || "",
         coachName: batch.coach_name || "Belum ditentukan",
-        healthScore: 100,
+        healthScore: null,
         createdAt: batch.created_at ? batch.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
       };
       return { valid: true, batch: mappedBatch, companyName: mappedBatch.companyName };
