@@ -10,6 +10,7 @@ import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, normalize
 interface DailyHadithWidgetProps {
   userId: string;
   timeZone?: string;
+  onReadChange?: (read: boolean) => void;
 }
 
 const HADITHS = [
@@ -45,7 +46,7 @@ const HADITHS = [
   },
 ];
 
-export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: DailyHadithWidgetProps) {
+export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE, onReadChange }: DailyHadithWidgetProps) {
   const supabase = createClient();
   const todayStr = getLocalDateString(new Date(), timeZone);
 
@@ -140,6 +141,7 @@ export function DailyHadithWidget({ userId, timeZone = DEFAULT_TIME_ZONE }: Dail
 
       // Sync matching PTP habits
       await syncHabitLog("Membaca Hadits Harian", checked);
+      onReadChange?.(checked);
     } catch (err) {
       console.error("Gagal update status baca hadits:", err);
       setIsRead(!checked);

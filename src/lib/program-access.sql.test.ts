@@ -98,6 +98,9 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql"]) {
+    await db.exec(readFileSync(new URL("../../supabase/migrations/" + file, import.meta.url), "utf8"));
+  }
 }, 20000);
 afterAll(() => db.close());
 
@@ -171,17 +174,17 @@ describe("spiritual trial database", () => {
     ).toHaveLength(0);
   });
 
-  it("locks full-program planning for a trial and prevents new entries after expiry", async () => {
+  it("locks other areas for a trial and prevents new entries after expiry", async () => {
     await asUser(users[0]);
     const { rows: journeys } = await db.query<{ id: string }>(
       "SELECT id FROM journeys WHERE user_id=auth.uid()",
     );
     await expect(
       db.query(
-        "INSERT INTO action_plans(user_id,journey_id,title) VALUES(auth.uid(),$1,'Rencana kepemimpinan')",
+        "INSERT INTO action_plans(user_id,journey_id,title,area_category) VALUES(auth.uid(),$1,'Rencana kepemimpinan','Leadership Excellence')",
         [journeys[0].id],
       ),
-    ).rejects.toThrow(/Fitur ini memerlukan/);
+    ).rejects.toThrow(/Uji coba hanya mencakup/);
     await owner();
     await db.query(
       "UPDATE slj_trial_enrollments SET starts_at=NOW()-INTERVAL '15 days',expires_at=NOW()-INTERVAL '1 day' WHERE user_id=$1",
@@ -316,17 +319,107 @@ describe("spiritual trial database", () => {
     ).rejects.toThrow(/permission denied/);
   });
 
-  it("enforces the program gate inside existing privileged RPCs as well as direct table writes", async () => {
+  it("allows the spiritual self-guided flow and prevents area bypass through privileged RPCs", async () => {
     await asUser(users[4]);
-    await expect(
-      db.query("SELECT get_participant_assessment(auth.uid())"),
-    ).rejects.toThrow(/Assessment tersedia dalam program/);
-    const { rows } = await db.query<{ id: string }>(
-      "SELECT id FROM journeys WHERE user_id=auth.uid()",
+    const { rows } = await db.query<{ id: string }>("SELECT id FROM journeys WHERE user_id=auth.uid()");
+    const id = rows[0].id;
+    await db.query("SELECT save_ptp_draft($1,$2::JSONB)", [id, JSON.stringify({
+      selected_areas: ["Spiritual Growth"], targets: {},
+    })]);
+    await expect(db.query("SELECT save_ptp_draft($1,$2::JSONB)", [id, JSON.stringify({
+      selected_areas: ["Leadership Excellence"], targets: {},
+    })])).rejects.toThrow(/Uji coba hanya mencakup/);
+    await expect(db.query("SELECT publish_ptp_draft($1,$2::JSONB)", [id, JSON.stringify({
+      selected_areas: ["Spiritual Growth", "Relationship", "Leadership Excellence"], targets: {},
+    })])).rejects.toThrow(/Uji coba hanya mencakup/);
+
+    const definition = { key: "spiritual", type: "quantity", label: "Tilawah", active: true,
+      baseline: 0, target: 14, direction: "higher_is_better", unit: "sesi", actual_source: "self_report" };
+    await db.query("SELECT publish_ptp_draft($1,$2::JSONB)", [id, JSON.stringify({
+      selected_areas: ["Spiritual Growth"], targets: {
+        "Spiritual Growth": { mainTarget: "Menjaga tilawah", indicators: [definition] },
+      },
+    })]);
+    await db.query("INSERT INTO action_plans(user_id,journey_id,title,area_category,frequency,quantity) VALUES(auth.uid(),$1,'Tilawah','Spiritual Growth','Harian',1)", [id]);
+    await db.query("INSERT INTO baseline_assessments(user_id) VALUES(auth.uid()) ON CONFLICT(user_id) DO NOTHING");
+    await db.exec("INSERT INTO baseline_answers(user_id,assessment_id,question_number,area,score) SELECT auth.uid(),id,1,'spiritual_growth',5 FROM baseline_assessments WHERE user_id=auth.uid()");
+    await expect(db.exec("INSERT INTO baseline_answers(user_id,assessment_id,question_number,area,score) SELECT auth.uid(),id,10,'personal_development',5 FROM baseline_assessments WHERE user_id=auth.uid()"))
+      .rejects.toThrow(/Uji coba hanya mencakup/);
+    await db.query("INSERT INTO monthly_reviews(user_id,month_number,status,participant_note) VALUES(auth.uid(),1,'ON_TRACK','Latihan spiritual berjalan')");
+    await expect(db.query("INSERT INTO monthly_reviews(user_id,month_number,status) VALUES(auth.uid(),2,'ON_TRACK')"))
+      .rejects.toThrow();
+    await db.exec("INSERT INTO ptp_indicator_actuals(indicator_id,participant_user_id,journey_id,month_number,actual_value) SELECT id,participant_user_id,journey_id,1,7 FROM ptp_indicators WHERE participant_user_id=auth.uid()");
+    const assessment = await db.query<{ report: { period: { program_end_date: string }; metrics: { execution: { score: number }; outcome: { score: number }; engagement: { ptp: boolean } } } }>("SELECT get_participant_assessment(auth.uid()) report");
+    expect(assessment.rows[0].report.metrics.engagement.ptp).toBe(true);
+    expect(assessment.rows[0].report.metrics.execution.score).toBe(0);
+    expect(assessment.rows[0].report.metrics.outcome.score).toBe(50);
+    const gate = await db.query<{ practice: boolean; program: boolean }>("SELECT slj_feature_access(auth.uid(),'practice') practice, slj_feature_access(auth.uid(),'program') program");
+    expect(gate.rows[0]).toEqual({ practice: true, program: false });
+
+    await owner();
+    await db.query("UPDATE slj_trial_enrollments SET starts_at=NOW()-INTERVAL '7 days',expires_at=NOW()+INTERVAL '7 days' WHERE user_id=$1", [users[4]]);
+    await db.query("UPDATE profiles SET start_date=NOW()-INTERVAL '7 days',end_date=NOW()+INTERVAL '7 days' WHERE user_id=$1", [users[4]]);
+    await asUser(users[4]);
+    expect((await db.query<{ program_day: number }>("SELECT current_program_day(auth.uid()) AS program_day")).rows[0].program_day).toBe(8);
+    await expect(db.exec("UPDATE monthly_reviews SET participant_note='Perubahan terlambat' WHERE user_id=auth.uid() AND month_number=1"))
+      .rejects.toThrow(/pekan yang sedang berjalan/);
+    await db.exec("INSERT INTO monthly_reviews(user_id,month_number,status,participant_note) VALUES(auth.uid(),2,'ON_TRACK','Evaluasi pekan kedua')");
+    await db.exec("INSERT INTO ptp_indicator_actuals(indicator_id,participant_user_id,journey_id,month_number,actual_value) SELECT id,participant_user_id,journey_id,2,14 FROM ptp_indicators WHERE participant_user_id=auth.uid()");
+    const weekly = await db.query<{ report: { metrics: { outcome: { score: number }; engagement: { checkpoint: { items: unknown[] } } } } }>("SELECT get_participant_assessment(auth.uid()) report");
+    expect(weekly.rows[0].report.metrics.outcome.score).toBe(100);
+    expect(weekly.rows[0].report.metrics.engagement.checkpoint.items).toHaveLength(2);
+
+    await asUser(admin);
+    const group = await db.query<{ report: { participants: { user_id: string }[] } }>("SELECT get_admin_group_impact() report");
+    expect(group.rows[0].report.participants.some(row => row.user_id === users[4])).toBe(false);
+  });
+
+  it("preserves the two trial weeks and starts a separate 90-day program after enrollment", async () => {
+    await asUser(users[4]);
+    const id = (await db.query<{ id: string }>("SELECT id FROM journeys WHERE user_id=auth.uid()")).rows[0].id;
+    await db.exec("UPDATE baseline_assessments SET completed=true,submitted_at=NOW() WHERE user_id=auth.uid()");
+    await db.exec("INSERT INTO sahabat_safar_profiles(user_id,preferences,is_completed) VALUES(auth.uid(),'{\"trialGoal\":\"Tilawah rutin\"}',true)");
+    const ids = (await db.query<{ id: string }>(`INSERT INTO habits(user_id,title,area_category,action_plan_id)
+      SELECT auth.uid(),'Tilawah','Spiritual Growth',id FROM action_plans WHERE journey_id=$1 RETURNING id`, [id])).rows;
+    await db.query("INSERT INTO habit_logs(user_id,habit_id,date,completed) VALUES(auth.uid(),$1,CURRENT_DATE::TEXT,true)", [ids[0].id]);
+
+    // Enrolling after the free trial ends must preserve the same answers and weekly records.
+    await owner();
+    await db.query("UPDATE slj_trial_enrollments SET starts_at=NOW()-INTERVAL '15 days',expires_at=NOW()-INTERVAL '1 day' WHERE user_id=$1", [users[4]]);
+    await db.query("UPDATE profiles SET start_date=NOW()-INTERVAL '15 days',end_date=NOW()-INTERVAL '1 day' WHERE user_id=$1", [users[4]]);
+    await db.query("UPDATE journeys SET final_reflection='Catatan refleksi 14 hari' WHERE user_id=$1", [users[4]]);
+    await asUser(users[4]);
+    expect((await access()).active).toBe(false);
+    const expired = (await db.query<{ result: unknown }>("SELECT get_slj_trial_result() AS result")).rows[0].result;
+    expect(expired).toMatchObject({
+      reviews: [{ month_number: 1, participant_note: "Latihan spiritual berjalan" }, { month_number: 2, participant_note: "Evaluasi pekan kedua" }],
+      actuals: expect.arrayContaining([{ actual_value: 7, month_number: 1 }, { actual_value: 14, month_number: 2 }].map(value => expect.objectContaining(value))),
+      reflection: "Catatan refleksi 14 hari",
+    });
+    await db.query("SELECT enroll_participant_by_access_code($1,$2)", ["Peserta Uji", "SLJ-UPGRADE"]);
+    const archived = (await db.query<{ result: unknown }>("SELECT get_slj_trial_result() AS result")).rows[0].result;
+    expect(archived).toEqual(expired);
+    await expect(db.query("SELECT practice FROM slj_trial_practice_archives")).rejects.toThrow(/permission denied/);
+
+    const current = await db.query<{ review_count: number; indicator_count: number; baseline: boolean; published_at: string | null; final_reflection: string | null }>(
+      `SELECT
+        (SELECT count(*)::INT FROM monthly_reviews WHERE user_id=auth.uid()) AS review_count,
+        (SELECT count(*)::INT FROM ptp_indicators WHERE participant_user_id=auth.uid()) AS indicator_count,
+        (SELECT completed FROM baseline_assessments WHERE user_id=auth.uid()) AS baseline,
+        ptp_published_at AS published_at, final_reflection FROM journeys WHERE user_id=auth.uid()`,
     );
-    await expect(
-      db.query("SELECT save_ptp_draft($1,'{}'::JSONB)", [rows[0].id]),
-    ).rejects.toThrow(/Uji coba mencakup/);
+    expect(current.rows[0]).toEqual({ review_count: 0, indicator_count: 0, baseline: false, published_at: null, final_reflection: null });
+    expect((await db.query("SELECT score FROM baseline_answers WHERE user_id=auth.uid()")).rows).toEqual([{ score: 5 }]);
+    expect((await db.query("SELECT is_archived, action_plan_id FROM habits WHERE id=$1", [ids[0].id])).rows)
+      .toEqual([{ is_archived: true, action_plan_id: null }]);
+    expect((await db.query("SELECT completed FROM habit_logs WHERE habit_id=$1", [ids[0].id])).rows)
+      .toEqual([{ completed: true }]);
+    expect((await access()).kind).toBe("program");
+
+    await db.query("SELECT enroll_participant_by_access_code($1,$2)", ["Peserta Uji", "SLJ-UPGRADE"]);
+    expect((await db.query<{ result: unknown }>("SELECT get_slj_trial_result() AS result")).rows[0].result).toEqual(archived);
+    await asUser(users[3]);
+    expect((await db.query<{ result: unknown }>("SELECT get_slj_trial_result() AS result")).rows[0].result).toBeNull();
   });
 
   it("can safely be reapplied without resetting registration settings or trial dates", async () => {
@@ -345,6 +438,9 @@ describe("spiritual trial database", () => {
         "utf8",
       ),
     );
+    for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql"]) {
+      await db.exec(readFileSync(new URL("../../supabase/migrations/" + file, import.meta.url), "utf8"));
+    }
     expect(
       (await db.query("SELECT * FROM slj_trial_enrollments ORDER BY user_id"))
         .rows,

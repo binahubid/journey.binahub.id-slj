@@ -35,6 +35,7 @@ interface ParticipantLayoutProps {
   hideBackToHome?: boolean;
   noPadding?: boolean;
   hideFooter?: boolean;
+  trialExpired?: boolean;
 }
 
 export function ParticipantLayout({
@@ -44,6 +45,7 @@ export function ParticipantLayout({
   hideBackToHome = false,
   noPadding = false,
   hideFooter = false,
+  trialExpired = false,
 }: ParticipantLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -53,6 +55,7 @@ export function ParticipantLayout({
   const [menuOpen, setMenuOpen] = useState(false);
   const [userName, setUserName] = useState("Peserta");
   const [isTrial, setIsTrial] = useState(pathname === "/trial");
+  const [isExpired, setIsExpired] = useState(trialExpired);
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -85,7 +88,10 @@ export function ParticipantLayout({
       setUnread(count || 0);
       try {
         const access = await getSljAccess(supabase);
-        if (!cancelled && access) setIsTrial(access.kind === "trial");
+        if (!cancelled && access) {
+          setIsTrial(access.kind === "trial");
+          setIsExpired(access.kind === "trial" && !access.active);
+        }
       } catch {
         /* Middleware handles access failures before private pages are rendered. */
       }
@@ -107,36 +113,23 @@ export function ParticipantLayout({
   }, [supabase]);
 
   const home = isTrial ? "/trial" : "/dashboard";
-  const trialNav = [
-    { href: "/trial", label: "Beranda", icon: LayoutDashboard },
-    { href: "/journal", label: "Jurnal", icon: BookOpen },
+  const nav = [
+    { href: home, label: "Beranda", icon: LayoutDashboard },
+    { href: "/journey", label: "Rencana perubahan", icon: Compass },
+    { href: "/monitoring", label: "Progres & evaluasi", icon: TrendingUp },
+    { href: "/journal", label: "Jurnal refleksi", icon: BookOpen },
+    { href: "/initial-process", label: "Persiapan perjalanan", icon: Sparkles },
+    { href: "/baseline", label: "Kenali diri", icon: Brain },
     { href: "/panduan", label: "Panduan", icon: CircleHelp },
+  ];
+  const bottomNav = [
+    { href: home, label: "Beranda", icon: LayoutDashboard },
+    { href: "/journey", label: "Rencana", icon: Compass },
+    { href: "/monitoring", label: "Progres", icon: TrendingUp },
+    { href: "/journal", label: "Jurnal", icon: BookOpen },
     { href: "/profile", label: "Profil", icon: UserRound },
   ];
-  const nav = isTrial
-    ? trialNav
-    : [
-        { href: "/dashboard", label: "Beranda", icon: LayoutDashboard },
-        { href: "/journey", label: "Rencana perubahan", icon: Compass },
-        { href: "/monitoring", label: "Progres & evaluasi", icon: TrendingUp },
-        { href: "/journal", label: "Jurnal refleksi", icon: BookOpen },
-        {
-          href: "/initial-process",
-          label: "Persiapan perjalanan",
-          icon: Sparkles,
-        },
-        { href: "/baseline", label: "Kenali diri", icon: Brain },
-        { href: "/panduan", label: "Panduan", icon: CircleHelp },
-      ];
-  const bottomNav = isTrial
-    ? trialNav
-    : [
-        { href: "/dashboard", label: "Beranda", icon: LayoutDashboard },
-        { href: "/journey", label: "Rencana", icon: Compass },
-        { href: "/monitoring", label: "Progres", icon: TrendingUp },
-        { href: "/journal", label: "Jurnal", icon: BookOpen },
-        { href: "/profile", label: "Profil", icon: UserRound },
-      ];
+  const canPractice = !isTrial || (!isExpired && !trialExpired);
   const showDock = !current?.startsWith("/baseline");
   async function logout() {
     await supabase.auth.signOut();
@@ -145,7 +138,7 @@ export function ParticipantLayout({
   }
   const navigation = (
     <nav aria-label="Menu peserta" className="space-y-1">
-      {nav.map((item) => (
+      {nav.filter(item => canPractice || item.href === home || item.href === "/panduan").map((item) => (
         <Link
           key={item.href}
           href={item.href}
@@ -316,7 +309,7 @@ export function ParticipantLayout({
           aria-label="Navigasi utama"
           className="fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-sm lg:hidden"
         >
-          {bottomNav.map((item) => (
+          {bottomNav.filter(item => canPractice || item.href === home || item.href === "/profile").map((item) => (
             <Link
               key={item.href}
               href={item.href}

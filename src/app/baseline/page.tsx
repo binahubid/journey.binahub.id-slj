@@ -33,6 +33,7 @@ import {
   ListOrdered,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getSljAccess } from "@/lib/program-access";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -187,6 +188,10 @@ export default function BaselinePage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
+  const [isTrial, setIsTrial] = useState(false);
+  const steps = isTrial ? BASELINE_STEPS.filter(step => step.areaKey === "spiritual_growth" || step.areaKey === "readiness") : BASELINE_STEPS;
+  const questions = steps.flatMap(step => step.questions);
+
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [answersMap, setAnswersMap] = useState<Record<number, number>>({});
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0); // 0 to 5 for steps, 6 for summary
@@ -208,6 +213,10 @@ export default function BaselinePage() {
       }
       setUserId(user.id);
       setErrorMessage(null);
+      const access = await getSljAccess(supabase);
+      const trial = access?.kind === "trial";
+      setIsTrial(trial);
+      const availableSteps = trial ? BASELINE_STEPS.filter(step => step.areaKey === "spiritual_growth" || step.areaKey === "readiness") : BASELINE_STEPS;
 
       // Restore from localStorage first as instant fallback
       let localAnswers: Record<number, number> = {};
@@ -240,7 +249,6 @@ export default function BaselinePage() {
 
       if (assessment) {
         setAssessmentId(assessment.id);
-        setIsCompleted(assessment.completed || false);
 
         // Fetch existing answers
         const { data: ansList, error: answersError } = await supabase.from("baseline_answers")
@@ -254,9 +262,11 @@ export default function BaselinePage() {
         });
         setAnswersMap(aMap);
 
-        if (assessment.completed) {
+        const complete = assessment.completed && availableSteps.flatMap(step => step.questions).every(question => aMap[question.id] !== undefined);
+        setIsCompleted(complete);
+        if (complete) {
           setIsIntro(false);
-          setCurrentStepIndex(6); // Summary screen
+          setCurrentStepIndex(availableSteps.length);
         }
       }
     } catch (err) {
@@ -303,8 +313,8 @@ export default function BaselinePage() {
       if (!currentAssId) return;
 
       const targetMap = mapToSave || answersMapRef.current;
-      const allQuestions = BASELINE_STEPS.flatMap(step => step.questions);
-      const answerPayload = Object.entries(targetMap).map(([qNumStr, scoreVal]) => {
+      const allQuestions = steps.flatMap(step => step.questions);
+      const answerPayload = Object.entries(targetMap).filter(([question]) => allQuestions.some(item => item.id === Number(question))).map(([qNumStr, scoreVal]) => {
         const qNum = parseInt(qNumStr, 10);
         const qObj = allQuestions.find(q => q.id === qNum);
         return {
@@ -353,9 +363,9 @@ export default function BaselinePage() {
   // ── COMPLETE ASSESSMENT ───────────────────────────────────────────────────
 
   const handleCompleteAssessment = async () => {
-    const missingQuestions = BASELINE_STEPS.flatMap(step => step.questions).filter(question => answersMap[question.id] === undefined);
+    const missingQuestions = steps.flatMap(step => step.questions).filter(question => answersMap[question.id] === undefined);
     if (missingQuestions.length > 0) {
-      const firstMissingStep = BASELINE_STEPS.findIndex(step => step.questions.some(question => answersMap[question.id] === undefined));
+      const firstMissingStep = steps.findIndex(step => step.questions.some(question => answersMap[question.id] === undefined));
       setErrorMessage(`Masih ada ${missingQuestions.length} pernyataan yang belum dijawab.`);
       setCurrentStepIndex(Math.max(0, firstMissingStep));
       return;
@@ -382,8 +392,8 @@ export default function BaselinePage() {
 
         if (currentAssId) {
           // 1. Batch save all baseline answers to Supabase
-          const allQuestions = BASELINE_STEPS.flatMap(step => step.questions);
-          const answerPayload = Object.entries(answersMap).map(([qNumStr, scoreVal]) => {
+          const allQuestions = steps.flatMap(step => step.questions);
+          const answerPayload = Object.entries(answersMap).filter(([question]) => allQuestions.some(item => item.id === Number(question))).map(([qNumStr, scoreVal]) => {
             const qNum = parseInt(qNumStr, 10);
             const qObj = allQuestions.find(q => q.id === qNum);
             return {
@@ -412,7 +422,7 @@ export default function BaselinePage() {
           if (assErr) throw assErr;
           setAssessmentId(currentAssId);
           setIsCompleted(true);
-          setCurrentStepIndex(6);
+          setCurrentStepIndex(steps.length);
           if (userId) localStorage.removeItem(`baseline_answers_draft:${userId}`);
         } else {
           throw new Error("Assessment baseline tidak ditemukan.");
@@ -432,7 +442,7 @@ export default function BaselinePage() {
 
   const calculateAreaScores = () => {
     const scores: Record<string, number> = {};
-    BASELINE_STEPS.forEach(step => {
+    steps.forEach(step => {
       let sum = 0;
       let count = 0;
       step.questions.forEach(q => {
@@ -448,8 +458,8 @@ export default function BaselinePage() {
     return scores;
   };
 
-  const answeredCount = Object.keys(answersMap).length;
-  const currentStep = BASELINE_STEPS[Math.min(currentStepIndex, 5)];
+  const answeredCount = questions.filter(question => answersMap[question.id] !== undefined).length;
+  const currentStep = steps[Math.min(currentStepIndex, steps.length - 1)];
   const currentStepAnswered = currentStep.questions.filter(question => answersMap[question.id] !== undefined).length;
   const currentStepComplete = currentStepAnswered === currentStep.questions.length;
 
@@ -464,6 +474,7 @@ export default function BaselinePage() {
   return (
     <ParticipantLayout activePath="/baseline" pageTitle="Baseline Self-Discovery">
       <div className="max-w-7xl w-full mx-auto pt-6 pb-20 font-sans text-slate-800 space-y-6">
+        {isTrial && <p className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-relaxed text-navy-900">Uji coba mencakup refleksi Spiritual Growth dan kesiapan menjalani latihan. Empat area transformasi lainnya tersedia dalam program pendampingan.</p>}
         {errorMessage && (
           <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
             <span className="flex-1">{errorMessage}</span>
@@ -502,7 +513,7 @@ export default function BaselinePage() {
                       </div>
 
                       <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                        Muhasabah yang jujur adalah langkah awal perubahan. Kenali kondisimu saat ini agar perjalanan 90 hari ini lebih terarah dan bermakna.
+                        Muhasabah yang jujur adalah langkah awal perubahan. Kenali kondisimu saat ini agar perjalanan {isTrial ? 14 : 90} hari ini lebih terarah dan bermakna.
                       </p>
 
                       {/* Ayat Quran Quote Card */}
@@ -630,7 +641,7 @@ export default function BaselinePage() {
                       </div>
                       <div>
                         <span className="text-xs text-slate-600 font-medium block leading-none">Jumlah pertanyaan</span>
-                        <span className="text-xs font-black text-[#071A33]">50 Pernyataan</span>
+                        <span className="text-xs font-black text-[#071A33]">{questions.length} Pernyataan</span>
                       </div>
                     </div>
 
@@ -641,7 +652,7 @@ export default function BaselinePage() {
                       </div>
                       <div>
                         <span className="text-xs text-slate-600 font-medium block leading-none">Durasi program</span>
-                        <span className="text-xs font-black text-[#071A33]">90 Hari Perjalanan</span>
+                        <span className="text-xs font-black text-[#071A33]">{isTrial ? 14 : 90} Hari Perjalanan</span>
                       </div>
                     </div>
                   </div>
@@ -707,7 +718,7 @@ export default function BaselinePage() {
                       <div className="space-y-0.5">
                         <h3 className="text-xs font-bold text-[#071A33]">Mulai perjalanan perubahan</h3>
                         <p className="text-xs text-slate-600 leading-snug">
-                          Hasil muhasabah ini akan menjadi peta transformasi 90 hari ke depan.
+                          Hasil muhasabah ini akan menjadi peta transformasi {isTrial ? 14 : 90} hari ke depan.
                         </p>
                       </div>
                     </div>
@@ -737,7 +748,7 @@ export default function BaselinePage() {
                       </div>
                       <div className="flex items-start gap-2 text-xs text-slate-700">
                         <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                        <span>Menjadi dasar pembuatan Target 90 Hari</span>
+                        <span>Menjadi dasar pembuatan Target {isTrial ? 14 : 90} Hari</span>
                       </div>
                       <div className="flex items-start gap-2 text-xs text-slate-700">
                         <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -758,7 +769,7 @@ export default function BaselinePage() {
 
             </div>
           </div>
-        ) : currentStepIndex === 6 ? (
+        ) : currentStepIndex === steps.length ? (
 
           /* ─── SUMMARY RESULT SCREEN ───────────────────────────────────── */
           <Card className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xs space-y-6 border-none">
@@ -780,7 +791,7 @@ export default function BaselinePage() {
             <div className="space-y-4 pt-1">
               {(() => {
                 const areaScores = calculateAreaScores();
-                return BASELINE_STEPS.filter(s => s.areaKey !== "readiness").map(step => {
+                return steps.filter(s => s.areaKey !== "readiness").map(step => {
                   const score = areaScores[step.areaKey] || 0;
                   const Icon = step.icon;
                   return (
@@ -807,7 +818,7 @@ export default function BaselinePage() {
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-xs text-amber-900 space-y-1">
               <span className="font-bold block">💡 Langkah Selanjutnya:</span>
               <p className="leading-relaxed">
-                Skor awal ini tersimpan sebagai data kondisi diri Anda dan akan ditampilkan sebagai rekomendasi saat merumuskan Niat & Target 90 Hari di PTP.
+                Skor awal ini tersimpan sebagai data kondisi diri Anda dan akan ditampilkan sebagai rekomendasi saat merumuskan Niat & Target {isTrial ? 14 : 90} Hari di PTP.
               </p>
             </div>
 
@@ -824,7 +835,7 @@ export default function BaselinePage() {
                 onClick={() => router.push("/journey")}
                 className="bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-10 px-6 shadow-xs"
               >
-                Lanjut ke PTP (Target 90 Hari)
+                Lanjut ke PTP (Target {isTrial ? 14 : 90} Hari)
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
@@ -839,17 +850,17 @@ export default function BaselinePage() {
             <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-3 border-none">
               <div className="flex items-center justify-between text-xs font-bold">
                 <span className="text-amber-700 uppercase tracking-wider">
-                  Langkah {currentStep.stepNum} dari 6: {currentStep.title}
+                  Langkah {currentStepIndex + 1} dari {steps.length}: {currentStep.title}
                 </span>
                 <span className="flex items-center gap-2 text-slate-600">
                   {saveStatus === "saving" ? "Menyimpan..." : saveStatus === "saved" ? "Tersimpan" : saveStatus === "error" ? "Belum tersinkron" : "Siap"}
-                  <span>Progres: {answeredCount} / 50</span>
+                  <span>Progres: {answeredCount} / {questions.length}</span>
                 </span>
               </div>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-amber-500 rounded-full transition-all duration-500"
-                  style={{ width: `${(answeredCount / 50) * 100}%` }}
+                  style={{ width: `${(answeredCount / questions.length) * 100}%` }}
                 />
               </div>
             </div>
@@ -874,7 +885,7 @@ export default function BaselinePage() {
               {isRefleksiExpanded && (
                 <div className="px-5 pb-5 pt-1 border-t border-slate-700/60 bg-[#071A33] space-y-2 animate-fadeIn">
                   <p className="text-xs sm:text-sm text-slate-100 italic leading-relaxed">
-                    &ldquo;{currentStep.muhasabahText}&rdquo;
+                    &ldquo;{isTrial ? currentStep.muhasabahText.replaceAll("90 hari", "14 hari") : currentStep.muhasabahText}&rdquo;
                   </p>
                 </div>
               )}
@@ -892,7 +903,7 @@ export default function BaselinePage() {
                     <Card key={q.id} className="bg-gradient-to-br from-[#071A33] to-navy-900 text-white p-6 rounded-3xl space-y-4 border-none shadow-md">
                       <div className="flex items-start gap-3">
                         <div className="h-7 w-7 rounded-full bg-amber-400/20 text-amber-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                          50
+                          {questions.length}
                         </div>
                         <div className="space-y-1">
                           <Badge className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs">
@@ -940,7 +951,7 @@ export default function BaselinePage() {
                             disabled={submitting}
                             className="bg-amber-400 hover:bg-amber-300 text-navy-950 text-xs font-extrabold rounded-xl px-8 h-11 shadow-lg w-full sm:w-auto"
                           >
-                            {submitting ? "Menyimpan..." : "Saya Siap Memulai Perjalanan 90 Hari"}
+                            {submitting ? "Menyimpan..." : "Saya siap memulai perjalanan " + (isTrial ? 14 : 90) + " hari"}
                             <CheckCircle2 className="h-4 w-4 ml-2" />
                           </Button>
                         </div>
@@ -953,7 +964,7 @@ export default function BaselinePage() {
                   <Card key={q.id} className="bg-white p-5 rounded-2xl shadow-2xs space-y-3 border-none">
                     <div className="flex items-start gap-3">
                       <span className="text-xs font-extrabold text-slate-600 font-mono mt-0.5">
-                        #{q.id}
+                        #{questions.findIndex(question => question.id === q.id) + 1}
                       </span>
                       <p className="text-xs sm:text-sm font-semibold text-navy-900 leading-snug">
                         {q.text}
@@ -1008,7 +1019,7 @@ export default function BaselinePage() {
                 Sebelumnya
               </Button>
 
-              {currentStepIndex < 5 && (
+              {currentStepIndex < steps.length - 1 && (
                 <Button
                   onClick={() => {
                     if (!currentStepComplete) {

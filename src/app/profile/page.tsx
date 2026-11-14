@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { User, MapPin, Calendar, Building2, Layers, HeartHandshake, Mail, Shield, Briefcase, MessageCircle, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
@@ -99,6 +100,7 @@ function StatusPill({ status }: { status: string }) {
 export default function ProfilePage() {
   const supabase = createClient();
   const [duration, setDuration] = useState(90);
+  const [hasTrial, setHasTrial] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfileData>({
@@ -134,6 +136,9 @@ export default function ProfilePage() {
         const access = await getSljAccess(supabase);
         const trial = access?.kind === "trial";
         setDuration(trial ? 14 : 90);
+        const { data: enrollment } = await supabase.from("slj_trial_enrollments")
+          .select("user_id").eq("user_id", user.id).maybeSingle();
+        setHasTrial(trial || Boolean(enrollment));
 
         // 2. Fetch Journey
         const { data: journey, error: journeyError } = await supabase
@@ -340,6 +345,16 @@ export default function ProfilePage() {
             </div>
           </div>
         </section>
+
+        {hasTrial && (
+          <Link
+            href="/trial/result"
+            className="flex min-h-11 w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-navy-900 hover:bg-slate-50"
+          >
+            <Sparkles className="h-4 w-4 text-amber-700" aria-hidden="true" />
+            Lihat hasil uji coba 14 hari
+          </Link>
+        )}
 
         {/* ─── INFO SECTIONS (BORDERLESS) ──────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6 items-start">

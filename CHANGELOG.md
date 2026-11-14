@@ -6,6 +6,13 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 
 ## [Unreleased]
 
+### Trial Spiritual Growth
+- Trial 14 hari memakai hero adaptif yang sama dengan program, termasuk jam lokal, jadwal salat esok hari, serta ringkasan empat aktivitas spiritual berdasarkan catatan peserta.
+- Seluruh menu latihan mandiri terbuka. Kenali diri mencakup Spiritual Growth dan kesiapan. Rencana perubahan dapat diterapkan pada satu area spiritual, beserta kebiasaan dan evaluasi di akhir pekan pertama dan kedua.
+- Empat area lainnya, pendampingan coach, dan Sahabat Safar memakai akses program pendampingan.
+- Hasil dua pekan dan refleksi akhir tetap dapat dibaca setelah trial berakhir atau saat peserta bergabung dengan program 90 hari.
+- SQL36 menegakkan batas area dan masa trial pada RLS, write trigger, publikasi PTP, serta assessment. Terapkan setelah SQL35. SQL37 menambahkan evaluasi pekanan selama trial 14 hari. SQL38 memisahkan riwayat trial dari evaluasi program pendampingan.
+
 ### Web app SLJ
 - Beranda mempertahankan hero adaptif di HP. Jam, visual, dan hitung mundur salat mengikuti zona waktu peserta. Setelah Isya, hitung mundur memakai jadwal Subuh esok hari.
 - Alur awal peserta, penyimpanan checklist, monitoring, ruang coach, dan tampilan admin dirapikan untuk layar kecil, navigasi keyboard, serta status kosong dan gagal.

@@ -26,7 +26,7 @@ beforeAll(async () => {
   await db.exec(readFileSync(new URL("../db/rls.sql", import.meta.url), "utf8"));
   const migrations = new URL("../../supabase/migrations/", import.meta.url);
   for (const file of readdirSync(migrations).filter(file => /^\d{3}_.*\.sql$/.test(file)
-    && Number(file.slice(0, 3)) >= 5 && Number(file.slice(0, 3)) <= 35 && !file.includes("preflight")).sort()) {
+    && Number(file.slice(0, 3)) >= 5 && Number(file.slice(0, 3)) <= 37 && !file.includes("preflight")).sort()) {
     await db.exec(readFileSync(new URL(file, migrations), "utf8"));
   }
   await db.query("INSERT INTO auth.users(id,email,email_confirmed_at) VALUES ($1,'participant@example.invalid',NOW()),($2,'empty@example.invalid',NOW())", [participant, emptyParticipant]);
@@ -100,6 +100,8 @@ describe("participant assessment database contract", () => {
     await db.exec("RESET ROLE");
     await db.exec(readFileSync(new URL("../../supabase/migrations/034_execution_consistency.sql", import.meta.url), "utf8"));
     await db.exec(readFileSync(new URL("../../supabase/migrations/035_assessment_report_scope.sql", import.meta.url), "utf8"));
+    await db.exec(readFileSync(new URL("../../supabase/migrations/036_trial_spiritual_practice.sql", import.meta.url), "utf8"));
+    await db.exec(readFileSync(new URL("../../supabase/migrations/037_trial_weekly_evaluation.sql", import.meta.url), "utf8"));
     expect((await assessment()).metrics.execution.score).toBe(75);
   });
 

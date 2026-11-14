@@ -64,3 +64,15 @@ describe("program timeline", () => {
     expect(getMonthEditState(3, 98)).toBe("LOCKED_PAST");
   });
 });
+
+
+it("uses two seven-day evaluation windows for a fourteen-day trial", () => {
+  expect(getActiveProgramMonth(7, 7, 2)).toBe(1);
+  expect(getActiveProgramMonth(8, 7, 2)).toBe(2);
+  expect(getProgramMonthWindow(2, 7, 0)).toEqual({ startDay: 8, dueDay: 14, graceEndDay: 14, lockDay: 15 });
+  expect(getMonthEditState(1, 7, 7, 0)).toBe("ACTIVE");
+  expect(getMonthEditState(2, 7, 7, 0)).toBe("LOCKED_FUTURE");
+  expect(getMonthEditState(1, 8, 7, 0)).toBe("LOCKED_PAST");
+  expect(getMonthEditState(2, 14, 7, 0)).toBe("ACTIVE");
+  expect(getMonthEditState(2, 15, 7, 0)).toBe("LOCKED_PAST");
+});

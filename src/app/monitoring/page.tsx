@@ -33,6 +33,7 @@ import {
   Hourglass,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getSljAccess, getTrialProgress, TRIAL_DAYS, TRIAL_PROGRAM_CODE } from "@/lib/program-access";
 import { getTransformationAreaColor, normalizeTransformationArea } from "@/lib/transformation-areas";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { getActiveProgramMonth, getMonthEditState, getProgramDay, getProgramMonthWindow } from "@/lib/program-timeline";
@@ -132,6 +133,12 @@ export default function MonitoringPage() {
   const supabase = createClient();
 
   const [dayCount, setDayCount] = useState(1);
+  const [isTrial, setIsTrial] = useState(false);
+  const totalDays = isTrial ? TRIAL_DAYS : 90;
+  const firstReflectionDay = totalDays - 1;
+  const periodDays = isTrial ? 7 : 30;
+  const periodLabel = isTrial ? "Pekan" : "Bulan";
+  const editState = (period: 1 | 2 | 3) => getMonthEditState(period, dayCount, periodDays, isTrial ? 0 : 7);
   const [coachName, setCoachName] = useState("Coach Pendamping");
   const [selectedMonth, setSelectedMonth] = useState<1 | 2 | 3>(1);
   const [status, setStatus] = useState<"ON_TRACK" | "NEED_SUPPORT">("ON_TRACK");
@@ -172,6 +179,7 @@ export default function MonitoringPage() {
 
   // Ref data for auto-actual suggestion from linked action plans
   const programStartDateRef = useRef<string>("");
+  const trialCalendarRef = useRef<{ start: number; timeZone: string } | null>(null);
   const habitIdByActionPlanRef = useRef<Record<string, string>>({});
   const habitLogsByHabitRef = useRef<Record<string, Array<{ activity_date?: string | null; date: string; completed: boolean; completed_count?: number | null }>>>({});
 
@@ -182,8 +190,11 @@ export default function MonitoringPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile, error: profileError } = await supabase.from("profiles").select("start_date, timezone, timezone_mode").eq("user_id", user.id).maybeSingle();
+      const { data: profile, error: profileError } = await supabase.from("profiles").select("start_date, end_date, program_code, timezone, timezone_mode").eq("user_id", user.id).maybeSingle();
       if (profileError) throw profileError;
+      const trial = profile?.program_code === TRIAL_PROGRAM_CODE;
+      setIsTrial(trial);
+      const trialAccess = trial ? await getSljAccess(supabase) : null;
 
       // Monthly reviews
       const { data: revData, error: reviewError } = await supabase.from("monthly_reviews").select("*").eq("user_id", user.id);
@@ -220,12 +231,15 @@ export default function MonitoringPage() {
       const today = new Date();
       const participantTimeZone = resolveParticipantTimeZone(profile?.timezone, profile?.timezone_mode === "MANUAL" ? "MANUAL" : "AUTO");
       const todayStr = getLocalDateString(today, participantTimeZone);
-      const start = profile?.start_date || journey.created_at;
+      const start = trialAccess?.starts_at || profile?.start_date || journey.created_at;
       const profileStartDate = start ? getLocalDateString(new Date(start), participantTimeZone) : todayStr;
-      const programDay = getProgramDay(profileStartDate, today, participantTimeZone);
+      const programDay = trialAccess ? getTrialProgress(trialAccess).day : getProgramDay(profileStartDate, today, participantTimeZone);
+      trialCalendarRef.current = trialAccess && start
+        ? { start: Date.parse(start), timeZone: participantTimeZone }
+        : null;
       programStartDateRef.current = profileStartDate;
       setDayCount(programDay);
-      const initialMonth = getActiveProgramMonth(programDay) ?? 1;
+      const initialMonth = getActiveProgramMonth(programDay, trial ? 7 : 30, trial ? 2 : 3) ?? 1;
       setSelectedMonth(initialMonth);
       setStatus(revMap[initialMonth]?.status === "NEED_SUPPORT" ? "NEED_SUPPORT" : "ON_TRACK");
       setNote(revMap[initialMonth]?.participantNote || "");
@@ -422,7 +436,9 @@ export default function MonitoringPage() {
         });
       }
 
-      const programEndDate = addCalendarDays(profileStartDate, 89);
+      const programEndDate = trialAccess?.expires_at
+        ? getLocalDateString(new Date(Date.parse(trialAccess.expires_at) - 1), participantTimeZone)
+        : addCalendarDays(profileStartDate, 89);
       const lastDate = todayStr < programEndDate ? todayStr : programEndDate;
       const { data, error: habitLogsError } = await supabase.from("habit_logs")
         .select("habit_id, date, activity_date, completed, completed_count")
@@ -444,7 +460,8 @@ export default function MonitoringPage() {
         execution.areas[area].score !== null ? "MEASURED" : execution.areas[area].unsupported ? "UNSUPPORTED" : "NOT_MEASURED"])));
       setTimeline(execution.timeline.map((point, index) => ({ date: point.date, scores: point.scores, programDay: index + 1 })));
 
-      const dates90 = Array.from({ length: 90 }, (_, index) => addCalendarDays(lastDate, index - 89));
+      const heatmapDays = trial ? TRIAL_DAYS : 90;
+      const dates90 = Array.from({ length: heatmapDays }, (_, index) => addCalendarDays(lastDate, index - heatmapDays + 1));
       const heatmap = dates90.map(dateStr => {
         const scheduledHabits = executionHabits.filter(h =>
           dateStr >= profileStartDate && dateStr <= programEndDate &&
@@ -484,13 +501,16 @@ export default function MonitoringPage() {
     isSaved: false, baselineScore,
   });
 
-  // Suggested actual from linked action plan habit logs for the selected month.
+  // Trial measurements accumulate toward the same 14-day target across both evaluations.
   const computeSuggestedActual = (indicator: IndicatorDefinition): number | null => {
     if (indicator.actualSource !== "action_plan" || !indicator.linkedActionPlanIds?.length) return null;
     const start = programStartDateRef.current;
     if (!start) return null;
-    const monthStart = addCalendarDays(start, (selectedMonth - 1) * 30);
-    const monthEnd = addCalendarDays(start, selectedMonth * 30 - 1);
+    const trialCalendar = trialCalendarRef.current;
+    const monthStart = trialCalendar ? start : addCalendarDays(start, (selectedMonth - 1) * periodDays);
+    const monthEnd = trialCalendar
+      ? getLocalDateString(new Date(trialCalendar.start + selectedMonth * periodDays * 86_400_000 - 1), trialCalendar.timeZone)
+      : addCalendarDays(start, selectedMonth * periodDays - 1);
     let total = 0;
     indicator.linkedActionPlanIds.forEach(planId => {
       const habitId = habitIdByActionPlanRef.current[planId];
@@ -517,11 +537,11 @@ export default function MonitoringPage() {
   };
 
   const handleSave = async () => {
-    if (getMonthEditState(selectedMonth, dayCount) !== "ACTIVE") {
+    if (editState(selectedMonth) !== "ACTIVE") {
       setSaveError(
-        getMonthEditState(selectedMonth, dayCount) === "LOCKED_FUTURE"
-          ? `Checkpoint Bulan Ke-${selectedMonth} belum aktif.`
-          : `Checkpoint Bulan Ke-${selectedMonth} sudah terkunci dan tidak dapat diedit.`
+        editState(selectedMonth) === "LOCKED_FUTURE"
+          ? `Checkpoint ${periodLabel} Ke-${selectedMonth} belum aktif.`
+          : `Checkpoint ${periodLabel} Ke-${selectedMonth} sudah terkunci dan tidak dapat diedit.`
       );
       return;
     }
@@ -548,7 +568,7 @@ export default function MonitoringPage() {
   };
 
   const handleSaveIndReport = async (area: string) => {
-    if (getMonthEditState(selectedMonth, dayCount) !== "ACTIVE") return;
+    if (editState(selectedMonth) !== "ACTIVE") return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !journeyId) return;
     const rep = areaReports[selectedMonth]?.[area];
@@ -623,8 +643,8 @@ export default function MonitoringPage() {
   };
 
   const handleSaveReflection = async () => {
-    if (!journeyId || dayCount < 89) {
-      setSaveError("Refleksi akhir program baru dapat diisi mulai Hari ke-89.");
+    if (!journeyId || dayCount < firstReflectionDay) {
+      setSaveError("Refleksi akhir tersedia mulai hari ke-" + firstReflectionDay + ".");
       return;
     }
     setSavingReflection(true);
@@ -661,14 +681,14 @@ export default function MonitoringPage() {
   };
 
   const healthData = calculateHealthScores();
-  const daysRemaining = Math.max(0, 90 - dayCount);
-  const nextCheckpointMonth = dayCount <= 30 ? 1 : dayCount <= 60 ? 2 : 3;
-  const daysToNextCheckpoint = dayCount <= 30 ? 30 - dayCount : dayCount <= 60 ? 60 - dayCount : Math.max(0, 90 - dayCount);
+  const daysRemaining = Math.max(0, totalDays - dayCount + (isTrial ? 1 : 0));
+  const nextCheckpointMonth = getActiveProgramMonth(dayCount, periodDays, isTrial ? 2 : 3) ?? 1;
+  const daysToNextCheckpoint = Math.max(0, nextCheckpointMonth * periodDays - dayCount);
 
   // Status kunci/aktif untuk input capaian bulan yang sedang dipilih
-  const monthEditState = getMonthEditState(selectedMonth, dayCount);
-  const { startDay: monthStartDay, graceEndDay: monthGraceEndDay } = getProgramMonthWindow(selectedMonth);
-  const finalReflectionUnlocked = dayCount >= 89;
+  const monthEditState = editState(selectedMonth);
+  const { startDay: monthStartDay, graceEndDay: monthGraceEndDay } = getProgramMonthWindow(selectedMonth, periodDays, isTrial ? 0 : 7);
+  const finalReflectionUnlocked = dayCount >= firstReflectionDay;
 
   const visibleChartAreas = chartArea === "all" || !selectedAreas.includes(chartArea) ? selectedAreas : [chartArea];
   const chartScaleMin = 0;
@@ -677,7 +697,7 @@ export default function MonitoringPage() {
   const chartY = (value: number) => 160 - ((value - chartScaleMin) / chartScaleRange) * 144;
   const chartZeroY = chartY(0);
   const chartAxisValues = Array.from({ length: 5 }, (_, index) => Math.round(chartScaleMax - index * (chartScaleRange / 4)));
-  const displayedDays = timeframe === "7d" ? 7 : timeframe === "1m" ? 30 : 90;
+  const displayedDays = timeframe === "7d" ? 7 : isTrial ? TRIAL_DAYS : timeframe === "1m" ? 30 : 90;
   const chartDayFormat = new Intl.DateTimeFormat("id-ID", {
     timeZone: "UTC",
     ...(timeframe === "7d" ? { weekday: "short" } : { day: "numeric", month: "numeric" }),
@@ -739,11 +759,11 @@ export default function MonitoringPage() {
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="text-amber-300 font-bold flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
-                      Hari ke-{Math.min(90, dayCount)} dari 90 Hari
+                      Hari ke-{Math.min(totalDays, dayCount)} dari {totalDays} Hari
                     </span>
                     <span className="text-slate-600">•</span>
                     <span className="text-slate-300">
-                      Evaluasi Bulan Ke-{selectedMonth}
+                      Evaluasi {periodLabel} Ke-{selectedMonth}
                     </span>
                   </div>
 
@@ -752,14 +772,16 @@ export default function MonitoringPage() {
                   </h1>
 
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                    Evaluasi reflektif progres 90 hari & kedisiplinan habit harian Anda secara konsisten.
+                    {isTrial
+                      ? "Pantau kebiasaan Spiritual Growth dan nilai kemajuan Anda dalam dua pekan."
+                      : "Pantau kebiasaan dan kemajuan menuju target perubahan selama 90 hari."}
                   </p>
 
                   {/* Progress Bar */}
                   <div className="pt-2 space-y-1.5">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                       <span className="text-slate-300 font-medium">
-                        Capaian target bulan {selectedMonth}
+                        Capaian target {periodLabel.toLowerCase()} {selectedMonth}
                       </span>
                       <span className="font-extrabold text-amber-300">
                         {healthData.overall === null ? "Belum Ada Data" : `${healthData.overall}%`}
@@ -781,7 +803,7 @@ export default function MonitoringPage() {
                     <Clock className="h-4 w-4 text-amber-300" />
                   </div>
                   <div>
-                    <p className="text-sm font-extrabold text-white">Checkpoint Bulan {nextCheckpointMonth}</p>
+                    <p className="text-sm font-extrabold text-white">{isTrial ? "Evaluasi pekan" : "Checkpoint Bulan"} {nextCheckpointMonth}</p>
                     <p className="text-xs text-amber-300 font-mono font-bold mt-0.5">
                       {daysToNextCheckpoint > 0 ? `${daysToNextCheckpoint} hari lagi` : "Saatnya Evaluasi!"}
                     </p>
@@ -790,6 +812,11 @@ export default function MonitoringPage() {
                     <span>Sisa Perjalanan</span>
                     <span className="font-bold text-white">{daysRemaining} Hari</span>
                   </div>
+                  {isTrial && (
+                    <Link href="/trial/result" className="inline-flex min-h-11 items-center text-xs font-semibold text-white underline underline-offset-4">
+                      Lihat ringkasan 14 hari
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
@@ -798,7 +825,7 @@ export default function MonitoringPage() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  Journey Health Scores — Bulan {selectedMonth}
+                  Journey Health Scores — {periodLabel} {selectedMonth}
                 </h2>
               </div>
 
@@ -822,7 +849,7 @@ export default function MonitoringPage() {
                           {score === null ? "--" : `${score}%`}
                         </span>
 
-                        {/* Badge: bedakan skor awal (dari baseline, belum ada laporan bulan ini) vs capaian nyata */}
+                        {/* Badge: bedakan skor awal (dari baseline, belum ada laporan periode ini) vs capaian nyata */}
                         {score === null ? (
                           <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
                             Belum Ada Data
@@ -898,7 +925,7 @@ export default function MonitoringPage() {
 
                   {/* Timeframe Filter Toggle */}
                   <div className="flex shrink-0 items-center gap-0.5 self-start rounded-lg border border-slate-200 bg-slate-50 p-0.5 sm:self-auto">
-                    {(["7d", "1m", "3m"] as const).map(tf => (
+                    {((isTrial ? ["7d", "1m"] : ["7d", "1m", "3m"]) as ("7d" | "1m" | "3m")[]).map(tf => (
                       <button
                         key={tf}
                         type="button"
@@ -908,7 +935,7 @@ export default function MonitoringPage() {
                           timeframe === tf ? "bg-white text-navy-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]" : "text-slate-600 hover:text-slate-700"
                         }`}
                       >
-                        {tf === "7d" ? "7 Hari" : tf === "1m" ? "1 Bulan" : "3 Bulan"}
+                        {tf === "7d" ? "7 Hari" : tf === "1m" ? isTrial ? "14 Hari" : "1 Bulan" : "3 Bulan"}
                       </button>
                     ))}
                   </div>
@@ -1017,7 +1044,7 @@ export default function MonitoringPage() {
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
                           <Flame className="h-4 w-4" />
                         </span>
-                        Grid Istiqamah 90 Hari
+                        Grid Istiqamah {totalDays} Hari
                       </h3>
                       <p className="ml-10 mt-0.5 text-xs leading-relaxed text-slate-600">
                         Aktivitas Action Plan pada setiap tanggal
@@ -1076,14 +1103,14 @@ export default function MonitoringPage() {
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xs font-bold text-slate-600 uppercase tracking-wider truncate">
-                    Area Transformasi & Pelaporan Bulanan
+                    {isTrial ? "Capaian Spiritual Growth" : "Area Transformasi & Pelaporan Bulanan"}
                   </h2>
                   <p className="mt-1 text-xs leading-relaxed text-slate-600">
                     {monthEditState === "ACTIVE"
-                      ? `Pelaporan Bulan Ke-${selectedMonth} dapat diisi atau diedit sampai Hari ke-${monthGraceEndDay}.`
+                      ? `Pelaporan ${periodLabel} Ke-${selectedMonth} dapat diisi atau diedit sampai Hari ke-${monthGraceEndDay}.`
                       : monthEditState === "LOCKED_FUTURE"
-                      ? `Pelaporan Bulan Ke-${selectedMonth} baru aktif mulai Hari ke-${monthStartDay}.`
-                      : `Pelaporan Bulan Ke-${selectedMonth} telah terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
+                      ? `Pelaporan ${periodLabel} Ke-${selectedMonth} baru aktif mulai Hari ke-${monthStartDay}.`
+                      : `Pelaporan ${periodLabel} Ke-${selectedMonth} telah terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
                   </p>
                 </div>
                 <span className={`inline-flex w-fit items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${
@@ -1093,10 +1120,10 @@ export default function MonitoringPage() {
                 }`}>
                   {monthEditState === "ACTIVE" ? <Edit3 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
                   {monthEditState === "ACTIVE"
-                    ? `Bulan ${selectedMonth} · Dapat diedit`
+                    ? `${periodLabel} ${selectedMonth} · Dapat diedit`
                     : monthEditState === "LOCKED_FUTURE"
-                    ? `Bulan ${selectedMonth} · Belum aktif`
-                    : `Bulan ${selectedMonth} · Terkunci`}
+                    ? `${periodLabel} ${selectedMonth} · Belum aktif`
+                    : `${periodLabel} ${selectedMonth} · Terkunci`}
                 </span>
               </div>
 
@@ -1164,7 +1191,7 @@ export default function MonitoringPage() {
                               {rep?.targets?.waktu && (
                                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                                   <span className="text-slate-600">Waktu Tepat Hari</span>
-                                  <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/30 hari` : "Belum Diisi"}</span>
+                                  <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/${isTrial ? TRIAL_DAYS : 30} hari` : "Belum Diisi"}</span>
                                 </div>
                               )}
                               {rep?.targets?.biaya && (
@@ -1174,7 +1201,7 @@ export default function MonitoringPage() {
                                 </div>
                               )}
                             </div>
-                          ) : (
+                          ) : rep?.indicators?.length ? null : (
                             <div className="pt-1 space-y-1">
                               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                                 <span className="text-slate-600">Rating Evaluasi Mandiri</span>
@@ -1192,7 +1219,7 @@ export default function MonitoringPage() {
                             className="w-full bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 flex items-center justify-center gap-2 mt-2"
                           >
                             <Edit3 className="h-3.5 w-3.5" />
-                            Input Capaian Bulanan
+                            {isTrial ? "Isi capaian pekan" : "Input Capaian Bulanan"}
                           </Button>
                         ) : (
                           <Button
@@ -1200,7 +1227,7 @@ export default function MonitoringPage() {
                             title={
                               monthEditState === "LOCKED_FUTURE"
                                 ? `Aktif mulai Hari ke-${monthStartDay}`
-                                : `Terkunci sejak Hari ke-${monthGraceEndDay + 1} (lewat masa tenggang 7 hari)`
+                                : `Terkunci sejak Hari ke-${monthGraceEndDay + 1}${isTrial ? "" : " (lewat masa tenggang 7 hari)"}`
                             }
                             className="mt-2 flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-100"
                           >
@@ -1229,7 +1256,7 @@ export default function MonitoringPage() {
                 </h3>
 
                 <div className="space-y-3">
-                  {([1, 2, 3] as (1 | 2 | 3)[]).map(m => {
+                  {((isTrial ? [1, 2] : [1, 2, 3]) as (1 | 2 | 3)[]).map(m => {
                     const rev = reviews[m];
                     const isCurrent = selectedMonth === m;
                     return (
@@ -1243,9 +1270,9 @@ export default function MonitoringPage() {
                         }`}
                       >
                         <div>
-                          <p className="text-xs font-extrabold text-navy-900">Checkpoint Bulan Ke-{m}</p>
+                          <p className="text-xs font-extrabold text-navy-900">{isTrial ? "Evaluasi pekan " + m : "Checkpoint Bulan Ke-" + m}</p>
                           <p className="text-xs text-slate-600 mt-0.5">
-                            {m === 1 ? "Evaluasi Hari 1–30" : m === 2 ? "Evaluasi Hari 31–60" : "Evaluasi Hari 61–90"}
+                            {isTrial ? (m === 1 ? "Hari 1–7" : "Hari 8–14") : m === 1 ? "Evaluasi Hari 1–30" : m === 2 ? "Evaluasi Hari 31–60" : "Evaluasi Hari 61–90"}
                           </p>
                         </div>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
@@ -1266,10 +1293,10 @@ export default function MonitoringPage() {
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 min-w-0 gap-2">
                   <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2 min-w-0 truncate">
                     <MessageSquare className="h-4 w-4 text-navy-900 shrink-0" />
-                    Feedback & Catatan Evaluasi (Bulan {selectedMonth})
+                    {isTrial ? "Catatan evaluasi" : "Feedback & Catatan Evaluasi"} ({periodLabel} {selectedMonth})
                   </h3>
                   <span className="text-xs text-slate-600 font-medium shrink-0">
-                    {coachName}
+                    {isTrial ? "Latihan mandiri" : coachName}
                   </span>
                 </div>
 
@@ -1279,29 +1306,28 @@ export default function MonitoringPage() {
                   <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-navy-900">
                       <span>Catatan Anda (Peserta)</span>
-                      <span className="text-xs font-normal text-slate-600">Bulan Ke-{selectedMonth}</span>
+                      <span className="text-xs font-normal text-slate-600">{periodLabel} Ke-{selectedMonth}</span>
                     </div>
                     <p className="text-xs text-slate-700 leading-relaxed italic">
-                      {note || "Belum ada catatan peserta untuk bulan ini."}
+                      {note || "Belum ada catatan peserta untuk periode ini."}
                     </p>
                   </div>
 
-                  {/* Coach Reply */}
-                  <div className="bg-amber-50/70 p-3.5 rounded-2xl space-y-1">
-                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
-                      <span>Ulasan {coachName}</span>
+                  {!isTrial && (
+                    <div className="bg-amber-50/70 p-3.5 rounded-2xl space-y-1">
+                      <p className="text-xs font-bold text-amber-900">Ulasan {coachName}</p>
+                      <p className="text-xs text-amber-950 leading-relaxed">
+                        {reviews[selectedMonth]?.coachNote || "Belum ada catatan pendamping."}
+                      </p>
                     </div>
-                    <p className="text-xs text-amber-950 leading-relaxed">
-                      {reviews[selectedMonth]?.coachNote || "Coach sedang meninjau progres perkembangan Anda bulan ini. Tetap jaga konsistensi!"}
-                    </p>
-                  </div>
+                  )}
                 </div>
 
                 {/* Checkpoint Form Editor (PRESERVED UNTOUCHED AS REQUESTED) */}
                 <div className="border-t border-slate-100 pt-4 space-y-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700">Catatan checkpoint Bulan Ke-{selectedMonth}</label>
+                      <label htmlFor="checkpoint-note" className="block text-xs font-bold text-slate-700">{isTrial ? "Catatan pekan" : "Catatan checkpoint bulan"} ke-{selectedMonth}</label>
                       <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
                         {monthEditState === "ACTIVE"
                           ? `Dapat diedit sampai Hari ke-${monthGraceEndDay}.`
@@ -1319,7 +1345,7 @@ export default function MonitoringPage() {
                           status === "ON_TRACK" ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-600"
                         } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
-                        On Track
+                        {isTrial ? "Sesuai rencana" : "On Track"}
                       </button>
                       <button
                         type="button"
@@ -1329,21 +1355,22 @@ export default function MonitoringPage() {
                           status === "NEED_SUPPORT" ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-600"
                         } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
-                        Need Support
+                        {isTrial ? "Ada kendala" : "Need Support"}
                       </button>
                     </div>
                   </div>
                   <Textarea
+                    id="checkpoint-note"
                     rows={3}
                     value={note}
                     onChange={e => setNote(e.target.value)}
                     disabled={monthEditState !== "ACTIVE"}
-                    placeholder="Tuliskan kendala atau keberhasilan Anda bulan ini..."
+                    placeholder="Tuliskan kendala atau keberhasilan Anda periode ini..."
                     className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100"
                   />
                   <div className="flex justify-end">
                     <Button onClick={handleSave} disabled={saving || monthEditState !== "ACTIVE"} className="h-10 w-full rounded-xl bg-[#071A33] px-5 text-xs font-bold text-amber-300 hover:bg-slate-900 disabled:bg-slate-100 disabled:text-slate-600 sm:w-auto">
-                      {monthEditState !== "ACTIVE" ? <><Lock className="mr-1.5 h-3.5 w-3.5" /> Tidak dapat diedit</> : saving ? "Menyimpan..." : saved ? "Tersimpan" : "Simpan catatan checkpoint"}
+                      {monthEditState !== "ACTIVE" ? <><Lock className="mr-1.5 h-3.5 w-3.5" /> Tidak dapat diedit</> : saving ? "Menyimpan..." : saved ? "Tersimpan" : isTrial ? "Simpan catatan pekan" : "Simpan catatan checkpoint"}
                     </Button>
                   </div>
                 </div>
@@ -1361,13 +1388,13 @@ export default function MonitoringPage() {
                     <h3 className="text-sm font-extrabold text-navy-900 sm:text-base">Refleksi akhir program</h3>
                     <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600">
                       {finalReflectionUnlocked
-                        ? "Rangkum pembelajaran utama, perubahan nyata, dan komitmen setelah perjalanan 90 hari."
+                        ? "Rangkum pembelajaran utama, perubahan nyata, dan komitmen untuk melanjutkan kebiasaan baik."
                         : "Bagian ini dibuka menjelang akhir perjalanan agar refleksi merangkum proses secara utuh."}
                     </p>
                   </div>
                 </div>
                 <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${finalReflectionUnlocked ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                  {finalReflectionUnlocked ? "Terbuka" : `Terbuka Hari ke-89 · ${Math.max(0, 89 - dayCount)} hari lagi`}
+                  {finalReflectionUnlocked ? "Terbuka" : `Terbuka Hari ke-${firstReflectionDay} · ${Math.max(0, firstReflectionDay - dayCount)} hari lagi`}
                 </span>
               </div>
               <Textarea
@@ -1435,7 +1462,9 @@ export default function MonitoringPage() {
               <div className="bg-slate-50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
                 <span className="font-bold text-slate-800 block">Panduan Evaluasi:</span>
                 <p className="leading-relaxed">
-                  Isi nilai aktual pada indikator yang Anda pilih setiap akhir bulan. Satu sampai empat indikator per area sudah cukup sesuai kebutuhan Anda.
+                  {isTrial
+                    ? "Isi capaian dan catatan di tiap pekan. Untuk target berbentuk jumlah, gunakan total sejak hari pertama."
+                    : "Isi nilai aktual pada indikator yang Anda pilih setiap akhir bulan. Satu sampai empat indikator per area sudah cukup sesuai kebutuhan Anda."}
                 </p>
               </div>
             </div>
@@ -1443,7 +1472,7 @@ export default function MonitoringPage() {
             <section className="rounded-2xl bg-white p-5 text-sm leading-6 text-slate-700">
               <h3 className="mb-3 font-semibold text-navy-900">Cara membaca hasil</h3>
               <dl className="space-y-3">
-                <div><dt className="font-semibold">Capaian target</dt><dd>Perubahan dari kondisi awal menuju target berdasarkan nilai aktual bulan yang dipilih.</dd></div>
+                <div><dt className="font-semibold">Capaian target</dt><dd>Perubahan dari kondisi awal menuju target berdasarkan nilai aktual pada {periodLabel.toLowerCase()} yang dipilih.</dd></div>
                 <div><dt className="font-semibold">Konsistensi pelaksanaan</dt><dd>Kebiasaan yang selesai dibandingkan jadwal sejak awal program. Angka ini terpisah dari capaian target.</dd></div>
               </dl>
             </section>
@@ -1462,19 +1491,23 @@ export default function MonitoringPage() {
                     4 Aspek Pengukuran
                   </p>
                   <p className="text-slate-600 leading-relaxed text-xs">
-                    Pengisian Kualitas (1–5★), Kuantitas, Waktu, dan Biaya dilakukan pada akhir bulan 1, 2, dan 3.
+                    {isTrial
+                      ? "Ukur indikator yang Anda pilih untuk target 14 hari, lalu catat hasilnya di tiap pekan."
+                      : "Pengisian Kualitas (1–5★), Kuantitas, Waktu, dan Biaya dilakukan pada akhir bulan 1, 2, dan 3."}
                   </p>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-xl space-y-1">
-                  <p className="font-bold text-navy-900 flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-navy-900" />
-                    Sahabat Safar Akuntabilitas
-                  </p>
-                  <p className="text-slate-600 leading-relaxed text-xs">
-                    Gunakan pengingat di Dashboard untuk memberi motivasi kepada Sahabat Safar Anda.
-                  </p>
-                </div>
+                {!isTrial && (
+                  <div className="bg-slate-50 p-3 rounded-xl space-y-1">
+                    <p className="font-bold text-navy-900 flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-navy-900" />
+                      Sahabat Safar Akuntabilitas
+                    </p>
+                    <p className="text-slate-600 leading-relaxed text-xs">
+                      Gunakan pengingat di Dashboard untuk memberi motivasi kepada Sahabat Safar Anda.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1503,7 +1536,9 @@ export default function MonitoringPage() {
                   <span className="truncate">Pelaporan Indikator: {editingAreaModal}</span>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-600">
-                  Input realisasi bulan ke-{selectedMonth}. Skor keberhasilan dihitung otomatis.
+                  {isTrial
+                    ? "Catat capaian Anda untuk pekan ini. Untuk target jumlah, masukkan total sejak hari pertama."
+                    : "Input realisasi bulan ke-" + selectedMonth + ". Skor keberhasilan dihitung otomatis."}
                 </DialogDescription>
               </DialogHeader>
 
@@ -1519,14 +1554,14 @@ export default function MonitoringPage() {
                         <>
                           <Hourglass className="h-8 w-8 text-slate-300 mx-auto" />
                           <p className="text-sm text-slate-600">
-                            Input untuk Bulan Ke-{selectedMonth} baru aktif mulai <b>Hari ke-{monthStartDay}</b>.
+                            Input untuk {periodLabel} Ke-{selectedMonth} baru aktif mulai <b>Hari ke-{monthStartDay}</b>.
                           </p>
                         </>
                       ) : (
                         <>
                           <Lock className="h-8 w-8 text-slate-300 mx-auto" />
                           <p className="text-sm text-slate-600">
-                            Masa input Bulan Ke-{selectedMonth} sudah berakhir (masa tenggang 7 hari terlewati sejak Hari ke-{monthGraceEndDay}). Data tidak bisa diedit lagi.
+                            {periodLabel} {selectedMonth} selesai. Data tetap dapat dibaca.
                           </p>
                         </>
                       )}
@@ -1561,8 +1596,8 @@ export default function MonitoringPage() {
                                const qualityDesc = indicator.type === "quality" ? getQualityRubricDescription(indicator.qualityRubric, typeof rep.indicatorActuals?.[indicator.key] === "number" ? (rep.indicatorActuals[indicator.key] as number) : null) : null;
                                return (
                                <div key={indicator.key} className="rounded-xl border border-slate-200 bg-white p-3">
-                                 <div className="mb-2 flex items-center justify-between gap-2"><label className="text-xs font-bold text-slate-700">{indicator.label}</label><div className="flex items-center gap-1.5"><Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[9px] font-bold">{sourceLabel(indicator.actualSource)}</Badge><span className="text-xs text-slate-600">Target {indicator.target} {indicator.unit}</span></div></div>
-                                 <Input type="number" value={rep.indicatorActuals?.[indicator.key] ?? ""} onChange={event => {
+                                 <div className="mb-2 flex items-center justify-between gap-2"><label htmlFor={`actual-${indicator.key}`} className="text-xs font-bold text-slate-700">{indicator.label}</label><div className="flex items-center gap-1.5"><Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[9px] font-bold">{sourceLabel(indicator.actualSource)}</Badge><span className="text-xs text-slate-600">Target {indicator.target} {indicator.unit}</span></div></div>
+                                 <Input id={`actual-${indicator.key}`} type="number" value={rep.indicatorActuals?.[indicator.key] ?? ""} onChange={event => {
                                     const value = event.target.value === "" ? undefined : Number(event.target.value);
                                     if (value !== undefined && (!Number.isFinite(value) || value < 0)) return;
                                     setAreaReports(current => ({ ...current, [selectedMonth]: { ...current[selectedMonth], [editingAreaModal]: { ...current[selectedMonth][editingAreaModal], indicatorActuals: { ...current[selectedMonth][editingAreaModal].indicatorActuals, [indicator.key]: value } } } }));
@@ -1585,13 +1620,13 @@ export default function MonitoringPage() {
                          ) : !rep.targets.kualitas && !rep.targets.kuantitas && !rep.targets.waktu && !rep.targets.biaya ? (
                       <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl space-y-3">
                         <div className="flex items-center justify-between">
-                          <label className="font-extrabold text-amber-900 text-xs block">Rating Capaian Bulanan (1 – 5 Bintang)</label>
+                          <label className="font-extrabold text-amber-900 text-xs block">Rating Capaian {periodLabel} (1 – 5 Bintang)</label>
                           <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
                              {rep.kualitasRating ? `${rep.kualitasRating}/5 ★ (${rep.kualitasRating * 20}% Capaian)` : "Belum Diisi"}
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 leading-relaxed">
-                          Berikan penilaian mandiri atas kualitas keberhasilan & pencapaian Anda pada area ini di Bulan Ke-{selectedMonth}.
+                          Berikan penilaian mandiri atas kualitas keberhasilan & pencapaian Anda pada area ini di {periodLabel} Ke-{selectedMonth}.
                         </p>
                         <div className="flex justify-center items-center gap-2 py-2">
                           {[1, 2, 3, 4, 5].map(star => (
@@ -1635,7 +1670,7 @@ export default function MonitoringPage() {
                             <Input
                               value={rep.kuantitasActual}
                               onChange={e => updateAreaReport(editingAreaModal, "kuantitasActual", e.target.value)}
-                              placeholder="Realisasi bulan ini (misal: 95)"
+                              placeholder="Realisasi periode ini (misal: 95)"
                               className="text-xs h-8 border-slate-200 rounded-lg bg-white"
                             />
                           </div>
@@ -1646,10 +1681,10 @@ export default function MonitoringPage() {
                           <label className="font-bold text-amber-800 block">3. Waktu (Hari Tepat Waktu)</label>
                           <p className="text-xs text-slate-600">Target PTP: {rep.targets.waktu || "Jadwal Tepat Waktu"}</p>
                           <Input
-                            type="number" min={0} max={30}
+                            type="number" min={0} max={isTrial ? 14 : 30}
                             value={rep.waktuActualDays}
                             onChange={e => updateAreaReport(editingAreaModal, "waktuActualDays", e.target.value)}
-                            placeholder="Hari tepat waktu dari 30 (misal: 25)"
+                            placeholder={isTrial ? "Hari tepat waktu selama trial" : "Hari tepat waktu dari 30 (misal: 25)"}
                             className="text-xs h-8 border-slate-200 rounded-lg bg-white"
                           />
                         </div>}
@@ -1677,7 +1712,7 @@ export default function MonitoringPage() {
                         disabled={savingArea === editingAreaModal}
                         className="w-full sm:w-auto bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-11 sm:h-9 px-5"
                       >
-                        {savingArea === editingAreaModal ? "Menyimpan..." : "Simpan Capaian Bulanan"}
+                        {savingArea === editingAreaModal ? "Menyimpan..." : isTrial ? "Simpan capaian pekan" : "Simpan Capaian Bulanan"}
                       </Button>
                     </DialogFooter>
                   </div>

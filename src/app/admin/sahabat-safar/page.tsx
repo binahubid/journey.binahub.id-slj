@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { TRIAL_PROGRAM_CODE } from "@/lib/program-access";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -235,6 +236,7 @@ export default function AdminSahabatSafarPage() {
         .from("profiles")
         .select("id, user_id, full_name, company_name, batch_id, location, avatar_url, sahabat_safar_user_id, sahabat_safar_name, trio_id")
         .eq("role", "participant")
+        .or(`program_code.is.null,program_code.neq.${TRIAL_PROGRAM_CODE}`)
         .order("full_name", { ascending: true });
 
       if (profErr) throw profErr;

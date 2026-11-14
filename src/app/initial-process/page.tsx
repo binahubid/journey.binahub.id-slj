@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import {
   Sparkles,
@@ -27,6 +28,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getSljAccess } from "@/lib/program-access";
 import { useRouter } from "next/navigation";
 
 // ── TYPES & CONSTANTS ──────────────────────────────────────────────────────
@@ -104,6 +106,8 @@ export default function InitialProcessPage() {
 
   const [activeStep, setActiveStep] = useState<number>(1); // 1: Eligibility, 2: Priority (100 pts), 3: Support Exchange, 4: Journey Prefs, 5: Done
   const [loading, setLoading] = useState(true);
+  const [isTrial, setIsTrial] = useState(false);
+  const [trialGoal, setTrialGoal] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -166,6 +170,9 @@ export default function InitialProcessPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         setUserId(user.id);
+        const access = await getSljAccess(supabase);
+        const trial = access?.kind === "trial";
+        setIsTrial(trial);
 
         // Try restoring from localStorage first
         const savedDraft = localStorage.getItem(`sahabat_safar_profile_draft:${user.id}`);
@@ -187,12 +194,15 @@ export default function InitialProcessPage() {
         if (profileError) throw profileError;
 
         if (profile) {
-          if (profile.layer1) setLayer1(profile.layer1);
-          if (profile.layer2) setLayer2(profile.layer2);
-          if (profile.layer3) setLayer3(profile.layer3);
-          if (profile.preferences) setPrefs(profile.preferences);
+          if (profile.layer1?.commMedia) setLayer1(profile.layer1);
+          if (typeof profile.layer2?.spiritual_growth === "number") setLayer2(profile.layer2);
+          if (profile.layer3?.spontaneousSupport && profile.layer3?.expectedSupport) setLayer3(profile.layer3);
+          if (profile.preferences) {
+            if (trial) setTrialGoal(profile.preferences.trialGoal || "");
+            else if (typeof profile.preferences.contactPreference === "string") setPrefs(profile.preferences);
+          }
           setSubmitted(profile.is_completed || false);
-          if (profile.is_completed) setActiveStep(5);
+          setActiveStep(profile.is_completed ? 5 : 1);
         }
       } catch (err) {
         console.error("Load Sahabat Safar profile error:", err);
@@ -219,8 +229,8 @@ export default function InitialProcessPage() {
   }, [layer1, layer2, layer3, prefs, userId]);
 
   useEffect(() => {
-    if (!loading && userId) saveDraft(layer1, layer2, layer3, prefs);
-  }, [layer1, layer2, layer3, prefs, loading, userId, saveDraft]);
+    if (!loading && !isTrial && userId) saveDraft(layer1, layer2, layer3, prefs);
+  }, [layer1, layer2, layer3, prefs, loading, isTrial, userId, saveDraft]);
 
   // Helper toggle commMedia (max 2)
   const toggleCommMedia = (item: string) => {
@@ -260,7 +270,7 @@ export default function InitialProcessPage() {
 
   // Submit profile to Supabase
   const handleSubmit = async () => {
-    const validationError = getValidationError();
+    const validationError = isTrial ? (trialGoal.trim() ? "" : "Tuliskan fokus latihan Anda.") : getValidationError();
     if (validationError) {
       setErrorMessage(validationError);
       return;
@@ -274,10 +284,8 @@ export default function InitialProcessPage() {
 
       const payload = {
         user_id: user.id,
-        layer1,
-        layer2,
-        layer3,
-        preferences: prefs,
+        ...(!isTrial && { layer1, layer2, layer3 }),
+        preferences: isTrial ? { trialGoal: trialGoal.trim() } : prefs,
         is_completed: true,
         updated_at: new Date().toISOString(),
       };
@@ -293,10 +301,12 @@ export default function InitialProcessPage() {
       }
 
       // Save locally as optimistic backup
-      localStorage.setItem(`sahabat_safar_profile_draft:${user.id}`, JSON.stringify({
-        ...payload,
-        submitted: true,
-      }));
+      if (!isTrial) {
+        localStorage.setItem(`sahabat_safar_profile_draft:${user.id}`, JSON.stringify({
+          ...payload,
+          submitted: true,
+        }));
+      }
 
       setSubmitted(true);
       setActiveStep(5);
@@ -343,7 +353,7 @@ export default function InitialProcessPage() {
 
   if (loading) {
     return (
-      <ParticipantLayout activePath="/initial-process" pageTitle="Initial Process — Sahabat Safar Profile">
+      <ParticipantLayout activePath="/initial-process" pageTitle="Persiapan perjalanan">
         <div className="min-h-[50vh] flex items-center justify-center">
           <div className="animate-spin h-8 w-8 border-4 border-amber-500 border-t-transparent rounded-full" />
         </div>
@@ -351,8 +361,47 @@ export default function InitialProcessPage() {
     );
   }
 
+  if (isTrial) {
+    return (
+      <ParticipantLayout activePath="/initial-process" pageTitle="Persiapan perjalanan">
+        <div className="mx-auto max-w-2xl space-y-5">
+          <header>
+            <h1 className="text-2xl font-bold tracking-tight text-navy-900 sm:text-3xl">Persiapan perjalanan</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Pilih satu kebiasaan spiritual yang ingin Anda bangun selama 14 hari.</p>
+          </header>
+          {loadError ? (
+            <p role="alert" className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700">
+              Persiapan belum dapat dimuat. Muat ulang halaman untuk mencoba lagi.
+            </p>
+          ) : (
+            <form onSubmit={(event) => { event.preventDefault(); void handleSubmit(); }} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div>
+                <label htmlFor="trial-goal" className="text-sm font-semibold text-navy-900">Apa yang ingin Anda biasakan?</label>
+                <Textarea
+                  id="trial-goal"
+                  value={trialGoal}
+                  onChange={(event) => { setTrialGoal(event.target.value); setSubmitted(false); }}
+                  maxLength={500}
+                  className="mt-2 min-h-28"
+                  placeholder="Contoh: Membaca Al-Qur’an 10 menit setelah Subuh."
+                  required
+                />
+              </div>
+              {errorMessage && <p role="alert" className="text-sm text-red-700">{errorMessage}</p>}
+              {submitted && <p role="status" className="text-sm font-medium text-emerald-700">Fokus latihan tersimpan.</p>}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {submitted && <Button type="button" variant="outline" onClick={() => router.push("/baseline")}>Lanjut ke Kenali Diri</Button>}
+                <Button type="submit" disabled={submitting || submitted}>{submitting ? "Menyimpan…" : "Simpan fokus latihan"}</Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </ParticipantLayout>
+    );
+  }
+
   return (
-    <ParticipantLayout activePath="/initial-process" pageTitle="Initial Process — Sahabat Safar Profile">
+    <ParticipantLayout activePath="/initial-process" pageTitle="Persiapan perjalanan">
       <div className="max-w-4xl mx-auto pt-4 pb-20 space-y-6 font-sans">
 
         {/* ── HEADER BANNER ───────────────────────────────────────────────── */}

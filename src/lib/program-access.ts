@@ -47,7 +47,8 @@ export function getTrialDestination(
     )
   )
     return null;
-  if (pathname === "/journal" && access.active) return null;
+  if (access.active && ["/journal", "/initial-process", "/baseline", "/journey", "/monitoring"].includes(pathname)) return null;
+  if (access.active && pathname === "/journey/setup") return "/journey";
   return "/trial";
 }
 

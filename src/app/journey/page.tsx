@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
+import { getSljAccess, getTrialProgress, TRIAL_DAYS, TRIAL_PROGRAM_CODE } from "@/lib/program-access";
 import { getProgramDay } from "@/lib/program-timeline";
 import { resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
@@ -50,7 +51,7 @@ import {
 const SECTIONS = [
   { num: 1, title: "Hasil Muhasabah", subtitle: "Insight terbesar tentang diri Anda" },
   { num: 2, title: "Niat Perubahan", subtitle: "Landasan komitmen ibadah karena Allah ﷻ" },
-  { num: 3, title: "Area Transformasi", subtitle: "Pilih area fokus dan tetapkan target 90 hari" },
+  { num: 3, title: "Area Transformasi", subtitle: "Pilih area fokus dan tetapkan target" },
   { num: 4, title: "Action Plan (Habit Engine)", subtitle: "Kebiasaan harian/mingguan yang dipantau" },
 ];
 
@@ -126,6 +127,9 @@ export default function JourneyPage() {
   const [endDate, setEndDate] = useState("-");
   const [coachName, setCoachName] = useState("Ditunjuk oleh Admin");
   const [dayCount, setDayCount] = useState(1);
+  const [isTrial, setIsTrial] = useState(false);
+  const requiredAreaCount = isTrial ? 1 : 3;
+  const totalDays = isTrial ? TRIAL_DAYS : 90;
 
   // Journey
   const [journeyId, setJourneyId] = useState<string | null>(null);
@@ -273,7 +277,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         const { data: journey, error: journeyError } = await supabase.from("journeys").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (journeyError) throw journeyError;
 
-        if (profile?.program_code) {
+        if (profile?.program_code && profile.program_code !== TRIAL_PROGRAM_CODE) {
           // Fetch batch mates for Sahabat Safar selection
           const { data: mates } = await supabase
             .from("profiles")
@@ -293,11 +297,15 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         }
 
         if (profile) {
+          const trial = profile.program_code === TRIAL_PROGRAM_CODE ? await getSljAccess(supabase) : null;
+          setIsTrial(Boolean(trial));
           setUserName(profile.full_name || user.email || "Peserta SLJ");
           if (profile.start_date) {
             const startD = new Date(profile.start_date);
             setStartDate(startD.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }));
-            setDayCount(getProgramDay(profile.start_date, new Date(), resolveParticipantTimeZone(profile.timezone, profile.timezone_mode || "AUTO")));
+            setDayCount(trial
+              ? getTrialProgress(trial).day
+              : getProgramDay(profile.start_date, new Date(), resolveParticipantTimeZone(profile.timezone, profile.timezone_mode || "AUTO")));
           }
           if (profile.end_date) {
             setEndDate(new Date(profile.end_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }));
@@ -310,7 +318,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           setMuhasabah(journey.muhasabah || "");
           setMaxUnlockedSection(
             journey.muhasabah?.trim() && journey.niat?.trim()
-              ? Array.isArray(journey.area_transformasi) && journey.area_transformasi.length === 3 ? 4 : 3
+              ? Array.isArray(journey.area_transformasi) && journey.area_transformasi.length === (profile?.program_code === TRIAL_PROGRAM_CODE ? 1 : 3) ? 4 : 3
               : journey.muhasabah?.trim() ? 2 : 1
           );
 
@@ -444,7 +452,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
               localStorage.removeItem(`ptp_draft:${journey.id}`);
             }
           }
-          setSection3Published(!hasDraft && Array.isArray(journey.area_transformasi) && journey.area_transformasi.length === 3);
+          setSection3Published(!hasDraft && Array.isArray(journey.area_transformasi) && journey.area_transformasi.length === (profile?.program_code === TRIAL_PROGRAM_CODE ? 1 : 3));
 
           // Action Plans
           const { data: plans, error: plansError } = await supabase.from("action_plans").select("id, title, frequency, quantity, target, category, area_category").eq("journey_id", journey.id);
@@ -540,7 +548,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   const isSection3ReadyForAutosave = () => {
     const areas = selectedAreasRef.current;
     const targets = areaTargetsMapRef.current;
-    return areas.length === 3 && areas.every(area => {
+    return areas.length === requiredAreaCount && areas.every(area => {
       const target = targets[area];
       if (!target?.mainTarget?.trim()) return false;
       const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
@@ -593,7 +601,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           const targetsObj = areaTargetsMapRef.current;
           for (const area of selectedAreasRef.current) {
             const target = targetsObj[area];
-            if (!target?.mainTarget?.trim()) throw new Error(`${area}: Target Utama 90 Hari wajib diisi.`);
+            if (!target?.mainTarget?.trim()) throw new Error(area + ": Target utama " + totalDays + " hari wajib diisi.");
             const definitions = target.indicators?.length ? target.indicators : legacyIndicators(target);
             const validation = validateAreaIndicators(definitions, area);
             if (!validation.valid) throw new Error(validation.errors[0].message);
@@ -736,7 +744,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     switch (num) {
       case 1: return muhasabah.trim().length > 0;
       case 2: return niat.trim().length > 0;
-      case 3: return section3Published && selectedAreas.length === 3 && selectedAreas.every(area => {
+      case 3: return section3Published && selectedAreas.length === requiredAreaCount && selectedAreas.every(area => {
         const target = areaTargetsMap[area];
         if (!target?.mainTarget?.trim()) return false;
         const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
@@ -771,6 +779,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
   };
 
   const toggleArea = (id: string) => {
+    if (isTrial && id !== "Spiritual Growth") return;
     if (ptpStatus === "LOCKED") return;
     let next: string[];
     if (selectedAreas.includes(id)) {
@@ -786,7 +795,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
       }
       next = selectedAreas.filter(a => a !== id);
     }
-    else { if (selectedAreas.length >= 3) return; next = [...selectedAreas, id]; }
+    else { if (selectedAreas.length >= requiredAreaCount) return; next = [...selectedAreas, id]; }
     setSaveError(null);
     setSelectedAreas(next);
     selectedAreasRef.current = next;
@@ -883,7 +892,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     }
   };
 
-  const isSection3FormComplete = () => selectedAreas.length === 3 && selectedAreas.every(area => {
+  const isSection3FormComplete = () => selectedAreas.length === requiredAreaCount && selectedAreas.every(area => {
     const target = areaTargetsMap[area];
     if (!target?.mainTarget?.trim()) return false;
     const indicators = target.indicators?.length ? target.indicators : legacyIndicators(target);
@@ -1064,17 +1073,18 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             <section className="space-y-3">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <h3 className="text-sm font-extrabold text-navy-900">Pilih 3 fokus perubahan</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600">Pilih area yang paling penting untuk 90 hari ke depan.</p>
+                  <h3 className="text-sm font-extrabold text-navy-900">{isTrial ? "Fokus latihan Spiritual Growth" : "Pilih 3 fokus perubahan"}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">{isTrial ? "Coba alur rencana perubahan untuk area spiritual selama 14 hari." : "Pilih area yang paling penting untuk 90 hari ke depan."}</p>
                 </div>
-                <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-amber-700">{selectedAreas.length}/3</span>
+                <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-amber-700">{selectedAreas.length}/{requiredAreaCount}</span>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {AREA_LIST.map(area => {
                   const Icon = area.icon;
                   const selected = selectedAreas.includes(area.id);
                   const isActive = selected && openAreaEditor === area.id;
-                  const disabled = !selected && selectedAreas.length >= 3;
+                  const premium = isTrial && area.id !== "Spiritual Growth";
+                  const disabled = premium || (!selected && selectedAreas.length >= requiredAreaCount);
                   const areaStyle = getTransformationAreaStyle(area.id);
                   return (
                     <button key={area.id} type="button" disabled={locked || disabled} onClick={() => {
@@ -1088,12 +1098,13 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                       style={selected ? { backgroundColor: areaStyle.color, color: "#fff", borderColor: areaStyle.color } : undefined}>
                       <span className={`mb-3 flex h-8 w-8 items-center justify-center rounded-lg ${selected ? "bg-white/16 text-white" : "bg-slate-100 text-slate-600"}`}><Icon className="h-4 w-4" /></span>
                       <span className={`block text-xs font-bold leading-tight ${selected ? "text-white" : ""}`}>{area.label}</span>
+                      {premium && <span className="mt-1 block text-xs">Program pendampingan</span>}
                       {selected && <Check className="absolute right-2.5 top-2.5 h-4 w-4 text-white/90" />}
                     </button>
                   );
                 })}
               </div>
-              <p className="text-xs text-slate-600">Untuk mengganti area, hapus salah satu area terpilih dari editor di bawah.</p>
+              <p className="text-xs text-slate-600">{isTrial ? "Empat area lainnya tersedia dalam program pendampingan." : "Untuk mengganti area, hapus salah satu area terpilih dari editor di bawah."}</p>
             </section>
 
             {editorArea && targetData ? (
@@ -1125,7 +1136,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                   </div>
 
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,1fr)]">
-                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Sasaran utama 90 hari</span><Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(editorArea.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah" className="min-h-24 resize-none rounded-xl border-slate-200 bg-white text-sm focus:border-amber-400" maxLength={500} /><span className="block text-xs text-slate-600">Tulis satu hasil utama yang spesifik dan realistis.</span></label>
+                    <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Sasaran utama {totalDays} hari</span><Textarea disabled={locked} value={targetData.mainTarget} onChange={e => updateField(editorArea.id, "mainTarget", e.target.value)} placeholder="Contoh: Konsisten sholat 5 waktu berjamaah" className="min-h-24 resize-none rounded-xl border-slate-200 bg-white text-sm focus:border-amber-400" maxLength={500} /><span className="block text-xs text-slate-600">Tulis satu hasil utama yang spesifik dan realistis.</span></label>
                     <label className="space-y-2"><span className="text-xs font-bold text-slate-700">Mengapa ini penting?</span><Textarea disabled={locked} value={targetData.targetAlasan} onChange={e => updateField(editorArea.id, "targetAlasan", e.target.value)} placeholder="Motivasi utama Anda" className="min-h-24 resize-none rounded-xl border-slate-200 bg-slate-50/60 text-sm focus:border-amber-400" maxLength={300} /></label>
                   </div>
 
@@ -1238,7 +1249,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 Action Plan & Habit Engine
               </h3>
               <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                Tetapkan kebiasaan rutin yang akan Anda jalankan. Kebiasaan ini akan dipantau secara berkala dalam sistem Monitoring 90 Hari.
+                Tetapkan kebiasaan rutin yang akan Anda jalankan. Kebiasaan ini akan dipantau secara berkala dalam sistem Monitoring {totalDays} Hari.
               </p>
             </div>
 
@@ -1496,7 +1507,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <div className="h-5 w-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">{i + 1}</div>
                 <div>
                   <p className="text-xs font-bold text-navy-900">{tip.title}</p>
-                  <p className="text-xs text-slate-600 leading-relaxed">{tip.desc}</p>
+                  <p className="text-xs text-slate-600 leading-relaxed">{isTrial ? tip.desc.replaceAll("90 hari", "14 hari").replaceAll("3 area maksimal", "Satu area spiritual") : tip.desc}</p>
                 </div>
               </li>
             ))}
@@ -1559,10 +1570,10 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         <div className="space-y-2.5">
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">4 Bagian</span><span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Selesai</span></div>
           <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Terakhir diubah</span><span className="text-sm font-semibold text-navy-900">{lastSaved ? `Hari ini, ${lastSaved.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}` : "Baru saja"}</span></div>
-          <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Coach</span><span className="text-sm font-semibold text-navy-900 truncate max-w-[150px]">{coachName}</span></div>
+          <div className="flex justify-between items-center"><span className="text-sm text-slate-600">Coach</span><span className="text-sm font-semibold text-navy-900 truncate max-w-[150px]">{isTrial ? "Latihan mandiri" : coachName}</span></div>
         </div>
       </div>
-      <Button onClick={() => router.push("/dashboard")} className="bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 px-8 font-bold shadow-lg">Kembali ke Dashboard</Button>
+      <Button onClick={() => router.push(isTrial ? "/trial" : "/dashboard")} className="bg-navy-900 hover:bg-navy-800 text-white rounded-xl h-11 px-8 font-bold shadow-lg">Kembali ke Dashboard</Button>
     </div>
   );
 
@@ -1583,7 +1594,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
     <div className="border-b border-warm-border bg-white px-6 py-2.5 flex items-center justify-between gap-5 text-xs overflow-x-auto shrink-0">
       {/* Left side: Tombol Kembali ke Home */}
       <button
-        onClick={() => router.push("/dashboard")}
+        onClick={() => router.push(isTrial ? "/trial" : "/dashboard")}
         className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-navy-900 bg-slate-50 border border-warm-border px-3.5 py-1.5 rounded-full shadow-2xs hover:bg-slate-100 transition-colors shrink-0"
       >
         <ArrowLeft className="h-3.5 w-3.5 text-amber-700" />
@@ -1596,7 +1607,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           <span className="text-slate-600 block text-xs uppercase tracking-wider">Progress Journey</span>
           <div className="flex items-baseline gap-1">
             <span className="font-bold text-navy-900">Hari ke-{dayCount}</span>
-            <span className="text-slate-600">dari 90 hari</span>
+            <span className="text-slate-600">dari {totalDays} hari</span>
           </div>
         </div>
         <div className="w-px h-7 bg-warm-border shrink-0" />
@@ -1610,7 +1621,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         <div>
           <span className="text-slate-600 block text-xs uppercase tracking-wider">Coach</span>
           <span className="font-semibold text-navy-900 block leading-tight">{coachName}</span>
-          <span className="text-slate-600 block text-xs">Ditunjuk oleh Admin</span>
+          <span className="text-slate-600 block text-xs">{isTrial ? "Pendampingan tersedia dalam program" : "Ditunjuk oleh Admin"}</span>
         </div>
         <div className="w-px h-7 bg-warm-border shrink-0" />
         <div>
@@ -1628,7 +1639,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
         {!desktopNavCollapsed && (
           <div>
             <h2 className="text-base font-black text-navy-900 leading-tight">Rencana perubahan</h2>
-            <p className="text-xs text-slate-600 mt-0.5">PTP 90 Hari</p>
+            <p className="text-xs text-slate-600 mt-0.5">PTP {totalDays} Hari</p>
           </div>
         )}
         <button
@@ -1715,7 +1726,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
           <DialogHeader>
             <DialogTitle className="pr-6 text-base font-black text-navy-900">Hapus Area dan Target?</DialogTitle>
             <DialogDescription>
-              Target 90 hari dan indikator area <strong>{areaPendingRemoval}</strong> akan dihapus dari draft.
+              Target {totalDays} hari dan indikator area <strong>{areaPendingRemoval}</strong> akan dihapus dari draft.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1742,7 +1753,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
             <div className="shrink-0 bg-white border-b border-warm-border">
               <div className="px-4 pt-3.5 pb-3">
                 <button
-                  onClick={() => router.push("/dashboard")}
+                  onClick={() => router.push(isTrial ? "/trial" : "/dashboard")}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-navy-900 mb-2.5 transition-colors"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 text-amber-500" />
@@ -1751,7 +1762,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <div className="flex items-start justify-between">
                   <div>
                     <h1 className="text-xl font-black text-navy-900 leading-tight">Rencana perubahan</h1>
-                    <p className="text-xs text-slate-600 mt-0.5">Personal Transformation Project 90 Hari</p>
+                    <p className="text-xs text-slate-600 mt-0.5">Personal Transformation Project {totalDays} Hari</p>
                   </div>
                   <span className={`shrink-0 font-bold px-2.5 py-1 rounded-full text-xs mt-0.5 inline-flex items-center gap-1 ${ptpStatus === "LOCKED" ? "bg-navy-100 text-navy-700" : "bg-amber-100 text-amber-700"}`}>
                     {ptpStatus === "LOCKED" ? <><Lock className="h-3 w-3" />Locked</> : <><Edit3 className="h-3 w-3" />Editable</>}
@@ -1772,7 +1783,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
                 </div>
-                <p className="text-xs text-slate-600 mt-1.5">{completedCount} dari {SECTIONS.length} langkah selesai · Hari ke-{dayCount} dari 90</p>
+                <p className="text-xs text-slate-600 mt-1.5">{completedCount} dari {SECTIONS.length} langkah selesai · Hari ke-{dayCount} dari {totalDays}</p>
               </div>
             </div>
 

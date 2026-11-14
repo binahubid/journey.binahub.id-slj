@@ -32,24 +32,29 @@ describe("SLJ trial access", () => {
   it("allows spiritual trial, journal, settings, and an explicit program upgrade", () => {
     for (const path of [
       "/trial",
+      "/trial/result",
       "/journal",
       "/profile",
       "/settings",
       "/notifications",
-    ])
-      expect(getTrialDestination(trial, path)).toBeNull();
-    for (const path of [
-      "/dashboard",
       "/journey",
       "/monitoring",
       "/initial-process",
       "/baseline",
     ])
+      expect(getTrialDestination(trial, path)).toBeNull();
+    for (const path of [
+      "/dashboard",
+      "/company",
+      "/coach",
+    ])
       expect(getTrialDestination(trial, path)).toBe("/trial");
     expect(getTrialDestination(trial, "/onboarding", true)).toBeNull();
-    expect(getTrialDestination({ ...trial, active: false }, "/journal")).toBe(
-      "/trial",
-    );
+    expect(getTrialDestination(trial, "/journey/setup")).toBe("/journey");
+    for (const path of ["/journal", "/journey", "/baseline", "/monitoring", "/initial-process"]) {
+      expect(getTrialDestination({ ...trial, active: false }, path)).toBe("/trial");
+    }
+    expect(getTrialDestination({ ...trial, active: false }, "/trial/result")).toBeNull();
   });
 
   it("preserves full program accounts and treats missing dates as unavailable", () => {

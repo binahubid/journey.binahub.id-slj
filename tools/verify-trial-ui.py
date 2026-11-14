@@ -47,7 +47,11 @@ with sync_playwright() as playwright:
             def handle(route):
                 url = route.request.url
                 if url.startswith(origin):
-                    route.continue_()
+                    candidate = (ROOT / "public" / url.removeprefix(origin + "/").split("?")[0]).resolve()
+                    if candidate.is_relative_to((ROOT / "public").resolve()) and candidate.is_file():
+                        route.fulfill(path=str(candidate))
+                    else:
+                        route.continue_()
                 elif url.startswith("https://api.aladhan.com/"):
                     assert "country=Saudi+Arabia" in url
                     route.fulfill(json={"data":{"timings":{"Fajr":"05:11","Dhuhr":"12:05","Asr":"15:17","Maghrib":"17:39","Isha":"19:09"}}})
@@ -61,14 +65,17 @@ with sync_playwright() as playwright:
             def no_overflow():
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"), f"Overflow at {width}: {page.url}"
             visit("/trial")
-            page.get_by_role("heading", name="Ruang ibadah hari ini").wait_for()
+            page.get_by_test_id("adaptive-journey-hero").wait_for()
+            hero = page.get_by_test_id("adaptive-journey-hero")
+            expect(hero.get_by_text("0/4", exact=True)).to_be_visible()
             (OUTPUT / f"controls-{width}.json").write_text(json.dumps(page.get_by_role("button").all_text_contents(), ensure_ascii=False), encoding="utf-8")
             no_overflow()
             page.screenshot(path=str(OUTPUT / f"trial-{width}.png"), full_page=True)
-            subuh = page.get_by_role("button", name=re.compile(r"^Subuh, "))
+            subuh = page.get_by_role("button", name=re.compile(r"^Subuh, ")).last
             assert subuh.get_attribute("aria-pressed") == "false"
             subuh.click()
-            page.wait_for_function("document.querySelector('button[aria-label^=\"Subuh, \"]').getAttribute('aria-pressed') === 'true' && !document.querySelector('button[aria-label^=\"Subuh, \"]').disabled")
+            expect(subuh).to_have_attribute("aria-pressed", "true")
+            expect(subuh).to_be_enabled()
             page.reload()
             page.wait_for_load_state("networkidle")
             assert subuh.get_attribute("aria-pressed") == "true"
@@ -88,19 +95,18 @@ with sync_playwright() as playwright:
             page.keyboard.press("Escape")
             assert not dialog.is_visible()
             expect(sunnah).to_be_focused()
-            page.get_by_role("button", name="Al-Qur’an", exact=True).click()
             page.get_by_role("button", name="Catat Bacaan", exact=True).click()
             page.get_by_label("Nama surah", exact=True).fill("Al-Fatihah")
             page.get_by_label("Dari ayat", exact=True).fill("1")
             page.get_by_label("Sampai ayat", exact=True).fill("7")
             page.get_by_role("button", name="Simpan Bacaan", exact=True).click()
             page.get_by_label("Riwayat bacaan Al-Qur’an").get_by_text("Al-Fatihah", exact=True).wait_for()
-            page.get_by_role("button", name="Hadits", exact=True).click()
+            expect(hero.get_by_text("1/4", exact=True)).to_be_visible()
             mark = page.get_by_role("button", name="Tandai dibaca", exact=True)
             mark.click()
             page.get_by_role("button", name="Sudah dibaca", exact=True).wait_for()
-            page.get_by_role("button", name="Refleksi", exact=True).click()
-            page.get_by_role("link", name="Buka jurnal refleksi", exact=True).click()
+            expect(hero.get_by_text("2/4", exact=True)).to_be_visible()
+            visit("/journal")
             page.get_by_role("heading", name="Refleksi Hari Ini", exact=True).wait_for()
             page.get_by_text("Waktu Saudi", exact=True).wait_for()
             page.get_by_role("textbox", name="Refleksi hari ini", exact=True).fill("Refleksi peserta demo")
@@ -113,6 +119,17 @@ with sync_playwright() as playwright:
             no_overflow()
             page.screenshot(path=str(OUTPUT / f"journal-{width}.png"))
             visit("/trial")
+            expect(hero.get_by_text("3/4", exact=True)).to_be_visible()
+            for prayer in ("Zuhur", "Asar", "Magrib", "Isya"):
+                button = page.get_by_role("button", name=re.compile("^" + prayer + ", ")).last
+                button.click()
+                expect(button).to_be_enabled()
+            expect(hero.get_by_text("4/4", exact=True)).to_be_visible()
+            hero.get_by_role("button", name="Lihat aktivitas harian", exact=True).click()
+            expect(page.get_by_role("dialog").get_by_text("Tercatat", exact=True)).to_have_count(4)
+            page.keyboard.press("Escape")
+            page.reload(wait_until="networkidle")
+            expect(hero.get_by_text("4/4", exact=True)).to_be_visible()
             page.get_by_role("button", name="Pengembangan diri", exact=False).click()
             page.get_by_role("dialog").get_by_role("heading", name="Pengembangan diri").wait_for()
             page.keyboard.press("Escape")
@@ -139,7 +156,7 @@ with sync_playwright() as playwright:
             page.get_by_label("Kota untuk jadwal salat").fill("Madinah")
             page.get_by_role("button", name="Mulai 14 hari gratis", exact=True).click()
             page.wait_for_url("**/trial")
-            page.get_by_role("heading", name="Ruang ibadah hari ini").wait_for()
+            page.get_by_test_id("adaptive-journey-hero").wait_for()
             visit("/admin/trials")
             page.get_by_role("heading", name="Uji coba spiritual", exact=True).wait_for()
             page.get_by_text("Peserta yang masa trialnya berakhir", exact=True).wait_for()
