@@ -7,8 +7,9 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 ## [Unreleased]
 
 ### Changed
-- Struktur, copy, urutan section, hero, gambar, dan empat kartu pricing landing SLJ dikembalikan ke versi sebelumnya. Perapian dibatasi pada bobot judul, keterbacaan tombol/FAQ, dan konsistensi interaksi.
-- Empat kartu pricing memakai aksen navy, biru, sage, dan gold dengan rincian paket yang sama.
+- Struktur, copy, urutan section, hero, dan empat kartu pricing landing SLJ dikembalikan ke versi sebelumnya.
+- Hierarki landing dirapikan melalui skala judul, kontras label, ukuran deskripsi HP, dan penyelarasan konten. Delapan ikon ilustrasi khusus ImageGen dipakai pada tahapan, pendampingan, manfaat, dan peserta.
+- Empat kartu pricing memakai background ImageGen navy, ice blue, sage, dan champagne dengan blur 2 px. Aksen garis atas dan ikon pricing dihapus. Aset disajikan sebagai WebP dan prompt dicatat pada `docs/slj-landing-visual-assets.json`.
 
 ## [0.8.0] — 2026-11-14
 

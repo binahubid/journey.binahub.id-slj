@@ -7,10 +7,10 @@ export function MotivationDeclineChart() {
     <div className="w-full flex flex-col justify-between space-y-6 h-full min-h-[340px] py-2">
       {/* Inline Header / Title */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#C79A3C]/20 pb-3">
-        <span className="text-xs font-extrabold uppercase tracking-widest text-[#0F1E3D]">
+        <span className="text-sm font-semibold text-[#0F1E3D]">
           Grafik Penurunan Semangat (Hari 1 &ndash; 90)
         </span>
-        <span className="text-[10px] font-bold text-[#C79A3C] bg-[#C79A3C]/10 border border-[#C79A3C]/30 px-2.5 py-0.5 rounded-full tracking-tight">
+        <span className="text-xs font-medium text-[#8B6724] bg-[#C79A3C]/10 border border-[#C79A3C]/30 px-3 py-1 rounded-lg">
           Skenario Ilustratif Tanpa Pendampingan
         </span>
       </div>
@@ -21,6 +21,8 @@ export function MotivationDeclineChart() {
           <svg
             viewBox="0 0 500 270"
             className="w-full h-full overflow-visible"
+            role="img"
+            aria-label="Ilustrasi penurunan semangat dalam skenario tanpa pendampingan"
           >
             {/* Subtle Horizontal Grid Lines */}
             <line x1="25" y1="40" x2="475" y2="40" stroke="#C79A3C" strokeOpacity="0.2" strokeDasharray="4 4" strokeWidth="1" />
@@ -53,7 +55,7 @@ export function MotivationDeclineChart() {
               <text x="25" y="235" textAnchor="start" fill="#0F1E3D" fontSize="11" fontWeight="bold">
                 Hari 1
               </text>
-              <text x="25" y="249" textAnchor="start" fill="#C79A3C" fontSize="10" fontWeight="600">
+              <text x="25" y="249" textAnchor="start" fill="#8B6724" fontSize="10" fontWeight="600">
                 Pulang Umrah
               </text>
             </g>
@@ -96,10 +98,10 @@ export function MotivationDeclineChart() {
 
       {/* Caption & Keterangan di bawah grafik */}
       <div className="pt-3 text-center border-t border-[#C79A3C]/20 space-y-1.5">
-        <p className="text-xs sm:text-sm font-semibold italic text-slate-700">
+        <p className="text-sm font-medium text-slate-700">
           &ldquo;Tanpa sistem, semangat perlahan menurun.&rdquo;
         </p>
-        <p className="text-[10px] text-slate-400 font-normal leading-relaxed max-w-lg mx-auto">
+        <p className="text-xs text-slate-600 font-normal leading-5 max-w-lg mx-auto">
           * Grafik ini adalah ilustrasi pola perubahan motivasi tanpa pendampingan terstruktur.
         </p>
       </div>

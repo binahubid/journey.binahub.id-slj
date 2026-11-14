@@ -1,0 +1,90 @@
+{
+  "tool": "built-in image_gen",
+  "purpose": "SLJ landing illustration icons and four pricing backgrounds",
+  "assets": [
+    {
+      "key": "pricing-foundation",
+      "file": "public/landing/slj/pricing-foundation.webp",
+      "transparent": false,
+      "sourceFilename": "exec-358e311f-e790-43e8-895c-a0075001d6b0.png",
+      "prompt": "Use case: stylized-concept. Asset type: a bespoke full-bleed portrait background image for a narrow pricing card on BinaJourney's Spiritual Leadership Journey website, 2:3 portrait composition. Create a photographic architectural still life made from smooth folded ice-blue paper and frosted pale-blue glass. A single broad, beautifully crafted folded path rises gently through two shallow curved steps at the LOWER RIGHT corner. Soft directional daylight from upper left, delicate realistic paper fibers and frosted-glass edges, crisp sophisticated materiality, calm optimistic atmosphere. Palette mainly luminous ice blue #E1EBF8 and porcelain white, small deeper blue #6D90BC in the lower right relief, a restrained champagne reflection. The top 55% and left 70% are an uninterrupted softly lit pale blue plane for dark navy HTML typography. The sculptural material is clearly visible across the bottom third and right margin, with enough depth and tonal variation to feel art-directed. Straight full-canvas edges, image reaches every edge. Text-free, logo-free, border-free, no graphic rules or top accent stripe. This is background art alone, with all titles, prices, labels, buttons and icons supplied later by the website."
+    },
+    {
+      "key": "icon-reflection",
+      "file": "public/landing/slj/icon-reflection.webp",
+      "transparent": true,
+      "sourceFilename": "exec-1e03589f-ad34-49d8-919b-2dcb2e0c3ba8.png",
+      "prompt": "Use case: stylized-concept. Asset type: one bespoke raster illustration icon for BinaJourney's Spiritual Leadership Journey website. A beautifully crafted miniature OPEN BOOK, recognizable at 48px, in a softly elevated three-quarter view. Thick ivory paper leaves with refined navy blue #0F1E3D cloth binding and one narrow brushed champagne-gold bookmark, carefully rounded paper edges, understated physical detail. Matte ceramic-and-paper model photographed in soft studio daylight from upper left, restrained shallow dimensionality, an elegant editorial object, clean strong silhouette. Square composition with object filling 78% of canvas, centered and fully visible, consistent small soft contact shadow immediately underneath only. True transparent background with alpha. Text-free pages and binding. Object alone, no tile, pedestal, frame, circular background, badges or other props. This is a custom product illustration for reading, reflection and daily practice, with a quiet, thoughtful BinaHub navy–ivory–gold identity."
+    },
+    {
+      "key": "pricing-trial",
+      "file": "public/landing/slj/pricing-trial.webp",
+      "transparent": false,
+      "sourceFilename": "exec-d5377d6f-364b-4adb-84c1-656bd0c5b531.png",
+      "prompt": "Use case: stylized-concept. Create a NEW bespoke 2:3 portrait full-canvas pricing background for the free 14-day spiritual practice package of BinaJourney. Image 1 is a MATERIAL, LIGHTING AND CRAFT REFERENCE. Same photographed architectural paper-and-frosted-glass family. Render a deep midnight navy #0F1E3D and smoky blue #273C5C folded paper landscape. At bottom right a broad single gently curling path begins and turns toward softly reflected warm champagne light; substantial sculptural layers and beautiful diffuse shadows, visibly richer than a flat gradient. Top 55% and left 70% form a calm continuous DARK NAVY paper plane for white HTML titles and lists. Matte fine fibers, delicate realistic surface grain, soft upper-left studio light, refined physical depth. Navy fills the image to every edge; luminous relief is concentrated along the lower third and far right, while the copy region stays dark and quiet. Text-free and logo-free; no buttons, illustrations of people, UI, frames, graphic lines or top accent stripe."
+    },
+    {
+      "key": "pricing-consistency",
+      "file": "public/landing/slj/pricing-consistency.webp",
+      "transparent": false,
+      "sourceFilename": "exec-f3166e57-96b2-4d69-a00a-59d7a47c3b95.png",
+      "prompt": "Use case: stylized-concept. Create a NEW bespoke 2:3 portrait full-bleed pricing background for BinaJourney's two-month consistency package. Image 1 is the REFERENCE for materials, light and finish, not an image to reproduce. Same exquisite photographic architectural folded-paper and frosted-glass family. This variant is pale jade, soft sage and porcelain #DFEEE7, #D2E4DC with a restrained warm champagne reflection. At the lower right, two broad gently interlocking sculptural arches make a continuous, flowing pathway, with beautifully lit curved edges and tactile paper grain. Main top 55% and left 70% remain a calm softly shaded PALE SAGE plane for dark navy HTML copy. The lower third and right edge have clearly visible dimensional curves and a deeper sage shadow, sophisticated and quiet. Soft daylight from upper left, natural material depth. Image reaches all four straight edges. Text-free, logo-free, no UI, no tile, no frame, no graphic rules, no top accent stripe."
+    },
+    {
+      "key": "pricing-transformation",
+      "file": "public/landing/slj/pricing-transformation.webp",
+      "transparent": false,
+      "sourceFilename": "exec-7bd8b0a9-8374-400e-9ba0-04cc820bea2d.png",
+      "prompt": "Use case: stylized-concept. Create a NEW bespoke 2:3 portrait full-canvas pricing background for BinaJourney's three-month transformation package. Image 1 is the MATERIAL AND LIGHTING REFERENCE. Same crafted photographed paper-and-frosted-glass architectural family. Palette is luminous ivory, warm champagne and restrained brushed gold #F3E6C9, #E6CEA0 with realistic warm diffuse shadows. At the LOWER RIGHT three broad shallow ascending curved terraces imply steady lasting progress. Deliberate tangible forms, fine paper fibers, frosted translucent edges, controlled golden afternoon studio light from upper left. The top 55% and left 70% are a quiet pale champagne plane allowing dark navy HTML type; dimensional relief fills the lower third and right margin and feels clearly sculptural, not flat. Full bleed to every straight canvas edge. Text-free, logo-free, no prices, labels, buttons, frames, graphic linework or top border stripe."
+    },
+    {
+      "key": "icon-direction",
+      "file": "public/landing/slj/icon-direction.webp",
+      "transparent": true,
+      "sourceFilename": "exec-82339ee4-e69f-45fa-bd90-405913b81d2e.png",
+      "prompt": "Use case: stylized-concept. Create a NEW bespoke icon illustration in the craft and lighting of reference Image 1, which is a style reference only. Subject: a single miniature beautifully engineered COMPASS, seen in the same slightly elevated three-quarter view, with an ivory matte ceramic face, deep navy #0F1E3D housing and raised navy compass needle, restrained brushed champagne-gold rim and one small gold pointer tip. Recognizable immediately at 48px. Physical tactile model, refined small details, clear simple cardinal ticks WITHOUT letters, typography or numerals. The compass alone, square centered composition, fully visible, filling 78% of the canvas, very soft contact shadow directly below. Consistent soft daylight from upper left. True TRANSPARENT alpha background. Text-free, logo-free, no tile, pedestal, frame, circular background outside the actual compass, or other props. BinaHub navy–ivory–gold visual identity."
+    },
+    {
+      "key": "icon-growth",
+      "file": "public/landing/slj/icon-growth.webp",
+      "transparent": true,
+      "sourceFilename": "exec-a92e82b5-d4d4-43a4-aa8c-90ca71e295b3.png",
+      "prompt": "Use case: stylized-concept. Create a NEW single bespoke icon illustration for BinaJourney's Spiritual Leadership Journey website. Image 1 is a reference for physical craft, scale, navy–ivory–champagne palette and soft upper-left studio lighting ONLY. Same thoughtful material family of matte ceramic, fine paper or cloth, and restrained brushed gold details. Clear strong silhouette that is legible at 48px, realistic tactile details, slightly elevated three-quarter view, fully visible centered object occupying 78% of a square canvas, tiny soft contact shadow directly underneath. True TRANSPARENT alpha background. Text-free and logo-free. The subject stands alone, without a tile, frame, background shape, pedestal or extra props. Subject: a small beautifully handmade botanical model, an OLIVE SPRIG with six broad ivory ceramic leaves on a delicate champagne-gold stem, growing from a low deep-navy ceramic planter. Asymmetrical natural leaf spacing, a gentle upward movement, crisp attractive leaf silhouettes and a tangible small model. The object expresses steady everyday growth, positive habits and sustained effort."
+    },
+    {
+      "key": "icon-companions",
+      "file": "public/landing/slj/icon-companions.webp",
+      "transparent": true,
+      "sourceFilename": "exec-8b17442d-2063-46b1-9443-898311beedff.png",
+      "prompt": "Use case: stylized-concept. Create a NEW single bespoke icon illustration for BinaJourney's Spiritual Leadership Journey website. Image 1 is a reference for physical craft, scale, navy–ivory–champagne palette and soft upper-left studio lighting ONLY. Same thoughtful material family of matte ceramic, fine paper or cloth, and restrained brushed gold details. Clear strong silhouette that is legible at 48px, realistic tactile details, slightly elevated three-quarter view, fully visible centered object occupying 78% of a square canvas, tiny soft contact shadow directly underneath. True TRANSPARENT alpha background. Text-free and logo-free. The subject stands alone, without a tile, frame, background shape, pedestal or extra props. Subject: a close GROUP OF THREE tactile human figurines, like beautifully crafted small wooden or ceramic peg people with rounded heads and simple shoulders, one larger deep-navy central figure and two slightly smaller ivory figures flanking it, connected as a supportive group. A tiny brushed-gold detail at the base of the navy figure, fine fabric-like matte surface, no faces or written markings. Warm, dignified, clear silhouette of community, coaching and mutual support."
+    },
+    {
+      "key": "icon-insight",
+      "file": "public/landing/slj/icon-insight.webp",
+      "transparent": true,
+      "sourceFilename": "exec-3e0f6888-375c-499f-a939-74b3d7275a47.png",
+      "prompt": "Use case: stylized-concept. Create a NEW single bespoke icon illustration for BinaJourney's Spiritual Leadership Journey website. Image 1 is only a reference for the physical craft, navy–ivory–champagne palette, matte tactile finish and soft upper-left daylight. Strong recognizable silhouette at 48px, slightly elevated three-quarter view, fully visible centered object occupying 78% of square canvas, tiny soft contact shadow immediately below. Genuine fully TRANSPARENT alpha background extending to all edges. Text-free, logo-free. Subject stands alone without a tile, backdrop, pedestal or frame. Subject: a small deep-navy MAGNIFYING GLASS with a finely brushed champagne-gold rim, placed over a small ivory folded journal with three understated embossed navy blocks on one page, suggesting reflection and insight. The lens is lightly translucent and the navy handle has a refined fabric-like texture. A beautifully made physical model with clear forms, crisp edges and restrained details."
+    },
+    {
+      "key": "icon-lantern",
+      "file": "public/landing/slj/icon-lantern.webp",
+      "transparent": true,
+      "sourceFilename": "exec-6ae9dbd2-bd45-4ddf-8d56-9b1d115ac3e8.png",
+      "prompt": "Use case: stylized-concept. Create a NEW single bespoke icon illustration for BinaJourney's Spiritual Leadership Journey website. Image 1 is only a reference for the physical craft, navy–ivory–champagne palette, matte tactile finish and soft upper-left daylight. Strong recognizable silhouette at 48px, slightly elevated three-quarter view, fully visible centered object occupying 78% of square canvas, tiny soft contact shadow immediately below. Genuine fully TRANSPARENT alpha background extending to all edges. Text-free, logo-free. Subject stands alone without a tile, backdrop, pedestal or frame. Subject: one elegant small architectural LANTERN, with a deep-navy matte ceramic octagonal base, four navy arched supports, a frosted ivory glass chamber, and a restrained brushed champagne-gold cap and small loop handle. The form is softly rounded and beautifully proportioned, with a warm ivory interior and tactile, tangible materials. It expresses spiritual awareness and meaningful reflection. The silhouette is clear and strong, a crafted object under daylight."
+    },
+    {
+      "key": "icon-professional",
+      "file": "public/landing/slj/icon-professional.webp",
+      "transparent": true,
+      "sourceFilename": "exec-57db0bdd-5fd4-4bb9-8cd8-e444dc323612.png",
+      "prompt": "Use case: stylized-concept. Create a NEW single bespoke icon illustration for BinaJourney's Spiritual Leadership Journey website. Image 1 is only a reference for the physical craft, navy–ivory–champagne palette, matte tactile finish and soft upper-left daylight. Strong recognizable silhouette at 48px, slightly elevated three-quarter view, fully visible centered object occupying 78% of square canvas, tiny soft contact shadow immediately below. Genuine fully TRANSPARENT alpha background extending to all edges. Text-free, logo-free. Subject stands alone without a tile, backdrop, pedestal or frame. Subject: one refined small PROFESSIONAL BRIEFCASE of deep-navy matte textured cloth with softly rounded edges, a solid ivory curved handle and two small champagne-gold clasps. A precise realistic seam along the edge and subtle depth make it feel like a thoughtfully made physical miniature. Dignified, compact and immediately recognizable, expressing work, leadership and organizational impact."
+    },
+    {
+      "key": "icon-commitment",
+      "file": "public/landing/slj/icon-commitment.webp",
+      "transparent": true,
+      "sourceFilename": "exec-589785e4-7cc7-48a2-af1b-a696278a8275.png",
+      "prompt": "Use case: background-extraction. Image 1 is the EDIT TARGET. Preserve the exact miniature three ivory steps, navy cloth flag, champagne-gold pole and edges, camera view, proportions, lighting, texture and colors. Remove the pale studio backdrop completely and give the result a genuine transparent alpha background, with alpha ZERO across the empty canvas and at all four corners. Keep only the subject and a very small natural contact shadow directly below it. Preserve the soft anti-aliased silhouette and the flag's cloth fold. All empty space must be transparent, ready to place on dark navy or colored web cards. Square canvas, entire object visible. No new objects, lettering, frame or tile."
+    }
+  ]
+}

@@ -1,12 +1,4 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BookOpen,
-  Check,
-  Compass,
-  Target,
-  TrendingUp,
-} from "lucide-react";
 
 const plans = [
   {
@@ -18,10 +10,9 @@ const plans = [
     href: "/register",
     action: "Mulai uji coba",
     trial: true,
-    icon: BookOpen,
-    surface: "border-[#24385C] border-t-[#C79A3C] bg-navy-900 text-white",
+    background: "/landing/slj/pricing-trial.webp",
+    surface: "border-navy-900 bg-navy-900 text-white",
     accent: "text-[#E4C992]",
-    iconSurface: "border-white/15 bg-white/10",
   },
   {
     name: "Bangun fondasi",
@@ -36,10 +27,9 @@ const plans = [
     href: "#kontak",
     action: "Diskusikan program",
     trial: false,
-    icon: Compass,
-    surface: "border-[#CDDCF4] border-t-[#577EBB] bg-[#EFF4FE] text-navy-900",
+    background: "/landing/slj/pricing-foundation.webp",
+    surface: "border-navy-900/10 bg-[#EFF4FE] text-navy-900",
     accent: "text-[#305D96]",
-    iconSurface: "border-[#CDDCF4] bg-white/80",
   },
   {
     name: "Jaga konsistensi",
@@ -54,10 +44,9 @@ const plans = [
     href: "#kontak",
     action: "Diskusikan program",
     trial: false,
-    icon: TrendingUp,
-    surface: "border-[#CCE2D7] border-t-[#518C7F] bg-[#EEF7F2] text-navy-900",
+    background: "/landing/slj/pricing-consistency.webp",
+    surface: "border-navy-900/10 bg-[#EEF7F2] text-navy-900",
     accent: "text-[#2E6855]",
-    iconSurface: "border-[#CCE2D7] bg-white/80",
   },
   {
     name: "Perkuat perubahan",
@@ -73,10 +62,9 @@ const plans = [
     href: "#kontak",
     action: "Diskusikan program",
     trial: false,
-    icon: Target,
-    surface: "border-[#E9D7B2] border-t-[#BC9144] bg-[#FCF5E7] text-navy-900",
+    background: "/landing/slj/pricing-transformation.webp",
+    surface: "border-navy-900/10 bg-[#FCF5E7] text-navy-900",
     accent: "text-[#8B6724]",
-    iconSurface: "border-[#E9D7B2] bg-white/80",
   },
 ];
 
@@ -107,36 +95,30 @@ export function PricingSection({
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {plans.map((plan) => {
-            const Icon = plan.icon;
             return (
               <article
                 key={plan.duration}
-                className={`relative isolate flex flex-col overflow-hidden rounded-3xl border border-t-4 p-6 ${plan.surface}`}
+                className={`relative isolate flex flex-col overflow-hidden rounded-3xl border p-6 ${plan.surface}`}
               >
+                <img
+                  src={plan.background}
+                  alt=""
+                  aria-hidden="true"
+                  width="768"
+                  height="1152"
+                  loading="lazy"
+                  className="pointer-events-none absolute inset-0 -z-10 size-full scale-105 object-cover blur-[2px]"
+                />
                 {plan.trial && (
-                  <img
-                    src="/bg-filosofi.webp"
-                    alt=""
+                  <div
                     aria-hidden="true"
-                    width="1810"
-                    height="869"
-                    loading="lazy"
-                    className="pointer-events-none absolute inset-0 -z-10 size-full object-cover opacity-50"
+                    className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-navy-900/10 via-navy-900/35 to-navy-900/55"
                   />
                 )}
-                <div className="flex min-h-10 items-center justify-between gap-3">
+                <div className="flex min-h-10 items-center gap-3">
                   <p className={`text-sm font-semibold ${plan.accent}`}>
                     {plan.duration}
                   </p>
-                  <span
-                    className={`grid size-10 shrink-0 place-items-center rounded-xl border ${plan.iconSurface} ${plan.accent}`}
-                  >
-                    <Icon
-                      aria-hidden="true"
-                      className="size-5"
-                      strokeWidth={1.5}
-                    />
-                  </span>
                 </div>
                 <h3 className="mt-3 text-lg font-semibold">{plan.name}</h3>
                 <p className="mt-6 text-4xl font-semibold tracking-tight tabular-nums">
@@ -144,29 +126,21 @@ export function PricingSection({
                 </p>
                 <p
                   className={`mt-1 text-xs ${
-                    plan.trial ? "text-blue-200" : "text-slate-600"
+                    plan.trial ? "text-blue-100" : "text-[#30405C]"
                   }`}
                 >
                   {plan.trial ? "Tanpa pembayaran" : "Estimasi per peserta"}
                 </p>
                 <p
                   className={`mt-5 min-h-16 text-sm leading-6 ${
-                    plan.trial ? "text-blue-100" : "text-slate-600"
+                    plan.trial ? "text-blue-100" : "text-[#30405C]"
                   }`}
                 >
                   {plan.description}
                 </p>
                 <ul className="mb-7 mt-4 flex-1 space-y-3 text-sm">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex gap-2">
-                      <Check
-                        aria-hidden
-                        className={`mt-0.5 h-4 w-4 shrink-0 ${
-                          plan.trial ? "text-[#DAB568]" : "text-slate-500"
-                        }`}
-                      />
-                      {feature}
-                    </li>
+                    <li key={feature}>{feature}</li>
                   ))}
                 </ul>
                 <Link
@@ -178,7 +152,6 @@ export function PricingSection({
                   }`}
                 >
                   {plan.trial && trialClosed ? "Masuk ke akun" : plan.action}
-                  <ArrowRight aria-hidden className="h-4 w-4" />
                 </Link>
                 {plan.trial && trialClosed && (
                   <p className="mt-3 text-center text-xs leading-5 text-blue-100">
@@ -189,7 +162,7 @@ export function PricingSection({
             );
           })}
         </div>
-        <p className="mt-6 max-w-4xl text-xs leading-6 text-slate-500">
+        <p className="mt-6 max-w-4xl text-xs leading-6 text-slate-600">
           Harga pendampingan merupakan estimasi awal. Cakupan layanan dan jadwal
           disepakati bersama BinaHub sebelum bergabung. Uji coba berfokus pada
           aktivitas spiritual, dengan pratinjau area pengembangan lainnya.
