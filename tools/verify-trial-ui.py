@@ -64,6 +64,14 @@ with sync_playwright() as playwright:
                 page.wait_for_load_state("networkidle")
             def no_overflow():
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"), f"Overflow at {width}: {page.url}"
+            def widget(label):
+                if width < 1024:
+                    page.get_by_role("group", name="Pilih aktivitas").get_by_role("button", name=label, exact=True).click()
+            def habit_details():
+                detail = page.get_by_role("button", name="Lihat Detail Habit", exact=True)
+                # Swipe the target above the fixed mobile dock before testing a real hit.
+                detail.evaluate("element => element.scrollIntoView({block:'center',behavior:'instant'})")
+                detail.click()
             visit("/trial")
             page.get_by_test_id("adaptive-journey-hero").wait_for()
             hero = page.get_by_test_id("adaptive-journey-hero")
@@ -71,6 +79,16 @@ with sync_playwright() as playwright:
             (OUTPUT / f"controls-{width}.json").write_text(json.dumps(page.get_by_role("button").all_text_contents(), ensure_ascii=False), encoding="utf-8")
             no_overflow()
             page.screenshot(path=str(OUTPUT / f"trial-{width}.png"), full_page=True)
+            if width < 1024:
+                shortcuts = page.get_by_role("group", name="Pilih aktivitas")
+                expect(shortcuts.get_by_role("button")).to_have_count(6)
+                for label, key in (("Habit", "habits"), ("Hadits", "hadith"), ("Tilawah", "quran"), ("Jurnal", "journal"), ("Analitik", "analytics"), ("Jadwal salat", "prayer")):
+                    widget(label)
+                    expect(page.locator(f"#dashboard-{key}")).to_be_visible()
+                    expect(shortcuts.get_by_role("button", name=label, exact=True)).to_have_attribute("aria-pressed", "true")
+                    assert page.locator('[id^="dashboard-"]:visible').count() == 1
+                    no_overflow()
+                assert page.evaluate("""async () => (await Promise.all(['prayer','habits','hadith','quran','journal','analytics'].map(key => new Promise(resolve => {const image=new Image();image.onload=()=>resolve(true);image.onerror=()=>resolve(false);image.src='/icons/dashboard/'+key+'.webp';})))).every(Boolean)""")
             subuh = page.get_by_role("button", name=re.compile(r"^Subuh, ")).last
             assert subuh.get_attribute("aria-pressed") == "false"
             subuh.click()
@@ -95,6 +113,7 @@ with sync_playwright() as playwright:
             page.keyboard.press("Escape")
             assert not dialog.is_visible()
             expect(sunnah).to_be_focused()
+            widget("Tilawah")
             page.get_by_role("button", name="Catat Bacaan", exact=True).click()
             page.get_by_label("Nama surah", exact=True).fill("Al-Fatihah")
             page.get_by_label("Dari ayat", exact=True).fill("1")
@@ -102,6 +121,7 @@ with sync_playwright() as playwright:
             page.get_by_role("button", name="Simpan Bacaan", exact=True).click()
             page.get_by_label("Riwayat bacaan Al-Qur’an").get_by_text("Al-Fatihah", exact=True).wait_for()
             expect(hero.get_by_text("1/4", exact=True)).to_be_visible()
+            widget("Hadits")
             mark = page.get_by_role("button", name="Tandai dibaca", exact=True)
             mark.click()
             page.get_by_role("button", name="Sudah dibaca", exact=True).wait_for()
@@ -130,6 +150,16 @@ with sync_playwright() as playwright:
             page.keyboard.press("Escape")
             page.reload(wait_until="networkidle")
             expect(hero.get_by_text("4/4", exact=True)).to_be_visible()
+            expand = page.get_by_role("button", name="Lihat ringkasan catatan salat")
+            count = page.get_by_text("Hari ini 5 / 5", exact=True)
+            assert count.count() == 1, page.locator("#dashboard-prayer").inner_text()
+            expand_box, count_box = expand.bounding_box(), count.bounding_box()
+            assert expand_box["width"] >= 44 and expand_box["height"] >= 44
+            assert expand_box["x"] >= count_box["x"] + count_box["width"]
+            expand.click()
+            page.get_by_role("dialog").wait_for()
+            page.keyboard.press("Escape")
+            widget("Analitik")
             page.get_by_role("button", name="Pengembangan diri", exact=False).click()
             page.get_by_role("dialog").get_by_role("heading", name="Pengembangan diri").wait_for()
             page.keyboard.press("Escape")
@@ -140,6 +170,21 @@ with sync_playwright() as playwright:
                 page.get_by_role("dialog").wait_for()
                 page.keyboard.press("Escape")
                 expect(opener).to_be_focused()
+            # Trial habit details must show the actual PTP habit, not the spiritual summary.
+            page.evaluate("""() => {const db=JSON.parse(sessionStorage.getItem('db'));db.habits=[{id:'trial-habit',user_id:db.profiles[0].user_id,title:'Refleksi pagi',frequency:'daily',frequency_kind:'daily',quantity:1,target:1,area_category:'Spiritual Growth',effective_from:new Date(Date.now()-86400000).toISOString().slice(0,10)}];sessionStorage.setItem('db',JSON.stringify(db));}""")
+            visit("/trial?widget=habits")
+            habit_details()
+            expect(page.get_by_role("dialog").get_by_role("heading", name="Detail habit PTP", exact=True)).to_be_visible()
+            expect(page.get_by_role("dialog").get_by_role("button", name="Refleksi pagi", exact=True)).to_be_visible()
+            expect(page.get_by_role("dialog").get_by_text("Aktivitas spiritual hari ini", exact=True)).to_have_count(0)
+            page.keyboard.press("Escape")
+            visit("/settings")
+            page.get_by_role("tab", name="Notifikasi & Lokasi", exact=True).click()
+            expect(page.get_by_role("checkbox", name="Pengingat habit harian")).to_be_visible()
+            expect(page.get_by_role("checkbox", name="Pengingat evaluasi program")).to_be_visible()
+            expect(page.get_by_text("Evaluasi Pekanan", exact=True)).to_be_visible()
+            expect(page.get_by_role("checkbox", name="Notifikasi pendamping")).to_have_count(0)
+            no_overflow()
             page.evaluate("sessionStorage.clear()")
             visit("/trial?scenario=expired")
             page.get_by_role("heading", name="Langkah kecil Anda berarti.").wait_for()
@@ -180,9 +225,40 @@ with sync_playwright() as playwright:
             page.get_by_role("heading", name="Mulai dengan satu langkah baik.").wait_for()
             no_overflow()
             page.screenshot(path=str(OUTPUT / f"pricing-{width}.png"), full_page=True)
+            page.evaluate("sessionStorage.clear()")
+            visit("/dashboard?scenario=program&widget=habits")
+            page.get_by_test_id("adaptive-journey-hero").wait_for()
+            expect(page.locator("#dashboard-habits")).to_be_visible()
+            habit_details()
+            expect(page.get_by_role("dialog").get_by_role("heading", name="Detail habit PTP", exact=True)).to_be_visible()
+            expect(page.get_by_role("dialog").get_by_role("button", name="Menyusun prioritas", exact=True)).to_be_visible()
+            page.keyboard.press("Escape")
+            widget("Analitik")
+            expect(page.locator("#dashboard-analytics")).to_be_visible()
+            page.reload(wait_until="networkidle")
+            expect(page.locator("#dashboard-analytics")).to_be_visible()
+            if width >= 1024:
+                assert page.locator('[id^="dashboard-"]:visible').count() == 6
+            no_overflow()
+            page.screenshot(path=str(OUTPUT / f"program-{width}.png"), full_page=True)
+            page.evaluate("""() => {const db=JSON.parse(sessionStorage.getItem('db'));db.notifications=[1,2].map(i=>({id:'notification-'+i,user_id:db.profiles[0].user_id,title:'Pengingat demo '+i,message:'Periksa latihan harian Anda.',category:'reminder',is_read:false,created_at:new Date().toISOString()}));sessionStorage.setItem('db',JSON.stringify(db));}""")
+            visit("/notifications")
+            expect(page.get_by_role("link", name="Notifikasi, 2 belum dibaca", exact=True)).to_be_visible()
+            page.get_by_role("button").filter(has_text="Pengingat demo 1").click()
+            expect(page.get_by_role("link", name="Notifikasi, 1 belum dibaca", exact=True)).to_be_visible()
+            page.evaluate("window.__failSave=true")
+            page.get_by_role("button", name="Tandai dibaca", exact=True).click()
+            expect(page.get_by_role("alert")).to_contain_text("belum berhasil ditandai")
+            expect(page.get_by_role("link", name="Notifikasi, 1 belum dibaca", exact=True)).to_be_visible()
+            page.evaluate("window.__failSave=false")
+            page.get_by_role("button", name="Tandai dibaca", exact=True).click()
+            expect(page.get_by_role("link", name="Notifikasi", exact=True)).to_be_visible()
+            page.reload(wait_until="networkidle")
+            expect(page.get_by_role("link", name="Notifikasi", exact=True)).to_be_visible()
+            no_overflow()
             assert not errors, errors
             assert not external, external
-            results.append({"width": width, "passed": True, "checks": ["persistence","failed-save rollback","focus trap","Escape","focus restoration","Quran save","hadith save","journal save in Saudi timezone","locked preview","expiry","activation","admin settings","closed enrollment","guide","pricing","no overflow"]})
+            results.append({"width": width, "passed": True, "checks": ["six widget shortcuts","icon assets","single mobile panel","prayer expand spacing","trial habit detail","trial reminder settings","persistence","failed-save rollback","focus trap","Escape","focus restoration","Quran save","hadith save","journal save in Saudi timezone","locked preview","expiry","activation","admin settings","closed enrollment","guide","pricing","no overflow"]})
             context.close()
     finally:
         browser.close()

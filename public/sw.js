@@ -1,4 +1,4 @@
-const CACHE_NAME = "slj-shell-v2";
+const CACHE_NAME = "slj-shell-v3";
 const APP_SHELL = ["/", "/offline", "/manifest.webmanifest"];
 
 function updateUnreadBadge(value) {
@@ -67,7 +67,11 @@ self.addEventListener("push", (event) => {
   });
 
   // The Badging API belongs to WorkerNavigator; zero clears an existing badge.
-  event.waitUntil(notificationPromise.then(() => updateUnreadBadge(payload.badgeCount)));
+  event.waitUntil(notificationPromise.then(async () => {
+    await updateUnreadBadge(payload.badgeCount);
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) client.postMessage({ type: "SYNC_BADGE" });
+  }));
 });
 
 self.addEventListener("notificationclick", (event) => {

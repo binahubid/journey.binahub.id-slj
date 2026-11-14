@@ -43,6 +43,7 @@ export default function NotificationsPage() {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
         if (queryError) throw queryError;
+        setError(null);
 
         if (data && data.length > 0) {
           const items = data.map((n) => ({
@@ -59,10 +60,8 @@ export default function NotificationsPage() {
               }),
             }));
           setNotifications(items);
-          syncBadge(items);
         } else {
           setNotifications([]);
-          syncBadge([]);
         }
       } catch (err) {
         console.error("Gagal memuat notifikasi:", err);
@@ -72,8 +71,22 @@ export default function NotificationsPage() {
       }
     }
 
-    loadNotifications();
-  }, [supabase, syncBadge]);
+    void loadNotifications();
+    const message = (event: MessageEvent) => {
+      if (event.data?.type === "SYNC_BADGE") void loadNotifications();
+    };
+    const focus = () => { void loadNotifications(); };
+    window.addEventListener("focus", focus);
+    navigator.serviceWorker?.addEventListener("message", message);
+    return () => {
+      window.removeEventListener("focus", focus);
+      navigator.serviceWorker?.removeEventListener("message", message);
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!loading && !error) syncBadge(notifications);
+  }, [loading, error, notifications, syncBadge]);
 
   const markAllRead = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -87,11 +100,8 @@ export default function NotificationsPage() {
         return;
       }
     }
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, isRead: true }));
-      syncBadge(updated);
-      return updated;
-    });
+    setError(null);
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
   const markRead = async (id: string) => {
@@ -100,11 +110,8 @@ export default function NotificationsPage() {
       setError("Notifikasi belum berhasil diperbarui.");
       return;
     }
-    setNotifications((prev) => {
-      const updated = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
-      syncBadge(updated);
-      return updated;
-    });
+    setError(null);
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
   };
 
   if (loading) {

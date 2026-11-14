@@ -6,6 +6,12 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 
 ## [Unreleased]
 
+### Beranda dan pengingat peserta
+- Beranda HP dan tablet memakai enam shortcut berikon khusus: jadwal salat, habit, hadits, tilawah, jurnal, dan analitik. Satu panel ditampilkan sesuai pilihan; pencatatan dan hero adaptif tetap tersedia.
+- Detail habit PTP terpisah dari ringkasan aktivitas spiritual trial. Tombol catatan salat mendapat ruang di header dan area sentuh 44 px. Ruang gulir memperhitungkan navigasi bawah HP.
+- SQL39 membuka pengingat habit trial yang belum selesai, evaluasi pekan pertama/kedua, serta tautan ke widget terkait. Antrean push melewati notifikasi yang sudah dibaca dan pengingat trial yang sudah berakhir.
+- Badge menunggu jumlah notifikasi berhasil dimuat, lalu ikut berubah saat push masuk atau notifikasi ditandai dibaca. Pengaturan trial menampilkan pengingat habit serta evaluasi pekanan.
+
 ### Panduan peserta dan rencana perubahan
 - Publikasi indikator mengirim rubrik kualitas, sumber capaian, dan tautan Action Plan menggunakan nama field yang dibaca database. Uji SQL mencakup error constraint rubrik dan penyimpanan pada trial serta program 90 hari.
 - Pesan trial Kenali Diri dipersingkat dan hanya muncul pada layar pembuka.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Loader2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_TIME_ZONE, getLocalDateRange } from "@/lib/local-date";
@@ -25,6 +25,7 @@ interface PrayerTrackerProps {
   accountCreatedDate?: string;
   timeZone?: string;
   view?: "today" | "week";
+  headerAction?: ReactNode;
 }
 const mandatory = [
   { key: "subuh", label: "Subuh" },
@@ -52,6 +53,7 @@ export function PrayerTracker({
   externalLogs,
   timeZone = DEFAULT_TIME_ZONE,
   view = "week",
+  headerAction,
 }: PrayerTrackerProps) {
   const supabase = createClient();
   const [logs, setLogs] = useState<Record<string, boolean>>({});
@@ -195,9 +197,12 @@ export function PrayerTracker({
     >
       <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-navy-900">Catatan salat</h3>
-        <span className="text-xs tabular-nums text-slate-500">
-          Hari ini {completed} / 5
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="whitespace-nowrap text-xs tabular-nums text-slate-500">
+            Hari ini {completed} / 5
+          </span>
+          {headerAction}
+        </div>
       </div>
       {error && (
         <p

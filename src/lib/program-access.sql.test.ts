@@ -99,7 +99,7 @@ beforeAll(async () => {
       "utf8",
     ),
   );
-  for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql"]) {
+  for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql", "039_trial_reminder_delivery.sql"]) {
     await db.exec(readFileSync(new URL("../../supabase/migrations/" + file, import.meta.url), "utf8"));
   }
 }, 20000);
@@ -254,7 +254,7 @@ describe("spiritual trial database", () => {
           [users[4]],
         )
       ).rows,
-    ).toEqual([{ action_url: "/trial" }]);
+    ).toEqual([{ action_url: "/trial?widget=quran" }]);
   });
 
   it("upgrades by a valid program code without shortening the full program or losing trial history", async () => {
@@ -471,6 +471,40 @@ describe("spiritual trial database", () => {
       .toEqual(["Personal Development", "Relationship", "Spiritual Growth"].map(area => ({ area, quality_rubric: rubric })));
   });
 
+  it("queues unfinished spiritual habits and weekly evaluations for active trials and sends only unread push items", async () => {
+    await asUser(users[5]);
+    await db.query("SELECT start_slj_spiritual_trial($1)", ["Peserta Pengingat"]);
+    await owner();
+    await db.query("UPDATE profiles SET timezone='UTC',start_date=NOW()-INTERVAL '6 days',end_date=NOW()+INTERVAL '8 days' WHERE user_id=$1", [users[5]]);
+    await db.query("UPDATE slj_trial_enrollments SET starts_at=NOW()-INTERVAL '6 days',expires_at=NOW()+INTERVAL '8 days' WHERE user_id=$1", [users[5]]);
+    await asUser(users[5]);
+    await db.exec("UPDATE settings SET habit_notifications_enabled=true,habit_reminder_time='00:00',journal_notifications_enabled=false,checkpoint_notifications_enabled=true,push_notifications_enabled=true WHERE user_id=auth.uid()");
+    await db.exec("INSERT INTO push_subscriptions(user_id,endpoint,p256dh,auth,is_active) VALUES(auth.uid(),'https://push.example.invalid/trial','synthetic-public-key','synthetic-auth',true)");
+    const completedHabit = (await db.query<{ id: string }>("INSERT INTO habits(user_id,title,area_category,frequency,quantity,effective_from) VALUES(auth.uid(),'Sudah selesai','Spiritual Growth','daily',1,(NOW() AT TIME ZONE 'UTC')::DATE) RETURNING id")).rows[0].id;
+    await db.query("INSERT INTO habit_logs(user_id,habit_id,date,completed,completed_count) VALUES(auth.uid(),$1,(NOW() AT TIME ZONE 'UTC')::DATE::TEXT,true,1)", [completedHabit]);
+    await db.exec("INSERT INTO habits(user_id,title,area_category,frequency,quantity,effective_from) VALUES(auth.uid(),'Latihan berikutnya','Spiritual Growth','daily',2,(NOW() AT TIME ZONE 'UTC')::DATE)");
+
+    await owner();
+    await db.exec("SET ROLE service_role");
+    await db.query("SELECT generate_due_user_reminders()");
+    await db.query("SELECT generate_due_user_reminders()");
+    const queue = (await db.query<{ user_id: string; action_url: string; title: string }>("SELECT * FROM claim_pending_push_notifications(1000)")).rows.filter(row => row.user_id === users[5]);
+    expect(queue.filter(row => row.title === "Habit hari ini belum selesai")).toEqual([
+      expect.objectContaining({ action_url: "/trial?widget=habits" }),
+    ]);
+    expect(queue.filter(row => row.title === "Evaluasi pekan pertama")).toHaveLength(1);
+
+    await owner();
+    await db.query("UPDATE notifications SET is_read=true WHERE user_id=$1", [users[5]]);
+    await db.exec("SET ROLE service_role");
+    expect((await db.query<{ user_id: string }>("SELECT * FROM claim_pending_push_notifications(1000)")).rows.filter(row => row.user_id === users[5])).toHaveLength(0);
+    await owner();
+    await db.query("UPDATE notifications SET is_read=false WHERE user_id=$1", [users[5]]);
+    await db.query("UPDATE slj_trial_enrollments SET starts_at=NOW()-INTERVAL '15 days',expires_at=NOW()-INTERVAL '1 day' WHERE user_id=$1", [users[5]]);
+    await db.exec("SET ROLE service_role");
+    expect((await db.query<{ user_id: string }>("SELECT * FROM claim_pending_push_notifications(1000)")).rows.filter(row => row.user_id === users[5])).toHaveLength(0);
+  });
+
   it("can safely be reapplied without resetting registration settings or trial dates", async () => {
     await asUser(admin);
     await db.query("SELECT admin_set_slj_trial_offer(false)");
@@ -487,7 +521,7 @@ describe("spiritual trial database", () => {
         "utf8",
       ),
     );
-    for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql"]) {
+    for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql", "039_trial_reminder_delivery.sql"]) {
       await db.exec(readFileSync(new URL("../../supabase/migrations/" + file, import.meta.url), "utf8"));
     }
     expect(

@@ -69,6 +69,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
       return choice.outcome;
     },
     updateBadge: (count: number) => {
+      window.dispatchEvent(new CustomEvent("slj:unread", { detail: count }));
       if (!("serviceWorker" in navigator)) return;
       const post = (reg: ServiceWorkerRegistration) => {
         const active = reg.active || reg.installing || reg.waiting;

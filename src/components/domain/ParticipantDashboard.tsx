@@ -31,6 +31,7 @@ import { DEFAULT_TIME_ZONE, getHabitOccurrenceKey, getLocalDateString, getLocalD
 import { AdaptiveJourneyHero } from "@/components/domain/AdaptiveJourneyHero";
 import { getTrialProgress, type SljAccess } from "@/lib/program-access";
 import { TrialAreaPreview } from "@/components/domain/TrialAreaPreview";
+import { DashboardShortcuts, DASHBOARD_WIDGETS, type DashboardWidget } from "@/components/domain/DashboardShortcuts";
 import { detectHabitCategory, getPrayerKeyFromHabitTitle } from "@/lib/habit-tracking";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import {
@@ -102,9 +103,28 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
   const [refresh, setRefresh] = useState(0);
   const [nextStep, setNextStep] = useState<{ href: string; label: string; description: string } | null>(null);
   const [habitTab, setHabitTab] = useState<"daily" | "weekly">("daily");
+  const [activeWidget, setActiveWidget] = useState<DashboardWidget>("prayer");
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("widget");
+    const widget = DASHBOARD_WIDGETS.find(item => item.id === requested);
+    if (widget) setActiveWidget(widget.id);
+  }, []);
+
+  const selectWidget = (widget: DashboardWidget) => {
+    setActiveWidget(widget);
+    const url = new URL(window.location.href);
+    url.searchParams.set("widget", widget);
+    window.history.replaceState(null, "", url);
+  };
+
+  const widgetPanelClass = (widget: DashboardWidget) =>
+    activeWidget === widget ? "min-w-0 space-y-5 lg:mb-5 lg:break-inside-avoid" : "hidden min-w-0 space-y-5 lg:mb-5 lg:break-inside-avoid lg:block";
+
 
   // Modals
   const [todayTasksModalOpen, setTodayTasksModalOpen] = useState(false);
+  const [spiritualActivitiesOpen, setSpiritualActivitiesOpen] = useState(false);
   const [consistencyModalOpen, setConsistencyModalOpen] = useState(false);
 
   // Dedicated Analytics Modals
@@ -1104,7 +1124,7 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
                 </div>
                 <button
                   type="button"
-                  onClick={() => setTodayTasksModalOpen(true)}
+                  onClick={() => isTrial ? setSpiritualActivitiesOpen(true) : setTodayTasksModalOpen(true)}
                   className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-white/80 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
                   aria-label="Lihat aktivitas harian"
                 >
@@ -1125,32 +1145,45 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
         />
 
         {isTrial && trialProgress && (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+          <div className="hidden flex-wrap items-center justify-between gap-2 text-sm text-slate-600 lg:flex">
             <p>Uji coba Spiritual Growth · {trialProgress.remainingDays} hari tersisa</p>
             <Link href="/panduan" className="inline-flex min-h-11 items-center gap-2 font-medium text-navy-900 underline underline-offset-4">Panduan <ArrowRight aria-hidden="true" className="size-4" /></Link>
           </div>
         )}
 
         {nextStep && (
-          <section aria-label="Langkah berikutnya" className="flex flex-col gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-navy-900">{nextStep.label}</h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-700">{nextStep.description}</p>
+          <section aria-label="Langkah berikutnya" className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-5">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-navy-900 sm:text-base">{nextStep.label}</h2>
+              <p className="mt-1 hidden max-w-xl text-sm leading-6 text-slate-700 sm:block">{nextStep.description}</p>
             </div>
             <Link href={nextStep.href} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white">Lanjutkan <ArrowRight aria-hidden className="size-4" /></Link>
           </section>
         )}
 
-        {/* ─── BARIS 1: 3 CARDS BENTO (JADWAL SHOLAT, HABITS HARI INI, HADITS HARI INI) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
-          {/* Card 1: Jadwal Sholat Hari Ini */}
-          <PrayerTimesWidget
+        <DashboardShortcuts value={activeWidget} onChange={selectWidget} />
+
+        <div className="grid grid-cols-1 items-start gap-5 lg:block lg:columns-2 xl:columns-3">
+          <section id="dashboard-prayer" aria-label="Salat" className={widgetPanelClass("prayer")}>
+            <PrayerTimesWidget
             location={userLocation}
             timeZone={userTimeZone}
           />
-
-          {/* Card 2: Habits Hari Ini (Participant PTP Habits) */}
-          <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between h-full">
+            <PrayerTracker
+              userId={userId}
+              accountCreatedDate={accountCreatedDate}
+              timeZone={userTimeZone}
+              externalLogs={prayerLogsMap}
+              onPrayerToggle={handlePrayerToggleFromTracker}
+              headerAction={
+                <Button type="button" variant="ghost" size="icon" onClick={() => setSholatAnalyticsOpen(true)} aria-label="Lihat ringkasan catatan salat" className="size-11 shrink-0 text-slate-600">
+                  <Maximize2 className="size-4" aria-hidden="true" />
+                </Button>
+              }
+            />
+          </section>
+          <section id="dashboard-habits" aria-label="Habit PTP" className={widgetPanelClass("habits")}>
+            <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between h-full">
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-1">
                 <h3 className="font-extrabold text-navy-900 text-xs tracking-wider uppercase flex items-center gap-1.5">
@@ -1266,52 +1299,101 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
             <div className="pt-3 border-t border-warm-border/60">
               <button
                 onClick={() => setTodayTasksModalOpen(true)}
-                className="text-xs font-bold text-navy-900 hover:text-amber-700 flex items-center justify-between w-full transition-colors"
+                className="flex min-h-11 w-full scroll-my-28 items-center justify-between rounded-lg text-xs font-bold text-navy-900 transition-colors hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <span>Lihat Detail Habit</span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </Card>
-
-          {/* Card 3: Hadits Hari Ini (Clickable to open Analytics) */}
-          <div className="relative">
+          </section>
+          <section id="dashboard-hadith" aria-label="Hadits" className={widgetPanelClass("hadith")}>
+            <div className="relative">
             <button type="button" aria-label="Lihat ringkasan baca hadits" onClick={() => setHadithAnalyticsOpen(true)} className="absolute right-3 top-3 z-20 flex size-11 items-center justify-center rounded-xl bg-white text-slate-600 hover:bg-slate-100"><BarChart3 aria-hidden className="size-4" /></button>
             <DailyHadithWidget userId={userId} timeZone={userTimeZone} onReadChange={isTrial ? setTrialHadithRead : undefined} />
           </div>
-        </div>
-
-        {/* ─── BARIS 2: 2 CARDS BENTO (TRACKING SHOLAT & TILAWAH AL-QUR'AN) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          {/* Card 1: Tracking Sholat */}
-          <div className="relative group">
-            <button
-              onClick={() => setSholatAnalyticsOpen(true)}
-              aria-label="Lihat ringkasan catatan salat" title="Buka Analitik Sholat"
-              className="absolute top-5 right-4 z-20 text-slate-600 hover:text-amber-700 transition-colors cursor-pointer p-1"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-            <PrayerTracker
-              userId={userId}
-              accountCreatedDate={accountCreatedDate}
-              timeZone={userTimeZone}
-              externalLogs={prayerLogsMap}
-              onPrayerToggle={handlePrayerToggleFromTracker}
-            />
-          </div>
-
-          {/* Card 2: Tilawah Al-Qur'an (Clickable to open Analytics) */}
-          <div className="relative">
+          </section>
+          <section id="dashboard-quran" aria-label="Tilawah Al-Qur’an" className={widgetPanelClass("quran")}>
+            <div className="relative">
             <button type="button" aria-label="Lihat ringkasan bacaan Al-Qur’an" onClick={() => setQuranAnalyticsOpen(true)} className="absolute right-3 top-3 z-20 flex size-11 items-center justify-center rounded-xl bg-white text-slate-600 hover:bg-slate-100"><BarChart3 aria-hidden className="size-4" /></button>
             <QuranTracker userId={userId} timeZone={userTimeZone} onQuranLogged={handleQuranLoggedFromTracker} />
           </div>
-        </div>
+          </section>
+          <section id="dashboard-journal" aria-label="Jurnal" className={widgetPanelClass("journal")}>
+            <Card className="group bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5 transition-shadow hover:shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Ruang hening</p>
+                    <h3 className="mt-0.5 truncate text-sm font-extrabold text-navy-900">Journal refleksi</h3>
+                    <p className="mt-0.5 text-xs font-medium text-slate-600">Catat satu hal yang bermakna hari ini</p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                   onClick={openQuickJournal}
+                  className="shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 text-xs font-bold text-amber-300 shadow-sm transition-transform hover:bg-slate-800 active:scale-[.98]"
+                >
+                  Tulis
+                </Button>
+              </div>
 
-        {/* ─── BARIS 3: 2 CARDS BENTO (PROGRESS JOURNEY & JOURNAL REFLEKSI) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          {/* Card 1: Progress Journey (Total Progress 90 Hari - Countdown) */}
-           <Card className="bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5">
+              {/* Reflection Card Preview */}
+              {journalLast ? (
+                <div className="relative overflow-hidden rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50 to-white p-4 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                      Catatan terakhir
+                    </span>
+                    <span className="text-xs font-medium text-slate-600">
+                      {journalLastDate}
+                    </span>
+                    {pinnedIds.includes(userJournals[0]?.id) && (
+                      <Pin className="h-3.5 w-3.5 shrink-0 fill-amber-600 text-amber-700" />
+                    )}
+                  </div>
+                  <p className="text-sm leading-6 text-navy-900 font-serif italic line-clamp-3">
+                    &ldquo;{journalPreview}&rdquo;
+                  </p>
+                  <span className="block text-xs font-semibold text-amber-700">Buka Journal untuk membaca seluruh catatan</span>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center space-y-2">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-300 shadow-sm ring-1 ring-slate-100">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600">Belum ada catatan refleksi</p>
+                  <p className="mx-auto max-w-[220px] text-xs leading-relaxed text-slate-600">Mulai dari satu kalimat. Tidak perlu menunggu hari yang sempurna.</p>
+                   <button type="button" onClick={openQuickJournal} className="pt-1 text-xs font-bold text-amber-700 hover:text-amber-800">
+                    Tulis refleksi pertama
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Clickable button to open full journal page */}
+            <div className="pt-3 border-t border-warm-border/60">
+              <Link href="/journal" className="w-full block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-between rounded-xl border-slate-200 text-xs font-bold text-navy-900 hover:bg-slate-50 py-2.5"
+                >
+                  <span className="flex items-center gap-2">
+                    <BookMarked className="h-4 w-4 text-amber-700" />
+                    Buka Halaman Journal ({userJournals.length} catatan)
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-slate-600" />
+                </Button>
+              </Link>
+            </div>
+          </Card>
+          </section>
+          <section id="dashboard-analytics" aria-label="Analitik" className={widgetPanelClass("analytics")}>
+            <Card className="bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
                 <div>
@@ -1392,83 +1474,17 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
               </Link>
             </div>
           </Card>
-
-          {/* Card 2: Journal Refleksi (Displays user reflections + Pin Journal) */}
-          <Card className="group bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5 transition-shadow hover:shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
-                <div className="flex items-start gap-3 min-w-0">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
-                    <BookOpen className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Ruang hening</p>
-                    <h3 className="mt-0.5 truncate text-sm font-extrabold text-navy-900">Journal refleksi</h3>
-                    <p className="mt-0.5 text-xs font-medium text-slate-600">Catat satu hal yang bermakna hari ini</p>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                   onClick={openQuickJournal}
-                  className="shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 text-xs font-bold text-amber-300 shadow-sm transition-transform hover:bg-slate-800 active:scale-[.98]"
-                >
-                  Tulis
-                </Button>
-              </div>
-
-              {/* Reflection Card Preview */}
-              {journalLast ? (
-                <div className="relative overflow-hidden rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50 to-white p-4 space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                      Catatan terakhir
-                    </span>
-                    <span className="text-xs font-medium text-slate-600">
-                      {journalLastDate}
-                    </span>
-                    {pinnedIds.includes(userJournals[0]?.id) && (
-                      <Pin className="h-3.5 w-3.5 shrink-0 fill-amber-600 text-amber-700" />
-                    )}
-                  </div>
-                  <p className="text-sm leading-6 text-navy-900 font-serif italic line-clamp-3">
-                    &ldquo;{journalPreview}&rdquo;
-                  </p>
-                  <span className="block text-xs font-semibold text-amber-700">Buka Journal untuk membaca seluruh catatan</span>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center space-y-2">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-300 shadow-sm ring-1 ring-slate-100">
-                    <BookOpen className="h-5 w-5" />
-                  </div>
-                  <p className="text-xs font-semibold text-slate-600">Belum ada catatan refleksi</p>
-                  <p className="mx-auto max-w-[220px] text-xs leading-relaxed text-slate-600">Mulai dari satu kalimat. Tidak perlu menunggu hari yang sempurna.</p>
-                   <button type="button" onClick={openQuickJournal} className="pt-1 text-xs font-bold text-amber-700 hover:text-amber-800">
-                    Tulis refleksi pertama
-                  </button>
-                </div>
-              )}
+            <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <button type="button" onClick={() => setSholatAnalyticsOpen(true)} className="flex min-h-14 w-full items-center justify-between px-5 text-sm font-medium text-navy-900 hover:bg-slate-50">Analitik salat <ChevronRight className="size-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => setQuranAnalyticsOpen(true)} className="flex min-h-14 w-full items-center justify-between px-5 text-sm font-medium text-navy-900 hover:bg-slate-50">Analitik tilawah <ChevronRight className="size-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => setHadithAnalyticsOpen(true)} className="flex min-h-14 w-full items-center justify-between px-5 text-sm font-medium text-navy-900 hover:bg-slate-50">Analitik hadits <ChevronRight className="size-4" aria-hidden="true" /></button>
             </div>
-
-            {/* Clickable button to open full journal page */}
-            <div className="pt-3 border-t border-warm-border/60">
-              <Link href="/journal" className="w-full block">
-                <Button
-                  variant="outline"
-                  className="w-full justify-between rounded-xl border-slate-200 text-xs font-bold text-navy-900 hover:bg-slate-50 py-2.5"
-                >
-                  <span className="flex items-center gap-2">
-                    <BookMarked className="h-4 w-4 text-amber-700" />
-                    Buka Halaman Journal ({userJournals.length} catatan)
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-slate-600" />
-                </Button>
-              </Link>
-            </div>
-          </Card>
+            {isTrial && <TrialAreaPreview />}
+          </section>
         </div>
 
         {/* ─── BARIS 4: 1 CARD PANJANG HADITS ATAU PEPATAH TENTANG KONSISTENSI ─── */}
-        <Card className="bg-white border-warm-border p-5 md:p-6 rounded-2xl shadow-2xs flex items-center justify-between gap-4">
+        <Card className="hidden bg-white border-warm-border p-5 md:p-6 rounded-2xl shadow-2xs lg:flex items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <div className="h-11 w-11 rounded-xl bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-700 shrink-0">
               <Sparkles className="h-5 w-5" />
@@ -1586,25 +1602,29 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
       </Dialog>
 
       {/* 2. MODAL TODAY'S TASKS & HABITS DETAIL */}
+      <Dialog open={spiritualActivitiesOpen} onOpenChange={setSpiritualActivitiesOpen}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader><DialogTitle>Aktivitas spiritual hari ini</DialogTitle></DialogHeader>
+          <ul className="divide-y divide-slate-100">
+            {trialActivities.map(activity => (
+              <li key={activity.label} className="flex items-center justify-between gap-4 py-4 text-sm">
+                <div><p className="font-medium text-navy-900">{activity.label}</p>{activity.detail && <p className="mt-1 text-xs text-slate-600">{activity.detail}</p>}</div>
+                <span className={activity.done ? "text-emerald-700" : "text-slate-600"}>{activity.done ? "Tercatat" : "Belum lengkap"}</span>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={todayTasksModalOpen} onOpenChange={setTodayTasksModalOpen}>
         <DialogContent className="max-w-md p-6">
           <DialogHeader className="border-b border-warm-border pb-3">
             <DialogTitle className="text-base font-extrabold text-navy-900 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-amber-700" />
-              {isTrial ? "Aktivitas spiritual hari ini" : "Detail Habits Aktif"}
+              Detail habit PTP
             </DialogTitle>
           </DialogHeader>
 
-          {isTrial ? (
-            <ul className="divide-y divide-slate-200 py-2">
-              {trialActivities.map(activity => (
-                <li key={activity.label} className="flex items-center justify-between gap-3 py-3 text-sm">
-                  <div><p className="font-medium text-navy-900">{activity.label}</p>{activity.detail && <p className="mt-1 text-xs text-slate-600">{activity.detail}</p>}</div>
-                  <span className={activity.done ? "text-emerald-700" : "text-slate-600"}>{activity.done ? "Tercatat" : "Belum lengkap"}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
           <div className="py-3 space-y-3">
             <Tabs value={habitTab} onValueChange={value => setHabitTab(value as "daily" | "weekly")}>
               <TabsList className="grid h-9 w-full grid-cols-2 border-0 bg-slate-100 p-1">
@@ -1628,6 +1648,7 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
             </Tabs>
 
             <div className="space-y-2 pt-2 max-h-[300px] overflow-y-auto pr-1">
+              {visibleHabits.length === 0 && <p className="py-4 text-center text-sm text-slate-600">Belum ada habit {habitTab === "daily" ? "harian" : "pekanan"}. <Link href="/journey" className="font-medium text-navy-900 underline underline-offset-4">Atur di rencana perubahan</Link>.</p>}
               {visibleHabits.map((h) => {
                 const isMultiStep = h.category === "general" && h.quantity > 1;
                 return (
@@ -1655,8 +1676,6 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
               })}
             </div>
           </div>
-
-          )}
 
           <DialogFooter className="pt-3 border-t border-warm-border">
             <Button
@@ -1761,7 +1780,6 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
         </DialogContent>
       </Dialog>
 
-      {isTrial && <div className="mx-auto mt-6 w-full max-w-6xl"><TrialAreaPreview /></div>}
 
       {/* ─── DEDICATED ANALYTICS MODAL: SHOLAT ─── */}
       <Dialog open={sholatAnalyticsOpen} onOpenChange={setSholatAnalyticsOpen}>

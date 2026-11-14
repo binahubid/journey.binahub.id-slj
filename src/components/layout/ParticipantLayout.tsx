@@ -57,13 +57,14 @@ export function ParticipantLayout({
   const [isTrial, setIsTrial] = useState(pathname === "/trial");
   const [isExpired, setIsExpired] = useState(trialExpired);
   const [unread, setUnread] = useState(0);
+  const [unreadLoaded, setUnreadLoaded] = useState(false);
 
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
   useEffect(() => {
-    updateBadge(unread);
-  }, [unread, updateBadge]);
+    if (unreadLoaded) updateBadge(unread);
+  }, [unread, unreadLoaded, updateBadge]);
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -85,7 +86,10 @@ export function ParticipantLayout({
       ]);
       if (cancelled) return;
       setUserName(profile?.full_name || user.email?.split("@")[0] || "Peserta");
-      setUnread(count || 0);
+      if (typeof count === "number") {
+        setUnread(count);
+        setUnreadLoaded(true);
+      }
       try {
         const access = await getSljAccess(supabase);
         if (!cancelled && access) {
@@ -103,11 +107,20 @@ export function ParticipantLayout({
     const message = (event: MessageEvent) => {
       if (event.data?.type === "SYNC_BADGE") void load();
     };
+    const unreadUpdate = (event: Event) => {
+      const count = (event as CustomEvent<unknown>).detail;
+      if (typeof count === "number" && Number.isFinite(count)) {
+        setUnread(Math.max(0, Math.floor(count)));
+        setUnreadLoaded(true);
+      }
+    };
     window.addEventListener("focus", focus);
+    window.addEventListener("slj:unread", unreadUpdate);
     navigator.serviceWorker?.addEventListener("message", message);
     return () => {
       cancelled = true;
       window.removeEventListener("focus", focus);
+      window.removeEventListener("slj:unread", unreadUpdate);
       navigator.serviceWorker?.removeEventListener("message", message);
     };
   }, [supabase]);
@@ -282,7 +295,7 @@ export function ParticipantLayout({
         </header>
         <main
           id="participant-content"
-          className={`${noPadding ? "" : "p-4 sm:p-6 lg:p-8"} ${showDock ? "pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8" : ""}`}
+          className={`${noPadding ? "" : "p-4 sm:p-6 lg:p-8"} ${showDock ? "pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8" : ""}`}
         >
           {!hideBackToHome && current !== home && (
             <Link

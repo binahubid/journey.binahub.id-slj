@@ -15,7 +15,7 @@ const write = (name, body) => fs.writeFile(path.join(dir, name), body);
 await write("index.html", '<!doctype html><html lang="id"><head><title>SLJ isolated component verification</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="./fixture.tsx"></script></body></html>');
 await write("link.tsx", 'import React from "react";export default function Link({prefetch,replace,scroll,...props}){return <a {...props}/>;}');
 await write("navigation.ts", 'const router={push:(url)=>location.assign(url),replace:(url)=>location.replace(url),refresh:()=>{}};export const useRouter=()=>router;export const usePathname=()=>location.pathname;export const useParams=()=>({id:location.pathname.split("/")[3]});');
-await write("pwa.ts", 'const result={updateBadge:()=>{},canInstall:false,isInstalled:false,isIos:false};export const usePwaInstall=()=>result;');
+await write("pwa.ts", 'const result={updateBadge:count=>window.dispatchEvent(new CustomEvent("slj:unread",{detail:count})),canInstall:false,isInstalled:false,isIos:false};export const usePwaInstall=()=>result;');
 await write("supabase.ts", [
   'const id="00000000-0000-4000-8000-000000000010";',
   'const trial={kind:"trial",active:true,starts_at:new Date(Date.now()-2*86400000).toISOString(),expires_at:new Date(Date.now()+12*86400000).toISOString(),days:14,user_id:id,full_name:"Peserta Uji",timezone:"Asia/Riyadh",location:"Makkah"};',

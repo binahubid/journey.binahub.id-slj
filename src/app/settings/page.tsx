@@ -396,13 +396,13 @@ export default function SettingsPage() {
                     <Bell className="h-4 w-4 text-accent" /> Preferensi Pengingat
                   </label>
 
-                  {!isTrial && (<div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
+                  <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
                       <span className="text-xs font-semibold text-navy-900 block">Pengingat Habit Harian</span>
                       <span className="text-xs text-gray-500">Pengingat utama pukul 20.00 jika habit hari ini belum selesai.</span>
                     </div>
                     <Switch aria-label="Pengingat habit harian" checked={habitNotif} onCheckedChange={setHabitNotif} />
-                  </div>)}
+                  </div>
 
                   <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-warm-bg/30">
                     <div>
@@ -425,14 +425,14 @@ export default function SettingsPage() {
                       <div><span className="text-xs font-semibold text-navy-900 block">Hadits Hari Ini</span><span className="text-xs text-gray-500">Opsional, pukul 07.00 waktu lokal.</span></div>
                       <Switch aria-label="Pengingat hadits" checked={hadithNotif} onCheckedChange={setHadithNotif} />
                     </div>
-                    {!isTrial && (<div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
-                      <div><span className="text-xs font-semibold text-navy-900 block">Checkpoint Program</span><span className="text-xs text-gray-500">H-3, H-1, dan hari checkpoint.</span></div>
-                      <Switch aria-label="Pengingat evaluasi program" checked={checkpointNotif} onCheckedChange={setCheckpointNotif} />
-                    </div>)}
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
+                      <div><span className="text-xs font-semibold text-navy-900 block">{isTrial ? "Evaluasi Pekanan" : "Checkpoint Program"}</span><span className="text-xs text-gray-500">{isTrial ? "Evaluasi hari ke-7 dan ke-14, dengan pengingat H-3 dan H-1." : "H-3, H-1, dan hari checkpoint."}</span></div>
+                      <Switch aria-label="Pengingat evaluasi program" checked={checkpointNotif} onCheckedChange={setCheckpointNotif} />
+                    </div>
+                    {!isTrial && <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Coach & Sahabat Safar</span><span className="text-xs text-gray-500">Respons coach dan pengingat pasangan.</span></div>
                       <Switch aria-label="Notifikasi pendamping" checked={socialNotif} onCheckedChange={setSocialNotif} />
-                    </div>
+                    </div>}
                     <div className="flex items-center justify-between p-3.5 rounded-md border border-warm-border bg-white">
                       <div><span className="text-xs font-semibold text-navy-900 block">Pengingat Tidak Aktif</span><span className="text-xs text-gray-500">Dikirim setelah 3 hari tanpa aktivitas.</span></div>
                       <Switch aria-label="Pengingat saat tidak aktif" checked={inactivityNotif} onCheckedChange={setInactivityNotif} />
