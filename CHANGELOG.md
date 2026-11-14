@@ -7,9 +7,8 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 ## [Unreleased]
 
 ### Changed
-- Landing publik memakai hero foto, navigasi HP, pemilihan empat tahap perjalanan, serta rincian pendampingan dan FAQ yang dapat dibuka sesuai kebutuhan.
-- Pricing menampilkan perbandingan durasi 1/2/3 bulan dalam satu panel interaktif dengan estimasi yang mengikuti pilihan, berdampingan dengan uji coba spiritual 14 hari.
-- Struktur perbandingan, kontras teks, kontrol keyboard, dan ukuran layar kecil diperbaiki. Tombol pendaftaran mengikuti status uji coba dan sesi akun.
+- Struktur, copy, urutan section, hero, gambar, dan empat kartu pricing landing SLJ dikembalikan ke versi sebelumnya. Perapian dibatasi pada bobot judul, keterbacaan tombol/FAQ, dan konsistensi interaksi.
+- Empat kartu pricing memakai aksen navy, biru, sage, dan gold dengan rincian paket yang sama.
 
 ## [0.8.0] — 2026-11-14
 
