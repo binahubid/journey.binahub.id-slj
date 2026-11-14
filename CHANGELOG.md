@@ -4,6 +4,13 @@ Semua perubahan penting pada proyek Spiritual Leadership Journey (SLJ) dicatat d
 
 Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) dan proyek ini mematuhi [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Landing publik memakai hero foto, navigasi HP, pemilihan empat tahap perjalanan, serta rincian pendampingan dan FAQ yang dapat dibuka sesuai kebutuhan.
+- Pricing menampilkan perbandingan durasi 1/2/3 bulan dalam satu panel interaktif dengan estimasi yang mengikuti pilihan, berdampingan dengan uji coba spiritual 14 hari.
+- Struktur perbandingan, kontras teks, kontrol keyboard, dan ukuran layar kecil diperbaiki. Tombol pendaftaran mengikuti status uji coba dan sesi akun.
+
 ## [0.8.0] — 2026-11-14
 
 ### Added
