@@ -111,7 +111,7 @@ try:
         expect(notice).to_have_count(0)
 
         page.goto(origin + "/journal", wait_until="networkidle")
-        page.get_by_role("button").filter(has_text="Panduan Mujahadah").click()
+        page.get_by_text("Panduan refleksi", exact=True).click()
         expect(page.get_by_text("Apa pelajaran terbesar yang Allah tunjukkan kepada Anda selama perjalanan ini?", exact=True)).to_be_visible()
         page.evaluate("""() => {
           const db = JSON.parse(sessionStorage.getItem('db'));
@@ -119,8 +119,8 @@ try:
           sessionStorage.setItem('db', JSON.stringify(db));
         }""")
         page.reload(wait_until="networkidle")
-        page.get_by_role("button").filter(has_text="Panduan Istiqamah").click()
-        expect(page.get_by_role("button").filter(has_text="Refleksi 14 Hari")).to_be_visible()
+        page.get_by_text("Panduan refleksi", exact=True).click()
+        expect(page.get_by_role("heading").filter(has_text="Refleksi 14 Hari")).to_be_visible()
         expect(page.get_by_text("Apa tantangan terbesar yang dapat melemahkan komitmen Anda?", exact=True)).to_be_visible()
         expect(page.get_by_text("Bagaimana perasaan Anda hari ini?", exact=True)).to_be_visible()
         print("Passed introductory-only trial notice and journal guide perspective", flush=True)

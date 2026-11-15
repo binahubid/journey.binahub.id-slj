@@ -6,6 +6,12 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 
 ## [Unreleased]
 
+### Navigasi peserta, progres, dan jurnal
+- Shortcut beranda memberi umpan balik saat disentuh, memperlihatkan panel aktif, dan bergulir ke widget jika panel berada di luar layar.
+- Rute beranda, rencana, progres, jurnal, dan profil menampilkan skeleton sesuai susunan halaman selama pemuatan.
+- Progres memisahkan ringkasan grafik, capaian, dan evaluasi. Sumbu grafik memperlihatkan persentase dengan label terbaca di HP.
+- Jurnal menyediakan tampilan menulis dan riwayat di HP, pencarian, dan favorit. Kolom pelajaran dan rencana berikutnya dapat dibuka saat diperlukan.
+
 ### Beranda dan pengingat peserta
 - Beranda HP dan tablet memakai enam shortcut berikon khusus: jadwal salat, habit, hadits, tilawah, jurnal, dan analitik. Satu panel ditampilkan sesuai pilihan; pencatatan dan hero adaptif tetap tersedia.
 - Detail habit PTP terpisah dari ringkasan aktivitas spiritual trial. Tombol catatan salat mendapat ruang di header dan area sentuh 44 px. Ruang gulir memperhitungkan navigasi bawah HP.

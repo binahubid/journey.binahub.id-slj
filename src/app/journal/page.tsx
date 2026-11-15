@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { Card } from "@/components/ui/card";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -14,32 +12,26 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Flame,
-  ArrowLeft,
-  ChevronRight,
-  ChevronDown,
-  Check,
-  Lock,
-  Lightbulb,
-  Edit3,
-  Smile,
-  BookOpen,
-  Target,
-  Send,
-  Heart,
-  MessageCircle,
-  Calendar,
-  Sparkles,
-  User,
-  X,
-} from "lucide-react";
+import { ChevronRight, Check, Lock, Heart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_TIME_ZONE, getLocalDateString, getTimeZoneLabel, resolveParticipantTimeZone } from "@/lib/local-date";
+import {
+  DEFAULT_TIME_ZONE,
+  getLocalDateString,
+  getTimeZoneLabel,
+  resolveParticipantTimeZone,
+} from "@/lib/local-date";
 import { getProgramDay } from "@/lib/program-timeline";
 import { TRIAL_DAYS, TRIAL_PROGRAM_CODE } from "@/lib/program-access";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
-import { getCanonicalJournalDate, getJournalStreak, getJourneyDayForDate, parseJournalContent, composeJournalContent } from "@/lib/journal";
+import { ParticipantPageSkeleton } from "@/components/layout/ParticipantPageSkeleton";
+import { cn } from "@/lib/utils";
+import {
+  getCanonicalJournalDate,
+  getJournalStreak,
+  getJourneyDayForDate,
+  parseJournalContent,
+  composeJournalContent,
+} from "@/lib/journal";
 
 // ── DAILY PROMPTS MAPPING (DAY 1 TO 90) ─────────────────────────────────────
 
@@ -79,11 +71,11 @@ function getPromptForDay(day: number): string {
 // ── 5 MOOD OPTIONS ─────────────────────────────────────────────────────────
 
 const MOOD_ITEMS = [
-  { label: "Tenang", emoji: "🙂", colorClass: "border-emerald-500 text-emerald-600 bg-emerald-50/60" },
-  { label: "Bersyukur", emoji: "😊", colorClass: "border-amber-500 text-amber-700 bg-amber-50/60" },
-  { label: "Bersemangat", emoji: "💪", colorClass: "border-blue-500 text-blue-600 bg-blue-50/60" },
-  { label: "Butuh Doa", emoji: "🤲", colorClass: "border-purple-500 text-purple-600 bg-purple-50/60" },
-  { label: "Berat", emoji: "😔", colorClass: "border-rose-500 text-rose-600 bg-rose-50/60" },
+  { label: "Tenang", emoji: "🙂" },
+  { label: "Bersyukur", emoji: "😊" },
+  { label: "Bersemangat", emoji: "💪" },
+  { label: "Butuh Doa", emoji: "🤲" },
+  { label: "Berat", emoji: "😔" },
 ];
 
 interface JournalPost {
@@ -93,22 +85,18 @@ interface JournalPost {
   canonicalDate: string;
   timeStr: string;
   location: string;
-  userFullName: string;
-  userAvatar: string;
   content: string;
   pelajaran?: string;
   perbaikanBesok?: string;
   mood: string;
-  isLiked: boolean;
-  likeCount: number;
+  isFavorite: boolean;
   isPrivate: boolean;
 }
 
-export default function RefactoredJournalPage() {
+export default function JournalPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("Peserta");
   const [userLocation, setUserLocation] = useState("Jakarta");
   const [journalTimeZone, setJournalTimeZone] = useState(DEFAULT_TIME_ZONE);
   const [journeyStartDate, setJourneyStartDate] = useState<string | null>(null);
@@ -128,21 +116,22 @@ export default function RefactoredJournalPage() {
   // Live Digital Clock & Adaptive Background
   const [heroClockHH, setHeroClockHH] = useState<string>("--");
   const [heroClockMM, setHeroClockMM] = useState<string>("--");
-  const [showColon, setShowColon] = useState<boolean>(true);
   const [adaptiveJournalBg, setAdaptiveJournalBg] = useState<string>("/malam-journal.webp");
 
   useEffect(() => {
     const clockFormat = new Intl.DateTimeFormat("en-GB", {
-      timeZone: journalTimeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      timeZone: journalTimeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
     });
     const updateClock = () => {
       const d = new Date();
       const parts = clockFormat.formatToParts(d);
-      const hh = parts.find(part => part.type === "hour")?.value || "00";
-      const mm = parts.find(part => part.type === "minute")?.value || "00";
+      const hh = parts.find((part) => part.type === "hour")?.value || "00";
+      const mm = parts.find((part) => part.type === "minute")?.value || "00";
       setHeroClockHH(hh);
       setHeroClockMM(mm);
-      setShowColon(d.getSeconds() % 2 === 0);
 
       // Adaptive background based on time
       const totalMins = Number(hh) * 60 + Number(mm);
@@ -161,19 +150,37 @@ export default function RefactoredJournalPage() {
       }
     };
     updateClock();
-    const interval = setInterval(updateClock, 1000);
+    const interval = setInterval(updateClock, 30_000);
     return () => clearInterval(interval);
   }, [journalTimeZone]);
 
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [favoriteError, setFavoriteError] = useState(false);
+  const [savingFavorite, setSavingFavorite] = useState<string | null>(null);
+  const savingReflection = useRef(false);
+  const reflectionInput = useRef<HTMLTextAreaElement>(null);
+  const optionalFields = useRef<HTMLDetailsElement>(null);
 
-  // Collapsible guide states
-  const [showMujahadah, setShowMujahadah] = useState(false);
-  const [showIstiqamah, setShowIstiqamah] = useState(false);
+  const [journalView, setJournalView] = useState<"write" | "history">("write");
+  const [historySearch, setHistorySearch] = useState("");
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
 
-  // Instagram-style Posts for Right Column
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "history")
+      setJournalView("history");
+  }, []);
+
+  const selectJournalView = (view: "write" | "history") => {
+    setJournalView(view);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", view);
+    window.history.replaceState(null, "", url);
+  };
+
+  // Saved reflections for history.
   const [posts, setPosts] = useState<JournalPost[]>([]);
 
   // Selected Detail Modal Post
@@ -182,12 +189,34 @@ export default function RefactoredJournalPage() {
   // ── LOAD DATA ─────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesi login telah berakhir.");
 
-      // Profile
-      const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+      const [profileResult, settingsResult, journalResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("start_date,program_code,timezone,timezone_mode,location")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("settings")
+          .select("journal_privacy_default")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("journals")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+      ]);
+      const error = profileResult.error || settingsResult.error || journalResult.error;
+      if (error) throw error;
+      const profile = profileResult.data;
       const resolvedTimeZone = resolveParticipantTimeZone(
         profile?.timezone || DEFAULT_TIME_ZONE,
         profile?.timezone_mode || "AUTO",
@@ -197,11 +226,9 @@ export default function RefactoredJournalPage() {
         ? getLocalDateString(new Date(profile.start_date), resolvedTimeZone)
         : null;
       let currentDay = 1;
-      const fName = profile?.full_name || "Peserta";
 
       if (profile) {
         setTotalDays(profile.program_code === TRIAL_PROGRAM_CODE ? TRIAL_DAYS : 90);
-        setUserName(fName.split(" ")[0]);
         if (profile.location) {
           setUserLocation(profile.location);
         }
@@ -211,8 +238,7 @@ export default function RefactoredJournalPage() {
         }
       }
 
-      const { data: settings } = await supabase.from("settings").select("journal_privacy_default").eq("user_id", user.id).maybeSingle();
-      const privacyDefault = settings?.journal_privacy_default ?? true;
+      const privacyDefault = settingsResult.data?.journal_privacy_default ?? true;
 
       setDayCount(currentDay);
       setDailyPrompt(getPromptForDay(currentDay));
@@ -220,30 +246,47 @@ export default function RefactoredJournalPage() {
       const now = new Date();
       const today = getLocalDateString(now, resolvedTimeZone);
       setDateFormatted(
-        now.toLocaleDateString("id-ID", { timeZone: resolvedTimeZone, weekday: "long", day: "numeric", month: "long", year: "numeric" })
+        now.toLocaleDateString("id-ID", {
+          timeZone: resolvedTimeZone,
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }),
       );
 
-      // Load Journals
-      const { data: journals } = await supabase
-        .from("journals")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const journals = journalResult.data;
 
       if (journals && journals.length > 0) {
-        const todayJournal = journals.find((journal: any) => getCanonicalJournalDate(journal.date || journal.created_at) === today);
-        setJournalIsPrivate(todayJournal ? todayJournal.is_private ?? true : privacyDefault);
-        setStreakCount(getJournalStreak(journals.map((journal: any) => journal.date || journal.created_at), today));
+        const todayJournal = journals.find(
+          (journal: any) => getCanonicalJournalDate(journal.date || journal.created_at) === today,
+        );
+        setJournalIsPrivate(todayJournal ? (todayJournal.is_private ?? true) : privacyDefault);
+        setStreakCount(
+          getJournalStreak(
+            journals.map((journal: any) => journal.date || journal.created_at),
+            today,
+          ),
+        );
         setPosts(
           journals.map((j: any) => {
             const d = new Date(j.created_at || j.date);
-            const canonicalDate = getCanonicalJournalDate(j.date) || getLocalDateString(d, resolvedTimeZone);
+            const canonicalDate =
+              getCanonicalJournalDate(j.date) || getLocalDateString(d, resolvedTimeZone);
             const dateStr = new Date(canonicalDate + "T00:00:00Z").toLocaleDateString("id-ID", {
-              timeZone: "UTC", day: "numeric", month: "long", year: "numeric",
+              timeZone: "UTC",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
             });
-            const timeStr = d.toLocaleTimeString("id-ID", {
-              timeZone: resolvedTimeZone, hour: "2-digit", minute: "2-digit",
-            }) + " " + getTimeZoneLabel(resolvedTimeZone);
+            const timeStr =
+              d.toLocaleTimeString("id-ID", {
+                timeZone: resolvedTimeZone,
+                hour: "2-digit",
+                minute: "2-digit",
+              }) +
+              " " +
+              getTimeZoneLabel(resolvedTimeZone);
             const parsed = parseJournalContent(j.content);
 
             return {
@@ -253,17 +296,14 @@ export default function RefactoredJournalPage() {
               dateStr,
               timeStr,
               location: j.location || profile?.location || "Jakarta",
-              userFullName: fName,
-              userAvatar: fName.charAt(0).toUpperCase(),
               content: parsed.reflection,
               pelajaran: parsed.lesson,
               perbaikanBesok: parsed.improvement,
               mood: j.mood || "Bersyukur",
-              isLiked: j.is_favorite || false,
-              likeCount: j.is_favorite ? 1 : 0,
+              isFavorite: j.is_favorite ?? false,
               isPrivate: j.is_private ?? true,
             };
-          })
+          }),
         );
       } else {
         setJournalIsPrivate(privacyDefault);
@@ -273,46 +313,62 @@ export default function RefactoredJournalPage() {
       }
     } catch (err) {
       console.error("Gagal memuat jurnal:", err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
   }, [supabase]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ── SAVE REFLECTION ──────────────────────────────────────────────────────
 
   const handleSaveReflection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving || !mainReflection.trim()) return;
+    if (savingReflection.current || !mainReflection.trim()) return;
 
+    savingReflection.current = true;
     setSaving(true);
+    setSavedSuccess(false);
     setSaveError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         setSaveError("Sesi login telah berakhir. Silakan login ulang.");
         return;
       }
 
       const now = new Date();
-      const { data: profileTimeZone } = await supabase.from("profiles").select("timezone, timezone_mode").eq("user_id", user.id).maybeSingle();
+      const { data: profileTimeZone } = await supabase
+        .from("profiles")
+        .select("timezone, timezone_mode")
+        .eq("user_id", user.id)
+        .maybeSingle();
       const resolvedTimeZone = resolveParticipantTimeZone(
         profileTimeZone?.timezone || DEFAULT_TIME_ZONE,
-        profileTimeZone?.timezone_mode || "AUTO"
+        profileTimeZone?.timezone_mode || "AUTO",
       );
       const todayStr = getLocalDateString(now, resolvedTimeZone);
-      const timeStr = now.toLocaleTimeString("id-ID", {
-        timeZone: resolvedTimeZone, hour: "2-digit", minute: "2-digit",
-      }) + " " + getTimeZoneLabel(resolvedTimeZone);
+      const timeStr =
+        now.toLocaleTimeString("id-ID", {
+          timeZone: resolvedTimeZone,
+          hour: "2-digit",
+          minute: "2-digit",
+        }) +
+        " " +
+        getTimeZoneLabel(resolvedTimeZone);
 
       const combinedContent = composeJournalContent(mainReflection, pelajaran, perbaikanBesok);
 
-      const existingToday = posts.find(post => post.canonicalDate === todayStr);
+      const existingToday = posts.find((post) => post.canonicalDate === todayStr);
       const journalPayload = {
         content: combinedContent,
         mood: selectedMood,
-        is_private: existingToday ? existingToday.isPrivate : journalIsPrivate,
+        is_private: journalIsPrivate,
         location: userLocation,
       };
       const saveQuery = existingToday
@@ -322,7 +378,7 @@ export default function RefactoredJournalPage() {
 
       if (error) {
         console.error("Gagal menyimpan refleksi:", error);
-        setSaveError(`Gagal menyimpan refleksi: ${error.message}`);
+        setSaveError("Refleksi belum tersimpan. Coba lagi.");
         return;
       }
 
@@ -331,531 +387,562 @@ export default function RefactoredJournalPage() {
           id: data.id,
           canonicalDate: todayStr,
           dayNumber: getJourneyDayForDate(todayStr, journeyStartDate) || dayCount,
-          dateStr: now.toLocaleDateString("id-ID", { timeZone: resolvedTimeZone, day: "numeric", month: "long", year: "numeric" }),
+          dateStr: now.toLocaleDateString("id-ID", {
+            timeZone: resolvedTimeZone,
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          }),
           timeStr,
           location: userLocation,
-          userFullName: userName,
-          userAvatar: userName.charAt(0).toUpperCase(),
           content: mainReflection.trim(),
           pelajaran: pelajaran.trim(),
           perbaikanBesok: perbaikanBesok.trim(),
           mood: selectedMood,
-          isLiked: false,
-          likeCount: 1,
+          isFavorite: data.is_favorite ?? existingToday?.isFavorite ?? false,
           isPrivate: data.is_private ?? journalPayload.is_private,
         };
 
-        setPosts(prev => [newPost, ...prev.filter(post => post.canonicalDate !== todayStr)]);
-        setStreakCount(getJournalStreak([...posts.map(post => post.canonicalDate), todayStr], todayStr));
-        setMainReflection("");
-        setPelajaran("");
-        setPerbaikanBesok("");
+        setPosts((prev) => [newPost, ...prev.filter((post) => post.canonicalDate !== todayStr)]);
+        setStreakCount(
+          getJournalStreak([...posts.map((post) => post.canonicalDate), todayStr], todayStr),
+        );
         setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
       }
     } catch (err) {
       console.error("Gagal menyimpan refleksi:", err);
       setSaveError("Terjadi kesalahan jaringan. Silakan coba lagi.");
     } finally {
+      savingReflection.current = false;
       setSaving(false);
     }
   };
 
-  const toggleLikePost = async (id: string, currentLiked: boolean) => {
-    setPosts(prev =>
-      prev.map(p => {
-        if (p.id === id) {
-          return {
-            ...p,
-            isLiked: !currentLiked,
-            likeCount: currentLiked ? p.likeCount - 1 : p.likeCount + 1,
-          };
-        }
-        return p;
-      })
-    );
-    const { error } = await supabase.from("journals").update({ is_favorite: !currentLiked }).eq("id", id);
-    if (error) {
-      setPosts(prev => prev.map(post => post.id === id ? { ...post, isLiked: currentLiked, likeCount: currentLiked ? post.likeCount + 1 : Math.max(0, post.likeCount - 1) } : post));
-      setSaveError("Status favorit belum tersimpan. Coba lagi.");
+  const toggleFavorite = async (post: JournalPost) => {
+    setFavoriteError(false);
+    setSavingFavorite(post.id);
+    const isFavorite = !post.isFavorite;
+    try {
+      const { error } = await supabase
+        .from("journals")
+        .update({ is_favorite: isFavorite })
+        .eq("id", post.id);
+      if (error) throw error;
+      setPosts((previous) =>
+        previous.map((entry) => (entry.id === post.id ? { ...entry, isFavorite } : entry)),
+      );
+    } catch {
+      setFavoriteError(true);
+    } finally {
+      setSavingFavorite(null);
     }
   };
 
-  if (loading) {
+  function editToday(post: JournalPost) {
+    setMainReflection(post.content);
+    setPelajaran(post.pelajaran || "");
+    setPerbaikanBesok(post.perbaikanBesok || "");
+    setSelectedMood(post.mood);
+    setJournalIsPrivate(post.isPrivate);
+    setSavedSuccess(false);
+    selectJournalView("write");
+    requestAnimationFrame(() => {
+      if (optionalFields.current)
+        optionalFields.current.open = Boolean(post.pelajaran || post.perbaikanBesok);
+      reflectionInput.current?.focus();
+    });
+  }
+
+  if (loading) return <ParticipantPageSkeleton kind="journal" />;
+
+  if (loadError) {
     return (
-      <div className="min-h-screen bg-[#FAF9F5] flex items-center justify-center font-sans">
-        <div className="animate-spin h-8 w-8 border-3 border-[#071A33] border-t-transparent rounded-full" />
-      </div>
+      <ParticipantLayout activePath="/journal" pageTitle="Jurnal refleksi">
+        <section className="mx-auto max-w-xl space-y-4 rounded-3xl border border-slate-200 bg-white p-6">
+          <h1 className="text-xl font-semibold text-navy-900">Jurnal belum dapat dibuka</h1>
+          <p role="alert" className="text-sm leading-6 text-slate-600">
+            Periksa koneksi Anda, lalu coba muat ulang jurnal.
+          </p>
+          <Button onClick={() => void loadData()}>Muat ulang</Button>
+        </section>
+      </ParticipantLayout>
     );
   }
 
+  const todayPost = posts.find(
+    (post) => post.canonicalDate === getLocalDateString(new Date(), journalTimeZone),
+  );
+  const search = historySearch.trim().toLocaleLowerCase("id-ID");
+  const visiblePosts = posts
+    .filter((post) => !onlyFavorites || post.isFavorite)
+    .filter((post) =>
+      [post.content, post.pelajaran, post.perbaikanBesok, post.dateStr]
+        .join(" ")
+        .toLocaleLowerCase("id-ID")
+        .includes(search),
+    )
+    .sort((a, b) => b.canonicalDate.localeCompare(a.canonicalDate));
+  const mobilePanel = (view: "write" | "history") =>
+    cn("min-w-0", journalView !== view && "hidden lg:block");
+
   return (
-    <ParticipantLayout activePath="/journal" pageTitle="Refleksi Hari Ini">
-      <div className="w-full min-h-screen bg-[#FAF9F5] text-navy-950 font-sans pb-20">
+    <ParticipantLayout activePath="/journal" pageTitle="Jurnal refleksi">
+      <div className="mx-auto max-w-6xl space-y-6 pb-6">
+        <header
+          className="relative overflow-hidden rounded-3xl bg-navy-900 p-5 text-white sm:p-7"
+          style={{
+            backgroundImage:
+              "linear-gradient(90deg,rgba(7,26,51,.94),rgba(7,26,51,.66)),url('" +
+              adaptiveJournalBg +
+              "')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-white/80">
+            <span>
+              Hari ke-{dayCount} dari {totalDays}
+            </span>
+            <span className="flex items-center gap-1.5 tabular-nums">
+              <span>
+                {heroClockHH}:{heroClockMM}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>{getTimeZoneLabel(journalTimeZone)}</span>
+            </span>
+          </div>
+          <h1 className="mt-5 text-balance text-2xl font-semibold sm:text-3xl">Refleksi Hari Ini</h1>
+          <p className="mt-2 max-w-lg text-sm leading-6 text-white/85">
+            Ruang untuk mencatat yang Anda rasakan, pelajari, dan ingin perbaiki.
+          </p>
+          <p className="mt-4 text-xs text-white/75">{dateFormatted}</p>
+        </header>
 
-        {/* ─── MAIN CONTENT WRAPPER (2-COLUMN: 75% LEFT / 25% RIGHT) ───────────── */}
-        <div className="w-full pt-4 sm:pt-6 pb-28 sm:pb-20">
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 sm:gap-7 items-start">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+          <p>
+            <span className="font-semibold text-navy-900 tabular-nums">{posts.length}</span> catatan
+            tersimpan <span className="mx-2 text-slate-300">·</span>
+            <span className="font-semibold text-navy-900 tabular-nums">{streakCount}</span> hari
+            berturut-turut
+          </p>
+          <p className="flex items-center gap-1.5 text-xs">
+            <Lock aria-hidden="true" className="size-3.5" /> Anda mengatur privasi tiap catatan
+          </p>
+        </div>
 
-            {/* ─── LEFT COLUMN (75% / col-span-8 or col-span-9) ───────────────── */}
-            <div className="xl:col-span-9 space-y-5 sm:space-y-7 w-full">
-              
-              {/* 1. CLEAN HERO BANNER WITH FULL ADAPTIVE TIME BACKGROUND */}
-              <div
-                className="relative rounded-2xl sm:rounded-3xl p-4 sm:p-8 min-h-[200px] sm:min-h-[260px] flex flex-col justify-between overflow-hidden shadow-lg border border-white/20 text-white bg-cover transition-all duration-700"
-                style={{
-                  backgroundImage: `url('${adaptiveJournalBg}')`,
-                  backgroundPosition: "center top",
-                }}
-              >
-                {/* Dark Gradient Overlay for Optimal Readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/60 pointer-events-none" />
+        <div
+          role="group"
+          aria-label="Tampilan jurnal"
+          className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1 lg:hidden"
+        >
+          {(
+            [
+              { id: "write", label: "Menulis" },
+              { id: "history", label: "Riwayat" },
+            ] as const
+          ).map((item) => (
+            <Button
+              key={item.id}
+              variant="ghost"
+              aria-pressed={journalView === item.id}
+              aria-controls={"journal-" + item.id}
+              onClick={() => selectJournalView(item.id)}
+              className={cn(
+                "min-h-11 rounded-xl text-sm",
+                journalView === item.id ? "bg-white text-navy-900 shadow-sm" : "text-slate-600",
+              )}
+            >
+              {item.label}
+              {item.id === "history" && (
+                <span className="ml-2 text-xs tabular-nums text-slate-500">{posts.length}</span>
+              )}
+            </Button>
+          ))}
+        </div>
 
-                <div className="relative z-10 flex flex-col justify-between h-full min-h-[180px] sm:min-h-[220px] w-full space-y-4 sm:space-y-6">
-                  
-                  {/* TOP ROW: Sisi Kiri Atas (Hari ke-X) & Sisi Kanan Atas (Jam WIB 18:50 dengan titik dua berkedip) */}
-                  <div className="flex items-start justify-between gap-2 w-full">
-                    {/* Sisi Kiri Atas: Hari ke-X */}
-                    <div>
-                      <span className="text-amber-300 font-extrabold bg-black/50 px-3 py-1 rounded-full border border-amber-300/30 text-xs sm:text-sm shadow-xs inline-block">
-                        Hari ke-{dayCount} Journey
-                      </span>
-                    </div>
-
-                    {/* Sisi Kanan Atas: Jam WIB 18:50 (WIB di kiri, titik dua berkedip) */}
-                    <div className="flex items-center gap-1.5 text-right">
-                      <span className="text-xs sm:text-xs font-mono font-bold text-amber-900 bg-amber-400 px-1.5 py-0.5 rounded shadow-2xs">
-                        {getTimeZoneLabel(journalTimeZone)}
-                      </span>
-                      <div className="text-2xl sm:text-5xl font-black text-white font-mono tracking-tighter leading-none drop-shadow-lg flex items-center">
-                        <span>{heroClockHH}</span>
-                        <span className={`inline-block transition-opacity duration-200 ${showColon ? "opacity-100" : "opacity-20 text-amber-300"}`}>:</span>
-                        <span>{heroClockMM}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* BOTTOM ROW: Sisi Kiri Bawah (Refleksi Hari Ini & Quote) & Sisi Kanan Bawah (Tanggal) */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 w-full pt-1">
-                    {/* Sisi Kiri Bawah: Judul & Quote */}
-                    <div className="space-y-0.5 max-w-lg w-full text-left">
-                      <h1 className="text-xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
-                        Refleksi Hari Ini
-                      </h1>
-                      <p className="text-xs sm:text-sm text-slate-100 italic font-serif leading-relaxed drop-shadow-sm">
-                        &ldquo;Setiap langkah kecil yang ditulis akan lebih mudah menjadi kebiasaan.&rdquo;
-                      </p>
-                    </div>
-
-                    {/* Sisi Kanan Bawah: Tanggal */}
-                    <div className="text-left sm:text-right shrink-0">
-                      <p className="text-xs sm:text-sm font-semibold text-slate-200 drop-shadow-sm">
-                        📅 {dateFormatted}
-                      </p>
-                    </div>
-                  </div>
-
+        <div className="grid items-start gap-6 lg:grid-cols-3">
+          <section
+            id="journal-write"
+            aria-label="Menulis refleksi"
+            className={cn(mobilePanel("write"), "lg:col-span-2")}
+          >
+            <form
+              onSubmit={handleSaveReflection}
+              onChange={() => setSavedSuccess(false)}
+              className="space-y-6 rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-7"
+            >
+              <div>
+                <h2 className="text-lg font-semibold text-navy-900">
+                  Apa yang ingin Anda ingat hari ini?
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{dailyPrompt}</p>
+              </div>
+              {todayPost && !mainReflection.trim() && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm text-slate-700">
+                  <p>Catatan hari ini sudah tersimpan.</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={saving}
+                    className="min-h-11"
+                    onClick={() => editToday(todayPost)}
+                  >
+                    Edit catatan
+                  </Button>
                 </div>
+              )}
+              <div>
+                <label
+                  htmlFor="journal-reflection"
+                  className="mb-2 block text-sm font-medium text-navy-900"
+                >
+                  Refleksi hari ini
+                </label>
+                <Textarea
+                  ref={reflectionInput}
+                  id="journal-reflection"
+                  rows={5}
+                  maxLength={1000}
+                  value={mainReflection}
+                  onChange={(event) => setMainReflection(event.target.value)}
+                  placeholder="Mulai dari satu momen yang bermakna bagi Anda…"
+                  className="min-h-36 resize-y rounded-2xl border-slate-200 p-4 text-base leading-7 sm:text-sm"
+                />
+                <p className="mt-2 text-right text-xs tabular-nums text-slate-500">
+                  {mainReflection.length}/1000 karakter
+                </p>
               </div>
 
-              {/* 2. FORM REFLEKSI CARD */}
-              <Card className="w-full bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xs space-y-5 sm:space-y-6 border border-slate-200/80">
-                
-                {/* ─── PANDUAN MUJAAHAH (COLLAPSIBLE) ─── */}
-                <div className="bg-amber-50/70 rounded-2xl border border-amber-200/60 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setShowMujahadah(!showMujahadah)}
-                    className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Lightbulb className="h-4 w-4 text-amber-700 shrink-0" />
-                      <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider">
-                        Panduan Mujahadah
+              <fieldset>
+                <legend className="mb-3 text-sm font-medium text-navy-900">
+                  Bagaimana perasaan Anda hari ini?
+                </legend>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                  {MOOD_ITEMS.map((mood) => (
+                    <button
+                      type="button"
+                      key={mood.label}
+                      aria-pressed={selectedMood === mood.label}
+                      onClick={() => {
+                        setSelectedMood(mood.label);
+                        setSavedSuccess(false);
+                      }}
+                      className={cn(
+                        "flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl border p-2 text-xs transition-colors",
+                        selectedMood === mood.label
+                          ? "border-blue-200 bg-blue-50 font-semibold text-navy-900"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                      )}
+                    >
+                      <span aria-hidden="true" className="text-2xl">
+                        {mood.emoji}
                       </span>
+                      {mood.label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <details ref={optionalFields} className="group rounded-2xl border border-slate-200 p-4">
+                <summary className="cursor-pointer text-sm font-medium text-navy-900">
+                  Lengkapi refleksi <span className="ml-1 font-normal text-slate-500">(opsional)</span>
+                </summary>
+                <div className="mt-5 space-y-5">
+                  <div>
+                    <label
+                      htmlFor="journal-lesson"
+                      className="mb-2 block text-sm font-medium text-navy-900"
+                    >
+                      Pelajaran hari ini
+                    </label>
+                    <Textarea
+                      id="journal-lesson"
+                      rows={3}
+                      maxLength={500}
+                      value={pelajaran}
+                      onChange={(event) => setPelajaran(event.target.value)}
+                      placeholder="Apa yang Anda pelajari dari pengalaman hari ini?"
+                      className="rounded-xl border-slate-200 text-base leading-7 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="journal-improvement"
+                      className="mb-2 block text-sm font-medium text-navy-900"
+                    >
+                      Rencana perbaikan besok
+                    </label>
+                    <Textarea
+                      id="journal-improvement"
+                      rows={3}
+                      maxLength={500}
+                      value={perbaikanBesok}
+                      onChange={(event) => setPerbaikanBesok(event.target.value)}
+                      placeholder="Satu langkah kecil yang ingin Anda lakukan…"
+                      className="rounded-xl border-slate-200 text-base leading-7 sm:text-sm"
+                    />
+                  </div>
+                </div>
+              </details>
+
+              <details className="text-sm leading-7 text-slate-600">
+                <summary className="min-h-11 cursor-pointer content-center font-medium text-navy-900">
+                  Panduan refleksi
+                </summary>
+                <h3 className="mt-3 font-medium text-navy-900">Panduan Mujahadah</h3>
+                <ol className="mt-2 list-decimal space-y-2 pl-5">
+                  <li>
+                    Apa pelajaran terbesar yang Allah tunjukkan kepada Anda selama perjalanan ini?
+                  </li>
+                  <li>Apa yang bisa Anda lakukan lebih baik bila ada kesempatan kembali?</li>
+                  <li>Apa amal atau kebiasaan yang akan Anda jaga sepulang dari Tanah Suci?</li>
+                </ol>
+                {dayCount >= totalDays && (
+                  <>
+                    <h3 className="mt-4 font-medium text-navy-900">
+                      Panduan Istiqamah · Refleksi {totalDays} Hari
+                    </h3>
+                    <ol className="mt-2 list-decimal space-y-2 pl-5">
+                      <li>
+                        Perubahan apa yang mulai Anda rasakan? Bagaimana dampaknya terhadap diri,
+                        pekerjaan, dan lingkungan Anda?
+                      </li>
+                      <li>Apa tantangan terbesar yang dapat melemahkan komitmen Anda?</li>
+                      <li>
+                        Apa kebiasaan yang akan Anda jaga agar perubahan ini bertahan sepanjang
+                        perjalanan Anda?
+                      </li>
+                    </ol>
+                  </>
+                )}
+              </details>
+
+              <div className="space-y-4 border-t border-slate-100 pt-5">
+                <label className="flex min-h-11 items-start gap-3 text-sm leading-6 text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={journalIsPrivate}
+                    onChange={(event) => setJournalIsPrivate(event.target.checked)}
+                    className="mt-1 size-4 shrink-0 accent-navy-900"
+                  />
+                  <span>
+                    <span className="block font-medium text-navy-900">Jadikan catatan privat</span>
+                    {journalIsPrivate
+                      ? "Hanya Anda yang dapat membaca."
+                      : "Pendamping yang berwenang dapat membaca."}
+                  </span>
+                </label>
+                {saveError && (
+                  <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
+                    {saveError}
+                  </p>
+                )}
+                {savedSuccess && todayPost && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+                    <p role="status" className="flex items-center gap-2">
+                      <Check className="size-4" aria-hidden="true" /> Refleksi hari ini tersimpan.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="min-h-11"
+                      onClick={() => setSelectedPost(todayPost)}
+                    >
+                      Lihat catatan
+                    </Button>
+                  </div>
+                )}
+                <Button
+                  type="submit"
+                  disabled={saving || Boolean(savingFavorite) || !mainReflection.trim() || savedSuccess}
+                  className="min-h-12 w-full rounded-2xl bg-navy-900 text-sm text-white"
+                >
+                  {saving
+                    ? "Menyimpan…"
+                    : todayPost
+                      ? "Perbarui Catatan Hari Ini"
+                      : "Simpan Refleksi Hari Ini"}
+                </Button>
+              </div>
+            </form>
+          </section>
+
+          <section
+            id="journal-history"
+            aria-label="Riwayat refleksi"
+            className={mobilePanel("history")}
+          >
+            <div className="space-y-5 rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6">
+              <div>
+                <h2 className="text-lg font-semibold text-navy-900">Riwayat refleksi</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Baca kembali momen dan pelajaran Anda.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <label className="sr-only" htmlFor="journal-search">
+                  Cari catatan jurnal
+                </label>
+                <Input
+                  id="journal-search"
+                  type="search"
+                  value={historySearch}
+                  onChange={(event) => setHistorySearch(event.target.value)}
+                  placeholder="Cari isi atau tanggal catatan"
+                  className="min-h-11 rounded-xl text-base sm:text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-pressed={onlyFavorites}
+                  onClick={() => setOnlyFavorites(!onlyFavorites)}
+                  className={cn(
+                    "min-h-11 rounded-xl text-xs",
+                    onlyFavorites ? "bg-amber-50 text-amber-800" : "text-slate-600",
+                  )}
+                >
+                  <Heart
+                    className={cn("mr-2 size-4", onlyFavorites && "fill-current")}
+                    aria-hidden="true"
+                  />{" "}
+                  Hanya favorit
+                </Button>
+              </div>
+              {favoriteError && (
+                <p role="alert" className="text-sm text-rose-700">
+                  Favorit belum berhasil diperbarui. Coba lagi.
+                </p>
+              )}
+              {visiblePosts.length === 0 ? (
+                <div className="space-y-3 py-6 text-center">
+                  <p className="text-sm font-medium text-navy-900">
+                    {posts.length ? "Tidak ada catatan yang sesuai." : "Belum ada refleksi."}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-600">
+                    {posts.length
+                      ? "Coba kata lain atau tampilkan semua catatan."
+                      : "Mulai dengan satu momen yang berarti hari ini."}
+                  </p>
+                  {posts.length ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setHistorySearch("");
+                        setOnlyFavorites(false);
+                      }}
+                    >
+                      Tampilkan semua
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        selectJournalView("write");
+                        requestAnimationFrame(() => reflectionInput.current?.focus());
+                      }}
+                    >
+                      Tulis refleksi pertama
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {visiblePosts.map((post) => (
+                    <li key={post.id} className="flex items-start gap-2 py-4">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPost(post)}
+                        className="min-w-0 flex-1 space-y-2 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        <span className="block text-xs text-slate-500">
+                          {post.dateStr} · Hari {post.dayNumber}
+                        </span>
+                        <span className="block line-clamp-3 text-sm leading-6 text-navy-900">
+                          {post.content}
+                        </span>
+                        <span className="flex items-center gap-2 text-xs text-slate-500">
+                          {post.mood}
+                          <span aria-hidden="true">·</span>
+                          {post.isPrivate ? "Privat" : "Dibagikan ke pendamping"}
+                          <ChevronRight className="size-3.5" aria-hidden="true" />
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={
+                          (post.isFavorite ? "Hapus favorit " : "Tandai favorit ") + post.dateStr
+                        }
+                        aria-pressed={post.isFavorite}
+                        disabled={Boolean(savingFavorite) || saving}
+                        onClick={() => void toggleFavorite(post)}
+                        className={cn(
+                          "flex size-11 shrink-0 items-center justify-center rounded-xl disabled:opacity-50",
+                          post.isFavorite
+                            ? "bg-amber-50 text-amber-700"
+                            : "text-slate-400 hover:bg-slate-50",
+                        )}
+                      >
+                        <Heart
+                          className={cn("size-4", post.isFavorite && "fill-current")}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <Dialog
+          open={Boolean(selectedPost)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedPost(null);
+          }}
+        >
+          <DialogContent className="max-h-[85dvh] overflow-y-auto rounded-3xl p-6 sm:max-w-xl">
+            {selectedPost && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-semibold">
+                    Refleksi hari ke-{selectedPost.dayNumber}
+                  </DialogTitle>
+                  <DialogDescription className="text-sm leading-6">
+                    {selectedPost.dateStr} · {selectedPost.timeStr}
+                    <br />
+                    {selectedPost.isPrivate ? "Catatan privat" : "Dibagikan ke pendamping"} ·{" "}
+                    {selectedPost.mood}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-6 py-4 text-sm leading-7 text-slate-700">
+                  <p className="whitespace-pre-wrap break-words">{selectedPost.content}</p>
+                  {selectedPost.pelajaran && (
+                    <div className="border-t border-slate-100 pt-4">
+                      <h3 className="mb-2 font-semibold text-navy-900">Pelajaran hari ini</h3>
+                      <p className="whitespace-pre-wrap break-words">{selectedPost.pelajaran}</p>
                     </div>
-                    <ChevronDown className={`h-4 w-4 text-amber-700 transition-transform duration-200 ${showMujahadah ? "rotate-180" : ""}`} />
-                  </button>
-                  {showMujahadah && (
-                    <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 space-y-2 text-xs text-amber-900 border-t border-amber-200/40 pt-3">
-                      <div className="flex items-start gap-2">
-                        <span className="font-bold text-amber-700 shrink-0">1.</span>
-                        <span>Apa pelajaran terbesar yang Allah tunjukkan kepada Anda selama perjalanan ini?</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="font-bold text-amber-700 shrink-0">2.</span>
-                        <span>Apa yang bisa Anda lakukan lebih baik bila ada kesempatan kembali?</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="font-bold text-amber-700 shrink-0">3.</span>
-                        <span>Apa amal atau kebiasaan yang akan Anda jaga sepulang dari Tanah Suci?</span>
-                      </div>
+                  )}
+                  {selectedPost.perbaikanBesok && (
+                    <div className="border-t border-slate-100 pt-4">
+                      <h3 className="mb-2 font-semibold text-navy-900">Rencana perbaikan besok</h3>
+                      <p className="whitespace-pre-wrap break-words">{selectedPost.perbaikanBesok}</p>
                     </div>
                   )}
                 </div>
-                
-                {/* SECTION: CERITAKAN PERJALANANMU HARI INI */}
-                <div className="space-y-2 pt-1">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                      <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </div>
-                    <h2 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
-                      Ceritakan perjalananmu hari ini
-                    </h2>
-                  </div>
-
-                  <div className="relative">
-                    <Textarea
-                      rows={4}
-                      aria-label="Refleksi hari ini"
-                      maxLength={1000}
-                      value={mainReflection}
-                      onChange={e => setMainReflection(e.target.value)}
-                      placeholder="Tulis refleksi, rasa syukur, hikmah, atau hal yang ingin Anda pelajari..."
-                      className="text-xs sm:text-sm leading-relaxed border-slate-200 focus:border-amber-500 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 placeholder:text-slate-600 placeholder:italic font-serif bg-white"
-                    />
-                    <span className="absolute right-3.5 bottom-3 text-xs font-mono text-slate-600">
-                      {mainReflection.length}/1000
-                    </span>
-                  </div>
-                </div>
-
-                {/* SECTION 3: HARI INI SAYA MERASA (5 MOOD CARDS GRID) */}
-                <div className="space-y-3 border-t border-slate-100 pt-4 sm:pt-5">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                        <Smile className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      </div>
-                      <h2 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
-                        Bagaimana perasaan Anda hari ini?
-                      </h2>
-                    </div>
-                    <p className="text-xs text-slate-600 mt-0.5 ml-8 sm:ml-9.5">
-                      Pilih satu yang paling menggambarkan perasaan Anda.
-                    </p>
-                  </div>
-
-                  {/* 5 Mood Cards */}
-                  <div className="grid grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5">
-                    {MOOD_ITEMS.map((m) => {
-                      const isSelected = selectedMood === m.label;
-                      return (
-                        <button
-                          key={m.label}
-                          type="button"
-                          onClick={() => setSelectedMood(m.label)}
-                          className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 sm:gap-1.5 ${
-                            isSelected
-                              ? "bg-[#FFFDF3] border-amber-400 text-amber-950 font-bold shadow-2xs scale-102"
-                              : "bg-white border-slate-100 hover:border-slate-200 text-slate-600 font-medium"
-                          }`}
-                        >
-                          <div className={`h-6 w-6 sm:h-7 sm:w-7 rounded-full border-2 flex items-center justify-center text-xs ${m.colorClass}`}>
-                            {m.emoji}
-                          </div>
-                          <span className="text-xs sm:text-xs truncate w-full text-center">{m.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Final-day reflection follows the participant's program duration. */}
-                {dayCount >= totalDays && (
-                  <div className="bg-amber-50/70 rounded-2xl border border-amber-200/60 overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setShowIstiqamah(!showIstiqamah)}
-                      className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Target className="h-4 w-4 text-amber-700 shrink-0" />
-                        <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wider truncate">
-                          Panduan Istiqamah — Refleksi {totalDays} Hari
-                        </span>
-                      </div>
-                      <ChevronDown className={`h-4 w-4 text-amber-700 transition-transform duration-200 ${showIstiqamah ? "rotate-180" : ""}`} />
-                    </button>
-                    {showIstiqamah && (
-                      <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 space-y-2 text-xs text-amber-900 border-t border-amber-200/40 pt-3">
-                        <div className="flex items-start gap-2">
-                          <span className="font-bold text-amber-700 shrink-0">1.</span>
-                          <span>Perubahan apa yang mulai Anda rasakan setelah Umrah? Bagaimana dampaknya terhadap diri, pekerjaan, dan lingkungan Anda?</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <span className="font-bold text-amber-700 shrink-0">2.</span>
-                          <span>Apa tantangan terbesar yang dapat melemahkan komitmen Anda?</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <span className="font-bold text-amber-700 shrink-0">3.</span>
-                          <span>Apa kebiasaan yang akan Anda jaga agar perubahan ini bertahan sepanjang perjalanan Anda?</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* SECTION 4 & 5: PELAJARAN & PERBAIKAN BESOK */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 border-t border-slate-100 pt-4 sm:pt-5">
-                  
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                          <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </div>
-                        <h2 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
-                          Pelajaran hari ini
-                        </h2>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5 ml-8 sm:ml-9.5">
-                        Apa yang bisa Anda ambil dari hari ini?
-                      </p>
-                    </div>
-
-                    <div className="relative">
-                      <Textarea
-                        rows={2}
-                        maxLength={500}
-                        value={pelajaran}
-                        onChange={e => setPelajaran(e.target.value)}
-                        placeholder="Tuliskan pelajaran atau hikmah..."
-                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3 placeholder:text-slate-600 placeholder:italic font-serif bg-white"
-                      />
-                      <span className="absolute right-3.5 bottom-2 text-xs font-mono text-slate-600">
-                        {pelajaran.length}/500
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                          <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </div>
-                        <h2 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
-                          Apa yang ingin diperbaiki besok?
-                        </h2>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5 ml-8 sm:ml-9.5">
-                        Langkah kecil apa yang akan dilakukan?
-                      </p>
-                    </div>
-
-                    <div className="relative">
-                      <Textarea
-                        rows={2}
-                        maxLength={500}
-                        value={perbaikanBesok}
-                      aria-label="Rencana perbaikan besok"
-                        onChange={e => setPerbaikanBesok(e.target.value)}
-                        placeholder="Tuliskan komitmen perbaikan..."
-                        className="text-xs border-slate-200 focus:border-amber-500 rounded-xl p-3 placeholder:text-slate-600 placeholder:italic font-serif bg-white"
-                      />
-                      <span className="absolute right-3.5 bottom-2 text-xs font-mono text-slate-600">
-                        {perbaikanBesok.length}/500
-                      </span>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* ERROR ALERT */}
-                {saveError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium flex items-center gap-2">
-                    <X className="h-4 w-4 text-rose-500 shrink-0" />
-                    {saveError}
-                    <button onClick={() => setSaveError(null)} className="ml-auto text-rose-400 hover:text-rose-600">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                {/* FOOTER BAR */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-4 sm:pt-5">
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 font-medium">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input type="checkbox" checked={journalIsPrivate} onChange={(event) => setJournalIsPrivate(event.target.checked)} />
-                      <Lock className="h-3.5 w-3.5" />
-                      {journalIsPrivate ? "Privat, hanya Anda yang dapat membaca" : "Bagikan dengan coach/tim berwenang"}
-                    </label>
-                    <span className="hidden sm:inline">•</span>
-                    <span className="text-slate-600 font-semibold flex items-center gap-1">
-                      📍 {userLocation}
-                    </span>
-                  </div>
-
+                <DialogFooter>
                   <Button
-                    onClick={handleSaveReflection}
-                    disabled={saving || !mainReflection.trim()}
-                    className="w-full sm:w-auto bg-[#071A33] hover:bg-slate-900 text-amber-300 font-extrabold text-xs rounded-xl h-11 px-8 shadow-xs flex items-center justify-center gap-2"
+                    variant="outline"
+                    className="min-h-11 w-full rounded-xl"
+                    onClick={() => setSelectedPost(null)}
                   >
-                    {saving ? (
-                      "Menyimpan..."
-                    ) : savedSuccess ? (
-                      <>
-                        <Check className="h-4 w-4 text-emerald-400" />
-                        Tersimpan!
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-3.5 w-3.5" />
-                        Simpan Refleksi Hari Ini
-                      </>
-                    )}
+                    Tutup Refleksi
                   </Button>
-                </div>
-
-              </Card>
-
-            </div>
-
-            {/* ─── RIGHT COLUMN INSTAGRAM FEED GRID ─── */}
-            <div className="xl:col-span-3 space-y-4 w-full pt-4 xl:pt-0">
-              
-              {/* Header Section */}
-              <div className="flex items-center gap-2.5 border-b border-slate-200/80 pb-3">
-                <div className="h-7 w-7 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shrink-0">
-                  <Flame className="h-4 w-4 fill-amber-500" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-extrabold text-[#071A33] uppercase tracking-wider">
-                    Riwayat Refleksi
-                  </h2>
-                  <p className="text-xs text-slate-600">Refleksi Harian Anda</p>
-                </div>
-              </div>
-
-              {/* Instagram Feed Grid (2-Columns on Mobile, 3-Columns on Desktop) */}
-              {posts.length === 0 ? (
-                <div className="text-center py-10 px-4 space-y-3">
-                  <div className="h-14 w-14 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center mx-auto">
-                    <Edit3 className="h-6 w-6" />
-                  </div>
-                  <p className="text-xs font-semibold text-slate-600">Belum ada refleksi</p>
-                  <p className="text-xs text-slate-600 leading-relaxed max-w-[200px] mx-auto">
-                    Mulai tulis refleksi pertama Anda hari ini di kolom sebelah kiri.
-                  </p>
-                </div>
-              ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {posts.map((post) => (
-                  <button
-                    key={post.id}
-                    onClick={() => setSelectedPost(post)}
-                    className="aspect-square bg-white border border-slate-200/80 rounded-2xl p-2.5 flex flex-col justify-between hover:border-amber-400 hover:shadow-md transition-all text-left group relative overflow-hidden"
-                  >
-                    {/* Top: Day Tag */}
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-xs font-black text-[#071A33] leading-none">
-                        H-{post.dayNumber}
-                      </span>
-                      <span className="text-xs">
-                        {MOOD_ITEMS.find(m => m.label === post.mood)?.emoji || "😊"}
-                      </span>
-                    </div>
-
-                    {/* Middle Excerpt */}
-                    <p className="text-xs text-slate-600 italic font-serif line-clamp-2 leading-tight my-auto">
-                      &ldquo;{post.content}&rdquo;
-                    </p>
-
-                    {/* Bottom: Heart / Action */}
-                    <div className="flex items-center justify-between w-full text-xs text-slate-600 pt-1 border-t border-slate-100">
-                      <span className="flex items-center gap-0.5 text-rose-500 font-bold">
-                        <Heart className="h-2.5 w-2.5 fill-rose-500" />
-                        {post.likeCount}
-                      </span>
-                      <span className="font-extrabold text-amber-800 group-hover:underline">
-                        Lihat
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              )}
-
-            </div>
-
-          </div>
-        </div>
-
-        {/* ─── POST DETAIL MODAL (WHEN INSTAGRAM CARD IS CLICKED) ─────────── */}
-        {selectedPost && (
-          <Dialog open={!!selectedPost} onOpenChange={() => setSelectedPost(null)}>
-            <DialogContent className="sm:max-w-lg bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 space-y-4 font-sans">
-              
-              <DialogHeader className="border-b border-slate-100 pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-full bg-[#071A33] text-amber-300 font-bold text-xs flex items-center justify-center">
-                      {selectedPost.userAvatar}
-                    </div>
-                    <div>
-                      <DialogTitle className="text-sm font-black text-[#071A33]">
-                        Refleksi Hari ke-{selectedPost.dayNumber}
-                      </DialogTitle>
-                      <DialogDescription className="text-xs text-slate-600">
-                        {selectedPost.dateStr} • {selectedPost.timeStr} • 📍 {selectedPost.location}
-                      </DialogDescription>
-                    </div>
-                  </div>
-
-                  <Badge className="bg-amber-100 text-amber-900 border-amber-200 text-xs font-bold">
-                    {selectedPost.mood}
-                  </Badge>
-                </div>
-              </DialogHeader>
-
-              <div className="space-y-4 text-xs">
-                <div className="space-y-1">
-                  <span className="font-extrabold text-slate-600 uppercase tracking-wider text-xs block">
-                    Cerita Perjalanan:
-                  </span>
-                  <p className="text-slate-800 leading-relaxed font-serif italic bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    &ldquo;{selectedPost.content}&rdquo;
-                  </p>
-                </div>
-
-                {selectedPost.pelajaran && (
-                  <div className="space-y-1 bg-amber-50/60 p-3.5 rounded-2xl border border-amber-100">
-                    <span className="font-extrabold text-amber-900 text-xs flex items-center gap-1.5">
-                      <BookOpen className="h-3.5 w-3.5 text-amber-700" /> Pelajaran Hari Ini:
-                    </span>
-                    <p className="text-slate-700 italic font-serif leading-relaxed">
-                      {selectedPost.pelajaran}
-                    </p>
-                  </div>
-                )}
-
-                {selectedPost.perbaikanBesok && (
-                  <div className="space-y-1 bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100">
-                    <span className="font-extrabold text-emerald-900 text-xs flex items-center gap-1.5">
-                      <Target className="h-3.5 w-3.5 text-emerald-700" /> Rencana Perbaikan Besok:
-                    </span>
-                    <p className="text-slate-700 italic font-serif leading-relaxed">
-                      {selectedPost.perbaikanBesok}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <DialogFooter className="border-t border-slate-100 pt-3">
-                <Button
-                  onClick={() => setSelectedPost(null)}
-                  className="bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 px-6 w-full"
-                >
-                  Tutup Refleksi
-                </Button>
-              </DialogFooter>
-
-            </DialogContent>
-          </Dialog>
-        )}
-
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </ParticipantLayout>
   );

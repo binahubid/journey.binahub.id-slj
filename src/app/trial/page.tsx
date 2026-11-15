@@ -15,6 +15,7 @@ import {
   resolveParticipantTimeZone,
 } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { ParticipantPageSkeleton } from "@/components/layout/ParticipantPageSkeleton";
 import { buttonVariants } from "@/components/ui/button";
 
 export default function TrialPage() {
@@ -105,6 +106,8 @@ export default function TrialPage() {
   if (access && progress && !progress.expired) {
     return <ParticipantDashboard trialAccess={access} />;
   }
+
+  if (!access && !error) return <ParticipantPageSkeleton kind="trial" />;
 
   return (
     <ParticipantLayout

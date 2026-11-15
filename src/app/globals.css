@@ -26,6 +26,21 @@
   html:has(#participant-content) {
     scroll-padding-block: 5rem calc(6rem + env(safe-area-inset-bottom));
   }
+  .dashboard-widget-enter {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 180ms ease-out, transform 180ms ease-out;
+  }
+  @starting-style {
+    .dashboard-widget-enter {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-widget-enter { transform: none; transition: none; }
 }
 
 /* Custom Utilities for SLJ Calm & Editorial Theme */

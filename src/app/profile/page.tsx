@@ -5,6 +5,7 @@ import Link from "next/link";
 import { User, MapPin, Calendar, Building2, Layers, HeartHandshake, Mail, Shield, Briefcase, MessageCircle, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { ParticipantPageSkeleton } from "@/components/layout/ParticipantPageSkeleton";
 import { getSljAccess, getTrialProgress } from "@/lib/program-access";
 import { getProgramDay } from "@/lib/program-timeline";
 import { resolveParticipantTimeZone } from "@/lib/local-date";
@@ -254,11 +255,7 @@ export default function ProfilePage() {
   }, [supabase]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-warm-bg flex items-center justify-center font-sans">
-        <div className="animate-spin h-8 w-8 border-4 border-accent border-t-transparent rounded-full" />
-      </div>
-    );
+    return <ParticipantPageSkeleton kind="profile" />;
   }
 
   return (

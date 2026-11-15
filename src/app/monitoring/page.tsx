@@ -14,21 +14,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  CheckCircle2,
-  AlertTriangle,
   TrendingUp,
   Star,
   Target,
-  Clock,
-  Activity,
   Calendar,
   MessageSquare,
   Flame,
   Edit3,
-  Lightbulb,
   BookOpen,
-  BarChart2,
-  Users,
   Lock,
   Hourglass,
 } from "lucide-react";
@@ -36,6 +29,8 @@ import { createClient } from "@/lib/supabase/client";
 import { getSljAccess, getTrialProgress, TRIAL_DAYS, TRIAL_PROGRAM_CODE } from "@/lib/program-access";
 import { getTransformationAreaColor, normalizeTransformationArea } from "@/lib/transformation-areas";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { ParticipantPageSkeleton } from "@/components/layout/ParticipantPageSkeleton";
+import { cn } from "@/lib/utils";
 import { getActiveProgramMonth, getMonthEditState, getProgramDay, getProgramMonthWindow } from "@/lib/program-timeline";
 import Link from "next/link";
 import { calculateExecution } from "@/lib/execution";
@@ -43,7 +38,6 @@ import { calculateAreaOutcome, calculateIndicatorCoverage, calculateIndicatorOut
 import { addCalendarDays, getLocalDateString, resolveParticipantTimeZone } from "@/lib/local-date";
 
 type HabitFrequency = "daily" | "weekly" | "unsupported";
-type AreaExecutionStatus = "MEASURED" | "NOT_MEASURED" | "UNSUPPORTED";
 type ChartPoint = {
   date: string;
   programDay: number;
@@ -146,6 +140,8 @@ export default function MonitoringPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [progressView, setProgressView] = useState<"overview" | "targets" | "evaluation">("overview");
 
   const [reviews, setReviews] = useState<Record<number, MonthlyReviewItem>>({
     1: { monthNumber: 1, status: "NOT_FILLED", participantNote: "" },
@@ -172,7 +168,6 @@ export default function MonitoringPage() {
   const [heatmapData, setHeatmapData] = useState<{ date: string; count: number; level: number }[]>([]);
   const [habitConsistencyPct, setHabitConsistencyPct] = useState<number | null>(null);
   const [indicatorCoverage, setIndicatorCoverage] = useState<Record<string, number>>({});
-  const [areaExecutionStatuses, setAreaExecutionStatuses] = useState<Record<string, AreaExecutionStatus>>({});
 
   // Modal Drawer for 4-Dimension Indicator Update
   const [editingAreaModal, setEditingAreaModal] = useState<string | null>(null);
@@ -186,6 +181,8 @@ export default function MonitoringPage() {
   // ── Load Data ─────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -456,8 +453,6 @@ export default function MonitoringPage() {
 
       const execution = calculateExecution({ startDate: profileStartDate, endDate: lastDate, areas, habits: executionHabits, logs: habitLogs });
       setHabitConsistencyPct(execution.score === null ? null : Math.round(execution.score));
-      setAreaExecutionStatuses(Object.fromEntries(areas.map(area => [area,
-        execution.areas[area].score !== null ? "MEASURED" : execution.areas[area].unsupported ? "UNSUPPORTED" : "NOT_MEASURED"])));
       setTimeline(execution.timeline.map((point, index) => ({ date: point.date, scores: point.scores, programDay: index + 1 })));
 
       const heatmapDays = trial ? TRIAL_DAYS : 90;
@@ -485,7 +480,7 @@ export default function MonitoringPage() {
         details: error?.details,
         hint: error?.hint,
       });
-      setSaveError(`Data monitoring gagal dimuat${error?.message ? `: ${error.message}` : "."}`);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -530,6 +525,7 @@ export default function MonitoringPage() {
 
   const handleSelectMonth = (month: 1 | 2 | 3) => {
     setEditingAreaModal(null);
+    setSaveError(null);
     setSelectedMonth(month);
     const rev = reviews[month];
     setStatus(rev?.status === "NEED_SUPPORT" ? "NEED_SUPPORT" : "ON_TRACK");
@@ -682,8 +678,6 @@ export default function MonitoringPage() {
 
   const healthData = calculateHealthScores();
   const daysRemaining = Math.max(0, totalDays - dayCount + (isTrial ? 1 : 0));
-  const nextCheckpointMonth = getActiveProgramMonth(dayCount, periodDays, isTrial ? 2 : 3) ?? 1;
-  const daysToNextCheckpoint = Math.max(0, nextCheckpointMonth * periodDays - dayCount);
 
   // Status kunci/aktif untuk input capaian bulan yang sedang dipilih
   const monthEditState = editState(selectedMonth);
@@ -691,12 +685,8 @@ export default function MonitoringPage() {
   const finalReflectionUnlocked = dayCount >= firstReflectionDay;
 
   const visibleChartAreas = chartArea === "all" || !selectedAreas.includes(chartArea) ? selectedAreas : [chartArea];
-  const chartScaleMin = 0;
-  const chartScaleMax = 100;
-  const chartScaleRange = 100;
-  const chartY = (value: number) => 160 - ((value - chartScaleMin) / chartScaleRange) * 144;
-  const chartZeroY = chartY(0);
-  const chartAxisValues = Array.from({ length: 5 }, (_, index) => Math.round(chartScaleMax - index * (chartScaleRange / 4)));
+  const chartY = (value: number) => 160 - value * 1.44;
+  const chartAxisValues = [100, 75, 50, 25, 0];
   const displayedDays = timeframe === "7d" ? 7 : isTrial ? TRIAL_DAYS : timeframe === "1m" ? 30 : 90;
   const chartDayFormat = new Intl.DateTimeFormat("id-ID", {
     timeZone: "UTC",
@@ -707,18 +697,25 @@ export default function MonitoringPage() {
     day: chartDayFormat.format(new Date(point.date + "T12:00:00Z")),
   }));
   const hasChartData = chartData.some(point => visibleChartAreas.some(area => point.scores[area] != null));
-  const chartLabelInterval = Math.max(1, Math.ceil(chartData.length / 7));
-  const visibleChartLabels = chartData
-    .map((row, index) => ({ ...row, index }))
-    .filter(({ index }) => index === 0 || index === chartData.length - 1 || index % chartLabelInterval === 0);
+  const labelCount = Math.min(chartData.length, timeframe === "7d" ? 7 : 5);
+  const visibleChartLabels = Array.from({ length: labelCount }, (_, index) =>
+    labelCount === 1 ? 0 : Math.round(index * (chartData.length - 1) / (labelCount - 1))
+  );
+  const chartX = (index: number) => chartData.length === 1 ? 50 : index / (chartData.length - 1) * 100;
   const activeIstiqamahDays = heatmapData.filter(item => item.count > 0).length;
   const totalIstiqamahExecutions = heatmapData.reduce((total, item) => total + item.count, 0);
 
-  if (loading) {
+  if (loading) return <ParticipantPageSkeleton kind="monitoring" />;
+
+  if (loadError) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
-        <div className="animate-spin h-8 w-8 border-4 border-amber-500 border-t-transparent rounded-full" />
-      </div>
+      <ParticipantLayout activePath="/monitoring" pageTitle="Progres dan evaluasi">
+        <section className="mx-auto max-w-xl space-y-4 rounded-3xl border border-slate-200 bg-white p-6">
+          <h1 className="text-xl font-semibold">Progres belum dapat dibuka</h1>
+          <p role="alert" className="text-sm leading-6 text-slate-600">Periksa koneksi Anda, lalu coba muat ulang progres.</p>
+          <Button onClick={() => void loadData()}>Muat ulang</Button>
+        </section>
+      </ParticipantLayout>
     );
   }
 
@@ -727,272 +724,269 @@ export default function MonitoringPage() {
       <ParticipantLayout activePath="/monitoring" pageTitle="Monitoring Perjalanan SLJ">
         <div className="max-w-3xl mx-auto py-16 text-center space-y-4">
           <Target className="h-10 w-10 text-amber-700 mx-auto" />
-          <h1 className="text-xl font-black text-navy-900">PTP belum siap dimonitor</h1>
-          <p className="text-sm text-slate-600">Pilih tiga area transformasi, isi target, dan buat Action Plan terlebih dahulu.</p>
-          <Link href="/journey"><Button className="bg-navy-900 text-amber-300">Lengkapi PTP</Button></Link>
+          <h1 className="text-xl font-semibold text-navy-900">Lengkapi rencana perubahan</h1>
+          <p className="text-sm text-slate-600">
+            {isTrial ? "Tetapkan target dan kebiasaan Spiritual Growth agar progres Anda dapat dihitung." : "Tetapkan target dan kebiasaan di tiga area transformasi agar progres Anda dapat dihitung."}
+          </p>
+          <Link href="/journey">
+            <Button className="bg-navy-900 text-amber-300">Lengkapi PTP</Button>
+          </Link>
         </div>
       </ParticipantLayout>
     );
   }
 
   return (
-    <ParticipantLayout activePath="/monitoring" pageTitle="Monitoring Perjalanan SLJ">
-      {/* Full-width container with clean whitespace */}
-      <div className="w-full pt-6 pb-16 font-sans text-slate-800">
-        {saveError && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>{saveError}</span>
+    <ParticipantLayout activePath="/monitoring" pageTitle="Progres dan evaluasi">
+      <div className="mx-auto max-w-6xl space-y-6 pb-6">
+        {saveError && !editingAreaModal && (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-700"
+          >
+            {saveError}
           </div>
         )}
-        
-        {/* Two-column layout: Left Main Content (70%), Right Analytics & Guidance Sidebar (30%) */}
-        <div className="flex flex-col xl:flex-row gap-7 items-start">
-
-          {/* ─── LEFT MAIN CONTENT COLUMN ───────────────────────────────────── */}
-          <div className="flex-1 w-full space-y-7 min-w-0">
-
-            {/* ─── 1. HERO BANNER (Solid Dark Navy - No Gradient) ───────────── */}
-            <div className="bg-[#071A33] text-white p-4 sm:p-8 rounded-3xl shadow-xs">
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-                <div className="space-y-3 w-full max-w-xl min-w-0 lg:flex-1">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="text-amber-300 font-bold flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Hari ke-{Math.min(totalDays, dayCount)} dari {totalDays} Hari
-                    </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-slate-300">
-                      Evaluasi {periodLabel} Ke-{selectedMonth}
-                    </span>
-                  </div>
-
-                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white truncate">
-                    Progres dan evaluasi
-                  </h1>
-
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                    {isTrial
-                      ? "Pantau kebiasaan Spiritual Growth dan nilai kemajuan Anda dalam dua pekan."
-                      : "Pantau kebiasaan dan kemajuan menuju target perubahan selama 90 hari."}
-                  </p>
-
-                  {/* Progress Bar */}
-                  <div className="pt-2 space-y-1.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span className="text-slate-300 font-medium">
-                        Capaian target {periodLabel.toLowerCase()} {selectedMonth}
-                      </span>
-                      <span className="font-extrabold text-amber-300">
-                        {healthData.overall === null ? "Belum Ada Data" : `${healthData.overall}%`}
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-amber-400 rounded-full transition-all duration-700"
-                        style={{ width: `${healthData.overall === null ? 0 : healthData.overall}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Card: Next Checkpoint Widget (Solid Fill) */}
-                <div className="bg-white/10 p-4 rounded-2xl shrink-0 w-full lg:w-64 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Target Evaluasi</span>
-                    <Clock className="h-4 w-4 text-amber-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-extrabold text-white">{isTrial ? "Evaluasi pekan" : "Checkpoint Bulan"} {nextCheckpointMonth}</p>
-                    <p className="text-xs text-amber-300 font-mono font-bold mt-0.5">
-                      {daysToNextCheckpoint > 0 ? `${daysToNextCheckpoint} hari lagi` : "Saatnya Evaluasi!"}
-                    </p>
-                  </div>
-                  <div className="border-t border-white/10 pt-2 flex justify-between text-xs text-slate-300">
-                    <span>Sisa Perjalanan</span>
-                    <span className="font-bold text-white">{daysRemaining} Hari</span>
-                  </div>
-                  {isTrial && (
-                    <Link href="/trial/result" className="inline-flex min-h-11 items-center text-xs font-semibold text-white underline underline-offset-4">
-                      Lihat ringkasan 14 hari
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ─── 2. JOURNEY HEALTH SCORES (Border-free, Left Accent Line) ──── */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  Journey Health Scores — {periodLabel} {selectedMonth}
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {selectedAreas.map(area => {
-                  const score = healthData.areas[area] ?? null;
-                  const color = getTransformationAreaColor(area);
-                  const rep = areaReports[selectedMonth]?.[area];
-                  const hasFilledData = Boolean(rep?.isSaved);
-
-                  return (
-                    <div
-                      key={area}
-                      className="bg-white rounded-2xl p-4 shadow-2xs space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold truncate max-w-[140px]" style={{ color: "#0F1E3D" }}>{area}</span>
-                      </div>
-                          <div className="flex items-baseline justify-between">
-                        <span className="text-2xl font-black" style={{ color: "#0F1E3D" }}>
-                          {score === null ? "--" : `${score}%`}
-                        </span>
-
-                        {/* Badge: bedakan skor awal (dari baseline, belum ada laporan periode ini) vs capaian nyata */}
-                        {score === null ? (
-                          <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Belum Ada Data
-                          </span>
-                        ) : score >= 80 ? (
-                          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                            Sangat Baik
-                          </span>
-                        ) : score >= 50 ? (
-                          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
-                            Cukup Baik
-                          </span>
-                        ) : (
-                          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Perlu Fokus
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs font-semibold text-slate-600">Pelaksanaan kebiasaan: {
-                        areaExecutionStatuses[area] === "UNSUPPORTED"
-                          ? "Tidak Dapat Dihitung"
-                          : areaExecutionStatuses[area] === "MEASURED"
-                          ? "Diukur sesuai jadwal"
-                          : "Tidak Diukur"
-                      }</p>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${score ?? 0}%`, backgroundColor: color }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Real Calculated Konsistensi kebiasaan Card */}
-                <div className="bg-white rounded-2xl p-4 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-700">Konsistensi kebiasaan</span>
-                    <Flame className="h-4 w-4 text-amber-500" />
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-black text-amber-700">
-                      {habitConsistencyPct === null ? "Belum terukur" : `${habitConsistencyPct}%`}
-                    </span>
-                    <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                      {habitConsistencyPct === null ? "Belum ada jadwal" : habitConsistencyPct >= 75 ? "Konsisten" : "Berjalan"}
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${(habitConsistencyPct ?? 0)}%` }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ─── 3. PROGRESS ANALYTICS & 90-DAY GRID ─────────────────────────── */}
-            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
-
-              {/* Dynamic Multi-Timeframe Chart (2 cols) */}
-              <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2">
-                <div className="space-y-4 border-b border-slate-100 px-5 py-4">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="space-y-5 rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+            <span>
+              Hari ke-{Math.min(totalDays, dayCount)} dari {totalDays}
+            </span>
+            <span className="tabular-nums">{daysRemaining} hari tersisa</span>
+          </div>
+          <div>
+            <h1 className="text-balance text-2xl font-semibold text-navy-900 sm:text-3xl">
+              Progres dan evaluasi
+            </h1>
+            <p className="mt-2 max-w-2xl text-pretty text-sm leading-6 text-slate-600">
+              {isTrial
+                ? "Lihat perkembangan latihan Spiritual Growth Anda selama 14 hari."
+                : "Lihat kebiasaan yang Anda jalankan dan kemajuan menuju target perubahan Anda."}
+            </p>
+          </div>
+          <div
+            role="group"
+            aria-label="Periode evaluasi"
+            className="flex flex-wrap gap-2 border-t border-slate-100 pt-4"
+          >
+            {((isTrial ? [1, 2] : [1, 2, 3]) as (1 | 2 | 3)[]).map((period) => (
+              <Button
+                key={period}
+                type="button"
+                variant="ghost"
+                aria-pressed={selectedMonth === period}
+                onClick={() => handleSelectMonth(period)}
+                className={cn(
+                  "min-h-11 rounded-xl px-4 text-sm",
+                  selectedMonth === period
+                    ? "bg-navy-900 text-white hover:bg-navy-900 hover:text-white"
+                    : "bg-slate-50 text-slate-600",
+                )}
+              >
+                {periodLabel} {period}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs leading-5 text-slate-500">
+            {monthEditState === "ACTIVE"
+              ? "Anda dapat mengisi dan memperbarui evaluasi periode ini sampai hari ke-" +
+                monthGraceEndDay +
+                "."
+              : monthEditState === "LOCKED_FUTURE"
+                ? "Pengisian periode ini dibuka pada hari ke-" + monthStartDay + "."
+                : "Periode ini sudah selesai dan dapat Anda baca kembali."}
+          </p>
+        </header>
+        <div className="grid grid-cols-2 gap-3">
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
+            <h2 className="text-sm font-medium text-navy-900">Capaian target</h2>
+            <p className="mt-3 text-3xl font-semibold tabular-nums text-navy-900">
+              {healthData.overall === null ? "—" : healthData.overall + "%"}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {healthData.overall === null
+                ? "Isi nilai aktual pada tab Capaian untuk melihat hasil."
+                : "Kemajuan menuju target pada " +
+                  periodLabel.toLowerCase() +
+                  " " +
+                  selectedMonth +
+                  "."}
+            </p>
+          </section>
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
+            <h2 className="text-sm font-medium text-navy-900">Pelaksanaan habit</h2>
+            <p className="mt-3 text-3xl font-semibold tabular-nums text-navy-900">
+              {habitConsistencyPct === null ? "—" : habitConsistencyPct + "%"}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {habitConsistencyPct === null
+                ? "Belum ada jadwal habit yang dapat dihitung."
+                : "Kebiasaan yang terlaksana sesuai jadwal sejak awal program."}
+            </p>
+          </section>
+        </div>
+        <div
+          role="group"
+          aria-label="Tampilan progres"
+          className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1"
+        >
+          {(
+            [
+              { id: "overview", label: "Ringkasan" },
+              { id: "targets", label: "Capaian" },
+              { id: "evaluation", label: "Evaluasi" },
+            ] as const
+          ).map((item) => (
+            <Button
+              type="button"
+              key={item.id}
+              variant="ghost"
+              aria-pressed={progressView === item.id}
+              aria-controls={"progress-" + item.id}
+              onClick={() => setProgressView(item.id)}
+              className={cn(
+                "min-h-11 rounded-xl px-2 text-xs sm:text-sm",
+                progressView === item.id ? "bg-white text-navy-900 shadow-sm" : "text-slate-600",
+              )}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+        <section
+          id="progress-overview"
+          aria-label="Ringkasan progres"
+          className={cn("space-y-6", progressView !== "overview" && "hidden")}
+        >
+          <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
+            {/* Dynamic Multi-Timeframe Chart (2 cols) */}
+            <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2">
+              <div className="space-y-4 border-b border-slate-100 px-5 py-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
                       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
                         <TrendingUp className="h-3.5 w-3.5" />
                       </span>
-                       Konsistensi pelaksanaan
+                      Konsistensi pelaksanaan
                     </h3>
-                    <p className="ml-10 mt-0.5 text-xs leading-relaxed text-slate-600">Persentase kebiasaan yang terlaksana sejak awal program, sesuai jadwalnya. Setiap kebiasaan dan area terukur memiliki bobot yang sama.</p>
+                    <p className="ml-10 mt-0.5 text-xs leading-relaxed text-slate-600">
+                      Persentase habit yang terlaksana sesuai jadwal, dihitung sejak awal program.
+                    </p>
                   </div>
-
                   {/* Timeframe Filter Toggle */}
                   <div className="flex shrink-0 items-center gap-0.5 self-start rounded-lg border border-slate-200 bg-slate-50 p-0.5 sm:self-auto">
-                    {((isTrial ? ["7d", "1m"] : ["7d", "1m", "3m"]) as ("7d" | "1m" | "3m")[]).map(tf => (
-                      <button
-                        key={tf}
-                        type="button"
-                        onClick={() => setTimeframe(tf)}
-                        aria-pressed={timeframe === tf}
-                        className={`rounded-md px-2.5 py-1.5 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 ${
-                          timeframe === tf ? "bg-white text-navy-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]" : "text-slate-600 hover:text-slate-700"
-                        }`}
-                      >
-                        {tf === "7d" ? "7 Hari" : tf === "1m" ? isTrial ? "14 Hari" : "1 Bulan" : "3 Bulan"}
-                      </button>
-                    ))}
-                  </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5" aria-label="Filter area transformasi">
-                    <button type="button" onClick={() => setChartArea("all")} className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${chartArea === "all" ? "bg-navy-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Semua area</button>
-                    {selectedAreas.map(area => (
-                      <button key={area} type="button" onClick={() => setChartArea(area)} className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${chartArea === area ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`} style={chartArea === area ? { backgroundColor: getTransformationAreaColor(area) } : undefined}>{area}</button>
-                    ))}
+                    {((isTrial ? ["7d", "1m"] : ["7d", "1m", "3m"]) as ("7d" | "1m" | "3m")[]).map(
+                      (tf) => (
+                        <button
+                          key={tf}
+                          type="button"
+                          onClick={() => setTimeframe(tf)}
+                          aria-pressed={timeframe === tf}
+                          className={`min-h-11 rounded-md px-3 py-1.5 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 ${
+                            timeframe === tf
+                              ? "bg-white text-navy-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                              : "text-slate-600 hover:text-slate-700"
+                          }`}
+                        >
+                          {tf === "7d"
+                            ? "7 Hari"
+                            : tf === "1m"
+                              ? isTrial
+                                ? "14 Hari"
+                                : "1 Bulan"
+                              : "3 Bulan"}
+                        </button>
+                      ),
+                    )}
                   </div>
                 </div>
-
-                {/* Line Chart Render */}
-                {selectedAreas.length === 0 ? (
-                  <div className="space-y-2 px-5 py-16 text-center">
-                    <p className="text-xs text-slate-600">Belum ada area dipilih di PTP.</p>
-                    <Link href="/journey">
-                      <Button variant="outline" className="text-xs font-bold rounded-xl border-amber-400">Lengkapi PTP</Button>
-                    </Link>
-                  </div>
-                ) : !hasChartData ? (
-                  <div className="px-5 py-16 text-center text-sm text-slate-600">Belum ada jadwal kebiasaan yang dapat dihitung pada rentang ini.</div>
-                ) : (
-                  <div className="px-3 pb-2 pt-5 sm:px-5">
-                    <div className="relative h-[220px] w-full px-2 pb-7 pt-2 sm:h-[250px]">
-                    <svg className="h-full w-full overflow-visible" viewBox="0 0 720 180" preserveAspectRatio="none" role="img" aria-label="Grafik progres Action Plan per area transformasi">
-                      {chartAxisValues.map((value, step) => {
-                        const y = 16 + step * 36;
-                        return (
-                          <g key={`${value}-${step}`}>
-                            <line x1="42" y1={y} x2="708" y2={y} stroke="#E2E8F0" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                            <text x="34" y={y + 3} fill="#94A3B8" fontSize="8" fontWeight="600" textAnchor="end">{value}</text>
-                          </g>
-                        );
-                      })}
-                      <line x1="42" y1="16" x2="42" y2="160" stroke="#CBD5E1" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                      <line x1="42" y1={chartZeroY} x2="708" y2={chartZeroY} stroke="#94A3B8" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
+                <div
+                  role="group"
+                  className="flex flex-wrap gap-1.5"
+                  aria-label="Filter area transformasi"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={chartArea === "all"}
+                    onClick={() => setChartArea("all")}
+                    className={`min-h-11 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${chartArea === "all" ? "bg-navy-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  >
+                    Semua area
+                  </button>
+                  {selectedAreas.map((area) => (
+                    <button
+                      key={area}
+                      type="button"
+                      aria-pressed={chartArea === area}
+                      onClick={() => setChartArea(area)}
+                      className={`min-h-11 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${chartArea === area ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                      style={chartArea === area ? { backgroundColor: "#0F1E3D" } : undefined}
+                    >
+                      {area}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Line Chart Render */}
+              {selectedAreas.length === 0 ? (
+                <div className="space-y-2 px-5 py-16 text-center">
+                  <p className="text-xs text-slate-600">Belum ada area dipilih di PTP.</p>
+                  <Link href="/journey">
+                    <Button variant="outline" className="text-xs font-bold rounded-xl border-amber-400">
+                      Lengkapi PTP
+                    </Button>
+                  </Link>
+                </div>
+              ) : !hasChartData ? (
+                <div className="px-5 py-16 text-center text-sm text-slate-600">
+                  Belum ada jadwal kebiasaan yang dapat dihitung pada rentang ini.
+                </div>
+              ) : (
+                <div className="px-5 pb-4 pt-3 sm:px-6">
+                  <div className="relative ml-10 mr-3 h-44 sm:h-52">
+                    <svg
+                      className="absolute inset-0 h-full w-full overflow-visible"
+                      viewBox="0 0 720 180"
+                      preserveAspectRatio="none"
+                      role="img"
+                      aria-label="Grafik persentase pelaksanaan habit per area"
+                    >
+                      {chartAxisValues.map((value) => (
+                        <line
+                          key={value}
+                          x1="0"
+                          y1={chartY(value)}
+                          x2="720"
+                          y2={chartY(value)}
+                          stroke={value === 0 ? "#CBD5E1" : "#E2E8F0"}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      ))}
                       {visibleChartAreas.map((area) => {
-                        const pts = chartData.map((row, i) => {
+                        const points = chartData.map((row, index) => {
                           const score = row.scores[area];
-                          return score === null || score === undefined ? null : {
-                            x: chartData.length === 1 ? 375 : 42 + i * (666 / (chartData.length - 1)),
-                            y: chartY(score),
-                            score,
-                            index: i,
-                          };
+                          return score == null
+                            ? null
+                            : { x: chartX(index) * 7.2, y: chartY(score), score, index };
                         });
-                        const d = pts.reduce((path, point, index) => {
-                          if (!point) return path;
-                          return `${path}${!pts[index - 1] ? "M" : "L"} ${point.x} ${point.y} `;
-                        }, "");
+                        const path = points.reduce(
+                          (result, point, index) =>
+                            point
+                              ? result +
+                                (!points[index - 1] ? "M" : "L") +
+                                point.x +
+                                " " +
+                                point.y +
+                                " "
+                              : result,
+                          "",
+                        );
                         const color = getTransformationAreaColor(area);
                         return (
                           <g key={area}>
                             <path
-                              d={d}
+                              d={path}
                               fill="none"
                               stroke={color}
                               strokeWidth={2}
@@ -1000,521 +994,675 @@ export default function MonitoringPage() {
                               strokeLinejoin="round"
                               vectorEffect="non-scaling-stroke"
                             />
-                            {pts.map(point => point && (
-                              <circle key={point.index} cx={point.x} cy={point.y} r={2.5} fill="white" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke">
-                                <title>{`${area} · Hari ${chartData[point.index].programDay} · ${chartData[point.index].day}: ${Math.round(point.score)}% pelaksanaan`}</title>
-                              </circle>
-                            ))}
+                            {points.map(
+                              (point) =>
+                                point && (
+                                  <circle
+                                    key={point.index}
+                                    cx={point.x}
+                                    cy={point.y}
+                                    r={2.5}
+                                    fill="white"
+                                    stroke={color}
+                                    strokeWidth={1.5}
+                                    vectorEffect="non-scaling-stroke"
+                                  >
+                                    <title>
+                                      {area} · Hari {chartData[point.index].programDay} ·{" "}
+                                      {Math.round(point.score)}%
+                                    </title>
+                                  </circle>
+                                ),
+                            )}
                           </g>
                         );
                       })}
                     </svg>
-                    <div className="absolute inset-x-10 bottom-2 h-3 text-[9px] font-semibold tabular-nums text-slate-600">
-                      {visibleChartLabels.map((row) => (
-                        <span
-                          key={`${row.day}-${row.index}`}
-                          className="absolute -translate-x-1/2 whitespace-nowrap"
-                          style={{ left: `${chartData.length === 1 ? 50 : (row.index / (chartData.length - 1)) * 100}%` }}
-                        >
-                          {row.day}
-                        </span>
-                      ))}
-                    </div>
-                    </div>
+                    {chartAxisValues.map((value) => (
+                      <span
+                        key={value}
+                        aria-hidden="true"
+                        className="absolute right-full mr-2 -translate-y-1/2 whitespace-nowrap text-xs tabular-nums text-slate-500"
+                        style={{ top: (chartY(value) / 180) * 100 + "%" }}
+                      >
+                        {value}%
+                      </span>
+                    ))}
                   </div>
-                )}
-
-                {/* Legend */}
-                <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
-                  {visibleChartAreas.map(area => (
-                    <div key={area} className="flex items-center gap-2 text-xs text-slate-600">
-                      <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: getTransformationAreaColor(area), boxShadow: `0 0 0 1px ${getTransformationAreaColor(area)}33` }} />
-                      <span className="font-bold">{area}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* 90-Day Grid Heatmap */}
-              <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                <div className="border-b border-slate-100 px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-                          <Flame className="h-4 w-4" />
-                        </span>
-                        Grid Istiqamah {totalDays} Hari
-                      </h3>
-                      <p className="ml-10 mt-0.5 text-xs leading-relaxed text-slate-600">
-                        Aktivitas Action Plan pada setiap tanggal
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="block text-xl font-black leading-none tabular-nums text-navy-900">{activeIstiqamahDays}</span>
-                      <span className="mt-1 block text-xs font-semibold text-slate-600">hari aktif</span>
-                    </div>
+                  <div className="relative ml-10 mr-3 h-5 text-xs tabular-nums text-slate-600">
+                    {visibleChartLabels.map((index) => (
+                      <span
+                        key={index}
+                        className="absolute -translate-x-1/2 whitespace-nowrap"
+                        style={{ left: chartX(index) + "%" }}
+                      >
+                        {chartData[index].day}
+                      </span>
+                    ))}
                   </div>
                 </div>
-
-                <div className="space-y-4 px-5 pb-4 pt-4">
+              )}
+              {/* Legend */}
+              <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+                {visibleChartAreas.map((area) => (
+                  <div key={area} className="flex items-center gap-2 text-xs text-slate-600">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white"
+                      style={{
+                        backgroundColor: getTransformationAreaColor(area),
+                        boxShadow: `0 0 0 1px ${getTransformationAreaColor(area)}33`,
+                      }}
+                    />
+                    <span className="font-bold">{area}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            {/* 90-Day Grid Heatmap */}
+            <section className="h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="mb-3 flex justify-end">
-                      <span className="text-right text-xs font-semibold tabular-nums text-slate-600">{totalIstiqamahExecutions} total eksekusi</span>
-                    </div>
-
-                    <div className="grid grid-flow-col grid-rows-7 grid-cols-[repeat(13,minmax(0,1fr))] gap-1.5" role="img" aria-label={`Grid istiqamah 90 hari, ${activeIstiqamahDays} hari aktif`}>
-                      {heatmapData.map((item) => (
-                        <span
-                          key={item.date}
-                          title={`${item.date}: ${item.count} eksekusi Action Plan`}
-                          aria-hidden="true"
-                          className={`aspect-square w-full rounded-[3px] border transition-transform duration-200 hover:relative hover:z-10 hover:scale-125 ${
-                            item.level === 4 ? "border-emerald-800 bg-emerald-700"
-                            : item.level === 3 ? "border-emerald-700 bg-emerald-600"
-                            : item.level === 2 ? "border-emerald-600 bg-emerald-500"
-                            : item.level === 1 ? "border-emerald-300 bg-emerald-200"
-                            : "border-slate-200 bg-slate-100"
-                          }`}
-                        />
-                      ))}
-                    </div>
+                    <h3 className="flex items-center gap-2 text-sm font-extrabold text-navy-900">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                        <Flame className="h-4 w-4" />
+                      </span>
+                      Kalender habit
+                    </h3>
+                    <p className="ml-10 mt-0.5 text-xs leading-relaxed text-slate-600">
+                      Catatan pelaksanaan dari hari ke hari
+                    </p>
                   </div>
-
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-medium text-slate-600">
-                    <span>Belum aktif</span>
-                    <div className="flex items-center gap-1" aria-label="Intensitas istiqamah dari rendah ke tinggi">
-                      <span className="mr-1">Rendah</span>
-                      <span className="h-3 w-3 rounded-[3px] border border-slate-200 bg-slate-100" />
-                      <span className="h-3 w-3 rounded-[3px] border border-emerald-300 bg-emerald-200" title="1-3 eksekusi" />
-                      <span className="h-3 w-3 rounded-[3px] border border-emerald-600 bg-emerald-500" title="4-6 eksekusi" />
-                      <span className="h-3 w-3 rounded-[3px] border border-emerald-700 bg-emerald-600" title="7-10 eksekusi" />
-                      <span className="h-3 w-3 rounded-[3px] border border-emerald-800 bg-emerald-700" title=">10 eksekusi" />
-                      <span className="ml-1">Tinggi</span>
-                    </div>
+                  <div className="shrink-0 text-right">
+                    <span className="block text-xl font-black leading-none tabular-nums text-navy-900">
+                      {activeIstiqamahDays}
+                    </span>
+                    <span className="mt-1 block text-xs font-semibold text-slate-600">hari aktif</span>
                   </div>
                 </div>
-              </section>
-
-            </div>
-
-            {/* ─── 4. 3 AREA TRANSFORMATION CARDS (Border-free) ──────────────── */}
-            <div>
-              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              </div>
+              <div className="space-y-4 px-5 pb-4 pt-4">
                 <div>
-                  <h2 className="text-xs font-bold text-slate-600 uppercase tracking-wider truncate">
-                    {isTrial ? "Capaian Spiritual Growth" : "Area Transformasi & Pelaporan Bulanan"}
-                  </h2>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                    {monthEditState === "ACTIVE"
-                      ? `Pelaporan ${periodLabel} Ke-${selectedMonth} dapat diisi atau diedit sampai Hari ke-${monthGraceEndDay}.`
-                      : monthEditState === "LOCKED_FUTURE"
-                      ? `Pelaporan ${periodLabel} Ke-${selectedMonth} baru aktif mulai Hari ke-${monthStartDay}.`
-                      : `Pelaporan ${periodLabel} Ke-${selectedMonth} telah terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
+                  <div className="mb-3 flex justify-end">
+                    <span className="text-right text-xs font-semibold tabular-nums text-slate-600">
+                      {totalIstiqamahExecutions} kebiasaan tercatat
+                    </span>
+                  </div>
+                  <div
+                    className="grid grid-flow-col grid-rows-7 grid-cols-[repeat(13,minmax(0,1fr))] gap-1.5"
+                    role="img"
+                    aria-label={`Kalender habit ${totalDays} hari, ${activeIstiqamahDays} hari aktif`}
+                  >
+                    {heatmapData.map((item) => (
+                      <span
+                        key={item.date}
+                        title={`${item.date}: ${item.count} eksekusi Action Plan`}
+                        aria-hidden="true"
+                        className={`aspect-square w-full rounded-[3px] border transition-transform duration-200 hover:relative hover:z-10 hover:scale-125 ${
+                          item.level === 4
+                            ? "border-emerald-800 bg-emerald-700"
+                            : item.level === 3
+                              ? "border-emerald-700 bg-emerald-600"
+                              : item.level === 2
+                                ? "border-emerald-600 bg-emerald-500"
+                                : item.level === 1
+                                  ? "border-emerald-300 bg-emerald-200"
+                                  : "border-slate-200 bg-slate-100"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-medium text-slate-600">
+                  <span>Belum aktif</span>
+                  <div
+                    className="flex items-center gap-1"
+                    aria-label="Intensitas istiqamah dari rendah ke tinggi"
+                  >
+                    <span className="mr-1">Rendah</span>
+                    <span className="h-3 w-3 rounded-[3px] border border-slate-200 bg-slate-100" />
+                    <span
+                      className="h-3 w-3 rounded-[3px] border border-emerald-300 bg-emerald-200"
+                      title="1-3 eksekusi"
+                    />
+                    <span
+                      className="h-3 w-3 rounded-[3px] border border-emerald-600 bg-emerald-500"
+                      title="4-6 eksekusi"
+                    />
+                    <span
+                      className="h-3 w-3 rounded-[3px] border border-emerald-700 bg-emerald-600"
+                      title="7-10 eksekusi"
+                    />
+                    <span
+                      className="h-3 w-3 rounded-[3px] border border-emerald-800 bg-emerald-700"
+                      title=">10 eksekusi"
+                    />
+                    <span className="ml-1">Tinggi</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+          <section className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6">
+            <h2 className="text-base font-semibold text-navy-900">
+              {healthData.highestArea ? "Membaca perkembangan Anda" : "Mulai dari target Anda"}
+            </h2>
+            {healthData.highestArea ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl bg-blue-50 p-4">
+                  <p className="text-xs text-slate-600">Capaian tertinggi</p>
+                  <p className="mt-2 font-semibold text-navy-900">{healthData.highestArea}</p>
+                  <p className="mt-1 text-sm tabular-nums text-navy-900">
+                    {healthData.areas[healthData.highestArea]}% dari target
                   </p>
                 </div>
-                <span className={`inline-flex w-fit items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${
+                {healthData.lowestArea && healthData.lowestArea !== healthData.highestArea && (
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs text-slate-600">Perlu perhatian lebih</p>
+                    <p className="mt-2 font-semibold text-navy-900">{healthData.lowestArea}</p>
+                    <p className="mt-1 text-sm tabular-nums text-navy-900">
+                      {healthData.areas[healthData.lowestArea]}% dari target
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="max-w-xl text-sm leading-6 text-slate-600">
+                Catat nilai aktual pada indikator pilihan Anda untuk melihat kemajuan. Hasil yang belum
+                diisi akan ditampilkan dengan tanda “—”.
+              </p>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 rounded-xl"
+              onClick={() => {
+                setProgressView("targets");
+                requestAnimationFrame(() =>
+                  document
+                    .getElementById("progress-targets")
+                    ?.scrollIntoView({ block: "start", behavior: "instant" }),
+                );
+              }}
+            >
+              {monthEditState === "ACTIVE" ? "Isi" : "Lihat"} capaian {periodLabel.toLowerCase()}{" "}
+              {selectedMonth}
+            </Button>
+          </section>
+        </section>
+        <section
+          id="progress-targets"
+          aria-label="Capaian target"
+          className={cn("space-y-6", progressView !== "targets" && "hidden")}
+        >
+          <div>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-navy-900">
+                  {isTrial ? "Capaian Spiritual Growth" : "Capaian per area"}
+                </h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  {monthEditState === "ACTIVE"
+                    ? `Pelaporan ${periodLabel} Ke-${selectedMonth} dapat diisi atau diedit sampai Hari ke-${monthGraceEndDay}.`
+                    : monthEditState === "LOCKED_FUTURE"
+                      ? `Pelaporan ${periodLabel} Ke-${selectedMonth} baru aktif mulai Hari ke-${monthStartDay}.`
+                      : `Pelaporan ${periodLabel} Ke-${selectedMonth} telah terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
+                </p>
+              </div>
+              <span
+                className={`inline-flex w-fit items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${
                   monthEditState === "ACTIVE"
                     ? "bg-emerald-50 text-emerald-700"
                     : "bg-slate-200 text-slate-600"
-                }`}>
-                  {monthEditState === "ACTIVE" ? <Edit3 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                  {monthEditState === "ACTIVE"
-                    ? `${periodLabel} ${selectedMonth} · Dapat diedit`
-                    : monthEditState === "LOCKED_FUTURE"
+                }`}
+              >
+                {monthEditState === "ACTIVE" ? (
+                  <Edit3 className="h-3 w-3" />
+                ) : (
+                  <Lock className="h-3 w-3" />
+                )}
+                {monthEditState === "ACTIVE"
+                  ? `${periodLabel} ${selectedMonth} · Dapat diedit`
+                  : monthEditState === "LOCKED_FUTURE"
                     ? `${periodLabel} ${selectedMonth} · Belum aktif`
                     : `${periodLabel} ${selectedMonth} · Terkunci`}
-                </span>
+              </span>
+            </div>
+            {selectedAreas.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl text-center space-y-3">
+                <Target className="h-10 w-10 text-slate-300 mx-auto" />
+                <p className="text-sm text-slate-600">
+                  Lengkapi PTP Anda untuk memilih area transformasi.
+                </p>
+                <Link href="/journey">
+                  <Button variant="outline" className="text-xs font-bold rounded-xl border-amber-400">
+                    Ke Halaman PTP
+                  </Button>
+                </Link>
               </div>
-
-              {selectedAreas.length === 0 ? (
-                <div className="bg-white p-8 rounded-2xl text-center space-y-3">
-                  <Target className="h-10 w-10 text-slate-300 mx-auto" />
-                  <p className="text-sm text-slate-600">Lengkapi PTP Anda untuk memilih area transformasi.</p>
-                  <Link href="/journey">
-                    <Button variant="outline" className="text-xs font-bold rounded-xl border-amber-400">Ke Halaman PTP</Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {selectedAreas.map(area => {
-                    const rep = areaReports[selectedMonth]?.[area];
-                    const score = rep ? calcAreaScore(rep) : null;
-                    const color = getTransformationAreaColor(area);
-                    const hasFilledData = Boolean(rep?.isSaved);
-
-                    return (
-                      <div
-                        key={area}
-                        className={`relative flex flex-col justify-between space-y-4 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5 ${
-                          monthEditState === "ACTIVE"
-                            ? "border-slate-200/80 bg-white"
-                            : "border-slate-200 bg-slate-50/70"
-                        }`}
-                      >
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 min-w-0 gap-2">
-                            <span className={`text-xs font-extrabold min-w-0 truncate ${monthEditState === "ACTIVE" ? "text-navy-900" : "text-slate-600"}`}>{area}</span>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {selectedAreas.map((area) => {
+                  const rep = areaReports[selectedMonth]?.[area];
+                  const score = rep ? calcAreaScore(rep) : null;
+                  const color = getTransformationAreaColor(area);
+                  const hasFilledData = Boolean(rep?.isSaved);
+                  return (
+                    <div
+                      key={area}
+                      className={`relative flex flex-col justify-between space-y-4 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5 ${
+                        monthEditState === "ACTIVE"
+                          ? "border-slate-200/80 bg-white"
+                          : "border-slate-200 bg-slate-50/70"
+                      }`}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 min-w-0 gap-2">
+                          <span
+                            className={`text-xs font-extrabold min-w-0 truncate ${monthEditState === "ACTIVE" ? "text-navy-900" : "text-slate-600"}`}
+                          >
+                            {area}
+                          </span>
+                          <span
+                            className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${
                               score === null
                                 ? "bg-slate-100 text-slate-600"
-                                : score >= 80 ? "bg-emerald-50 text-emerald-700"
-                                : score >= 50 ? "bg-amber-50 text-amber-700"
-                                : "bg-slate-100 text-slate-600"
-                            }`}>
-                              {score === null ? (rep?.indicators?.length ? "Belum Ada Data" : "Definisi Perlu Diperbaiki") : `${score}% Capaian`}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600"><p>Coverage struktur: {indicatorCoverage[area] || 0}%</p><p>Coverage pengukuran: {getMeasurementCoverage(rep)}%</p></div>
-
-                          {rep?.targets?.mainTarget && (
-                            <p className="text-xs text-slate-600 line-clamp-2 italic">
-                              &ldquo;{rep.targets.mainTarget}&rdquo;
-                            </p>
-                          )}
-
-                          {/* 4 Dimensi — hanya tampil jika targetnya memang diisi user di PTP */}
-                          {(rep?.targets?.kualitas || rep?.targets?.kuantitas || rep?.targets?.waktu || rep?.targets?.biaya) ? (
-                            <div className="space-y-1.5 pt-1 text-xs">
-                              {rep?.targets?.kualitas && (
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                  <span className="text-slate-600">Rating Target PTP</span>
-                                  <span className="font-bold text-amber-700">{rep.targets.kualitas}</span>
-                                </div>
-                              )}
-                              {rep?.targets?.kuantitas && (
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                  <span className="text-slate-600">Realisasi Kuantitas</span>
-                                  <span className="font-bold text-navy-900">{rep?.kuantitasActual || "Belum Diisi"}</span>
-                                </div>
-                              )}
-                              {rep?.targets?.waktu && (
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                  <span className="text-slate-600">Waktu Tepat Hari</span>
-                                  <span className="font-bold text-navy-900">{rep?.waktuActualDays ? `${rep.waktuActualDays}/${isTrial ? TRIAL_DAYS : 30} hari` : "Belum Diisi"}</span>
-                                </div>
-                              )}
-                              {rep?.targets?.biaya && (
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                  <span className="text-slate-600">Biaya / Anggaran</span>
-                                  <span className="font-bold text-emerald-700">{rep?.biayaActual ? `Rp ${rep.biayaActual}` : "Belum Diisi"}</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : rep?.indicators?.length ? null : (
-                            <div className="pt-1 space-y-1">
+                                : score >= 80
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : score >= 50
+                                    ? "bg-amber-50 text-amber-700"
+                                    : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {score === null
+                              ? rep?.indicators?.length
+                                ? "Belum Ada Data"
+                                : "Definisi Perlu Diperbaiki"
+                              : `${score}% Capaian`}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
+                          <p>Indikator ditetapkan: {indicatorCoverage[area] || 0}%</p>
+                          <p>Indikator diukur: {getMeasurementCoverage(rep)}%</p>
+                        </div>
+                        {rep?.targets?.mainTarget && (
+                          <p className="text-xs text-slate-600 line-clamp-2 italic">
+                            &ldquo;{rep.targets.mainTarget}&rdquo;
+                          </p>
+                        )}
+                        {/* 4 Dimensi — hanya tampil jika targetnya memang diisi user di PTP */}
+                        {rep?.targets?.kualitas ||
+                        rep?.targets?.kuantitas ||
+                        rep?.targets?.waktu ||
+                        rep?.targets?.biaya ? (
+                          <div className="space-y-1.5 pt-1 text-xs">
+                            {rep?.targets?.kualitas && (
                               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                <span className="text-slate-600">Rating Evaluasi Mandiri</span>
-                                <span className="font-bold text-amber-700 flex items-center gap-1">
-                                  {rep?.kualitasRating ? <>{rep.kualitasRating}/5 <Star className="h-3 w-3 fill-amber-400 text-amber-400" /></> : "Belum Diisi"}
+                                <span className="text-slate-600">Rating Target PTP</span>
+                                <span className="font-bold text-amber-700">{rep.targets.kualitas}</span>
+                              </div>
+                            )}
+                            {rep?.targets?.kuantitas && (
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <span className="text-slate-600">Realisasi Kuantitas</span>
+                                <span className="font-bold text-navy-900">
+                                  {rep?.kuantitasActual || "Belum Diisi"}
                                 </span>
                               </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {monthEditState === "ACTIVE" ? (
-                          <Button
-                            onClick={() => setEditingAreaModal(area)}
-                            className="w-full bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl h-9 flex items-center justify-center gap-2 mt-2"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                            {isTrial ? "Isi capaian pekan" : "Input Capaian Bulanan"}
-                          </Button>
-                        ) : (
-                          <Button
-                            disabled
-                            title={
-                              monthEditState === "LOCKED_FUTURE"
-                                ? `Aktif mulai Hari ke-${monthStartDay}`
-                                : `Terkunci sejak Hari ke-${monthGraceEndDay + 1}${isTrial ? "" : " (lewat masa tenggang 7 hari)"}`
-                            }
-                            className="mt-2 flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-100"
-                          >
-                            {monthEditState === "LOCKED_FUTURE" ? (
-                              <><Hourglass className="h-3.5 w-3.5" /> Aktif di Hari ke-{monthStartDay}</>
-                            ) : (
-                              <><Lock className="h-3.5 w-3.5" /> Terkunci</>
                             )}
-                          </Button>
+                            {rep?.targets?.waktu && (
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <span className="text-slate-600">Waktu Tepat Hari</span>
+                                <span className="font-bold text-navy-900">
+                                  {rep?.waktuActualDays
+                                    ? `${rep.waktuActualDays}/${isTrial ? TRIAL_DAYS : 30} hari`
+                                    : "Belum Diisi"}
+                                </span>
+                              </div>
+                            )}
+                            {rep?.targets?.biaya && (
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <span className="text-slate-600">Biaya / Anggaran</span>
+                                <span className="font-bold text-emerald-700">
+                                  {rep?.biayaActual ? `Rp ${rep.biayaActual}` : "Belum Diisi"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : rep?.indicators?.length ? null : (
+                          <div className="pt-1 space-y-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <span className="text-slate-600">Rating Evaluasi Mandiri</span>
+                              <span className="font-bold text-amber-700 flex items-center gap-1">
+                                {rep?.kualitasRating ? (
+                                  <>
+                                    {rep.kualitasRating}/5{" "}
+                                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                  </>
+                                ) : (
+                                  "Belum Diisi"
+                                )}
+                              </span>
+                            </div>
+                          </div>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* ─── 5. CHECKPOINT TIMELINE & COACH THREAD (Border-free) ───────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-              {/* Checkpoint Timeline (1 col) */}
-              <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-4">
-                <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <Calendar className="h-4 w-4 text-amber-700" />
-                  Milestone Checkpoint
-                </h3>
-
-                <div className="space-y-3">
-                  {((isTrial ? [1, 2] : [1, 2, 3]) as (1 | 2 | 3)[]).map(m => {
-                    const rev = reviews[m];
-                    const isCurrent = selectedMonth === m;
-                    return (
-                      <button
-                        key={m}
-                        onClick={() => handleSelectMonth(m)}
-                        className={`w-full text-left p-3.5 rounded-xl transition-all flex items-center justify-between ${
-                          isCurrent
-                            ? "bg-amber-50/80 font-bold"
-                            : "bg-slate-50 hover:bg-slate-100"
+                      {monthEditState === "ACTIVE" ? (
+                        <Button
+                          onClick={() => {
+                            setSaveError(null);
+                            setEditingAreaModal(area);
+                          }}
+                          className="w-full bg-[#071A33] hover:bg-slate-900 text-amber-300 text-xs font-bold rounded-xl min-h-11 flex items-center justify-center gap-2 mt-2"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                          {isTrial ? "Isi capaian pekan" : "Isi capaian bulan"}
+                        </Button>
+                      ) : (
+                        <Button
+                          disabled
+                          title={
+                            monthEditState === "LOCKED_FUTURE"
+                              ? `Aktif mulai Hari ke-${monthStartDay}`
+                              : `Terkunci sejak Hari ke-${monthGraceEndDay + 1}${isTrial ? "" : " (lewat masa tenggang 7 hari)"}`
+                          }
+                          className="mt-2 flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-100"
+                        >
+                          {monthEditState === "LOCKED_FUTURE" ? (
+                            <>
+                              <Hourglass className="h-3.5 w-3.5" /> Aktif di Hari ke-{monthStartDay}
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="h-3.5 w-3.5" /> Terkunci
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+        <section
+          id="progress-evaluation"
+          aria-label="Evaluasi perjalanan"
+          className={cn("space-y-6", progressView !== "evaluation" && "hidden")}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Checkpoint Timeline (1 col) */}
+            <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-4">
+              <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Calendar className="h-4 w-4 text-amber-700" />
+                Jadwal evaluasi
+              </h3>
+              <div className="space-y-3">
+                {((isTrial ? [1, 2] : [1, 2, 3]) as (1 | 2 | 3)[]).map((m) => {
+                  const rev = reviews[m];
+                  const isCurrent = selectedMonth === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => handleSelectMonth(m)}
+                      className={`w-full text-left p-3.5 rounded-xl transition-all flex items-center justify-between ${
+                        isCurrent ? "bg-amber-50/80 font-bold" : "bg-slate-50 hover:bg-slate-100"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-xs font-extrabold text-navy-900">
+                          {isTrial ? "Evaluasi pekan " + m : "Checkpoint Bulan Ke-" + m}
+                        </p>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {isTrial
+                            ? m === 1
+                              ? "Hari 1–7"
+                              : "Hari 8–14"
+                            : m === 1
+                              ? "Evaluasi Hari 1–30"
+                              : m === 2
+                                ? "Evaluasi Hari 31–60"
+                                : "Evaluasi Hari 61–90"}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                          rev.status === "ON_TRACK"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : rev.status === "NEED_SUPPORT"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-200 text-slate-600"
                         }`}
                       >
-                        <div>
-                          <p className="text-xs font-extrabold text-navy-900">{isTrial ? "Evaluasi pekan " + m : "Checkpoint Bulan Ke-" + m}</p>
-                          <p className="text-xs text-slate-600 mt-0.5">
-                            {isTrial ? (m === 1 ? "Hari 1–7" : "Hari 8–14") : m === 1 ? "Evaluasi Hari 1–30" : m === 2 ? "Evaluasi Hari 31–60" : "Evaluasi Hari 61–90"}
-                          </p>
-                        </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                          rev.status === "ON_TRACK" ? "bg-emerald-100 text-emerald-800"
-                          : rev.status === "NEED_SUPPORT" ? "bg-amber-100 text-amber-800"
-                          : "bg-slate-200 text-slate-600"
-                        }`}>
-                          {rev.status === "ON_TRACK" ? "On Track" : rev.status === "NEED_SUPPORT" ? "Need Support" : "Belum Diisi"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Coach Conversation Thread (2 cols) */}
-              <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-2xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 min-w-0 gap-2">
-                  <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2 min-w-0 truncate">
-                    <MessageSquare className="h-4 w-4 text-navy-900 shrink-0" />
-                    {isTrial ? "Catatan evaluasi" : "Feedback & Catatan Evaluasi"} ({periodLabel} {selectedMonth})
-                  </h3>
-                  <span className="text-xs text-slate-600 font-medium shrink-0">
-                    {isTrial ? "Latihan mandiri" : coachName}
-                  </span>
-                </div>
-
-                {/* Conversation Messages */}
-                <div className="space-y-3">
-                  {/* Participant Message */}
-                  <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-navy-900">
-                      <span>Catatan Anda (Peserta)</span>
-                      <span className="text-xs font-normal text-slate-600">{periodLabel} Ke-{selectedMonth}</span>
-                    </div>
-                    <p className="text-xs text-slate-700 leading-relaxed italic">
-                      {note || "Belum ada catatan peserta untuk periode ini."}
-                    </p>
-                  </div>
-
-                  {!isTrial && (
-                    <div className="bg-amber-50/70 p-3.5 rounded-2xl space-y-1">
-                      <p className="text-xs font-bold text-amber-900">Ulasan {coachName}</p>
-                      <p className="text-xs text-amber-950 leading-relaxed">
-                        {reviews[selectedMonth]?.coachNote || "Belum ada catatan pendamping."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Checkpoint Form Editor (PRESERVED UNTOUCHED AS REQUESTED) */}
-                <div className="border-t border-slate-100 pt-4 space-y-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <label htmlFor="checkpoint-note" className="block text-xs font-bold text-slate-700">{isTrial ? "Catatan pekan" : "Catatan checkpoint bulan"} ke-{selectedMonth}</label>
-                      <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
-                        {monthEditState === "ACTIVE"
-                          ? `Dapat diedit sampai Hari ke-${monthGraceEndDay}.`
-                          : monthEditState === "LOCKED_FUTURE"
-                          ? `Aktif mulai Hari ke-${monthStartDay}.`
-                          : `Terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 sm:flex">
-                      <button
-                        type="button"
-                        onClick={() => setStatus("ON_TRACK")}
-                        disabled={monthEditState !== "ACTIVE"}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                          status === "ON_TRACK" ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-600"
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        {isTrial ? "Sesuai rencana" : "On Track"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStatus("NEED_SUPPORT")}
-                        disabled={monthEditState !== "ACTIVE"}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                          status === "NEED_SUPPORT" ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-600"
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        {isTrial ? "Ada kendala" : "Need Support"}
-                      </button>
-                    </div>
-                  </div>
-                  <Textarea
-                    id="checkpoint-note"
-                    rows={3}
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                    disabled={monthEditState !== "ACTIVE"}
-                    placeholder="Tuliskan kendala atau keberhasilan Anda periode ini..."
-                    className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100"
-                  />
-                  <div className="flex justify-end">
-                    <Button onClick={handleSave} disabled={saving || monthEditState !== "ACTIVE"} className="h-10 w-full rounded-xl bg-[#071A33] px-5 text-xs font-bold text-amber-300 hover:bg-slate-900 disabled:bg-slate-100 disabled:text-slate-600 sm:w-auto">
-                      {monthEditState !== "ACTIVE" ? <><Lock className="mr-1.5 h-3.5 w-3.5" /> Tidak dapat diedit</> : saving ? "Menyimpan..." : saved ? "Tersimpan" : isTrial ? "Simpan catatan pekan" : "Simpan catatan checkpoint"}
-                    </Button>
-                  </div>
-                </div>
+                        {rev.status === "ON_TRACK"
+                          ? "Sesuai rencana"
+                          : rev.status === "NEED_SUPPORT"
+                            ? "Perlu dukungan"
+                            : "Belum Diisi"}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
-            {/* ─── 6. REFLEKSI AKHIR 90 HARI (Border-free) ────────────────── */}
-            <div className={`relative overflow-hidden rounded-2xl border p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-6 ${finalReflectionUnlocked ? "border-slate-200/80 bg-white" : "border-slate-200 bg-slate-50/80"}`}>
-              <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${finalReflectionUnlocked ? "bg-amber-50 text-amber-700" : "bg-slate-200 text-slate-600"}`}>
-                    {finalReflectionUnlocked ? <BookOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-navy-900 sm:text-base">Refleksi akhir program</h3>
-                    <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600">
-                      {finalReflectionUnlocked
-                        ? "Rangkum pembelajaran utama, perubahan nyata, dan komitmen untuk melanjutkan kebiasaan baik."
-                        : "Bagian ini dibuka menjelang akhir perjalanan agar refleksi merangkum proses secara utuh."}
-                    </p>
-                  </div>
-                </div>
-                <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${finalReflectionUnlocked ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                  {finalReflectionUnlocked ? "Terbuka" : `Terbuka Hari ke-${firstReflectionDay} · ${Math.max(0, firstReflectionDay - dayCount)} hari lagi`}
+            {/* Coach Conversation Thread (2 cols) */}
+            <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 min-w-0 gap-2">
+                <h3 className="text-sm font-extrabold text-navy-900 flex items-center gap-2 min-w-0 truncate">
+                  <MessageSquare className="h-4 w-4 text-navy-900 shrink-0" />
+                  {isTrial ? "Catatan evaluasi" : "Catatan & tanggapan pendamping"} ({periodLabel}{" "}
+                  {selectedMonth})
+                </h3>
+                <span className="text-xs text-slate-600 font-medium shrink-0">
+                  {isTrial ? "Latihan mandiri" : coachName}
                 </span>
               </div>
-              <Textarea
-                rows={4}
-                value={finalReflection}
-                onChange={e => setFinalReflection(e.target.value)}
-                disabled={!finalReflectionUnlocked}
-                maxLength={3000}
-                placeholder="Tuliskan refleksi & komitmen keberlanjutan Anda..."
-                className="mt-4 min-h-[140px] resize-none rounded-xl border-slate-200 text-xs leading-relaxed focus:border-amber-400 disabled:bg-white/60 disabled:text-slate-600 disabled:opacity-100"
-              />
-              <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-xs font-medium text-slate-600">{finalReflection.length}/3000 karakter</span>
-                <Button
-                  onClick={handleSaveReflection}
-                  disabled={savingReflection || !journeyId || !finalReflectionUnlocked || !finalReflection.trim()}
-                  className="h-10 w-full rounded-xl bg-[#071A33] px-5 text-xs font-bold text-amber-300 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-600 sm:w-auto"
-                >
-                  {!finalReflectionUnlocked ? <><Lock className="mr-1.5 h-3.5 w-3.5" /> Belum tersedia</> : savingReflection ? "Menyimpan..." : savedReflection ? "Tersimpan" : "Simpan refleksi akhir"}
-                </Button>
-              </div>
-            </div>
-
-          </div>
-
-          {/* ─── RIGHT SIDEBAR COLUMN (Border-free, Solid Green for Top Area) ─── */}
-          <div className="w-full xl:w-96 shrink-0 space-y-6">
-
-            {/* 1. Real Analytical Progress Summary Card */}
-            <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <BarChart2 className="h-4 w-4 text-amber-700" />
-                  <h3 className="text-sm font-extrabold text-navy-900">Ringkasan Evaluasi</h3>
-                </div>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                {/* Top Area: Solid Green Background Fill as explicitly requested */}
-                {healthData.highestArea ? (
-                  <div className="bg-emerald-600 text-white p-3.5 rounded-xl space-y-1 shadow-xs">
-                    <p className="font-bold flex items-center gap-1.5 text-white min-w-0">
-                      <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
-                      <span className="truncate">Area Terbaik: {healthData.highestArea}</span>
-                    </p>
-                    <p className="text-emerald-50 text-xs leading-relaxed">
-                      Skor capaian mencapai <strong>{healthData.areas[healthData.highestArea]}%</strong>. Pertahankan ritme istiqamah ini.
-                    </p>
+              {/* Conversation Messages */}
+              <div className="space-y-3">
+                {/* Participant Message */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-navy-900">
+                    <span>Catatan Anda (Peserta)</span>
+                    <span className="text-xs font-normal text-slate-600">
+                      {periodLabel} Ke-{selectedMonth}
+                    </span>
                   </div>
-                ) : null}
-
-                {healthData.lowestArea && healthData.lowestArea !== healthData.highestArea ? (
-                  <div className="bg-amber-50 p-3 rounded-xl space-y-1">
-                    <p className="font-bold text-amber-900 flex items-center gap-1.5 min-w-0">
-                      <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0" />
-                      <span className="truncate">Fokus Perhatian: {healthData.lowestArea}</span>
-                    </p>
-                    <p className="text-slate-600 text-xs leading-relaxed">
-                      Skor capaian saat ini berada di <strong>{healthData.areas[healthData.lowestArea]}%</strong>.
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
-                <span className="font-bold text-slate-800 block">Panduan Evaluasi:</span>
-                <p className="leading-relaxed">
-                  {isTrial
-                    ? "Isi capaian dan catatan di tiap pekan. Untuk target berbentuk jumlah, gunakan total sejak hari pertama."
-                    : "Isi nilai aktual pada indikator yang Anda pilih setiap akhir bulan. Satu sampai empat indikator per area sudah cukup sesuai kebutuhan Anda."}
-                </p>
-              </div>
-            </div>
-
-            <section className="rounded-2xl bg-white p-5 text-sm leading-6 text-slate-700">
-              <h3 className="mb-3 font-semibold text-navy-900">Cara membaca hasil</h3>
-              <dl className="space-y-3">
-                <div><dt className="font-semibold">Capaian target</dt><dd>Perubahan dari kondisi awal menuju target berdasarkan nilai aktual pada {periodLabel.toLowerCase()} yang dipilih.</dd></div>
-                <div><dt className="font-semibold">Konsistensi pelaksanaan</dt><dd>Kebiasaan yang selesai dibandingkan jadwal sejak awal program. Angka ini terpisah dari capaian target.</dd></div>
-              </dl>
-            </section>
-
-            {/* 3. Tips & Panduan Monitoring Operasional */}
-            <div className="bg-white p-5 rounded-2xl shadow-2xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Lightbulb className="h-4 w-4 text-amber-500" />
-                <h3 className="text-sm font-extrabold text-navy-900">Tips & Panduan Monitoring</h3>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="bg-slate-50 p-3 rounded-xl space-y-1">
-                  <p className="font-bold text-navy-900 flex items-center gap-1.5">
-                    <BookOpen className="h-3.5 w-3.5 text-amber-700" />
-                    4 Aspek Pengukuran
-                  </p>
-                  <p className="text-slate-600 leading-relaxed text-xs">
-                    {isTrial
-                      ? "Ukur indikator yang Anda pilih untuk target 14 hari, lalu catat hasilnya di tiap pekan."
-                      : "Pengisian Kualitas (1–5★), Kuantitas, Waktu, dan Biaya dilakukan pada akhir bulan 1, 2, dan 3."}
+                  <p className="text-xs text-slate-700 leading-relaxed italic">
+                    {note || "Belum ada catatan peserta untuk periode ini."}
                   </p>
                 </div>
-
                 {!isTrial && (
-                  <div className="bg-slate-50 p-3 rounded-xl space-y-1">
-                    <p className="font-bold text-navy-900 flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5 text-navy-900" />
-                      Sahabat Safar Akuntabilitas
-                    </p>
-                    <p className="text-slate-600 leading-relaxed text-xs">
-                      Gunakan pengingat di Dashboard untuk memberi motivasi kepada Sahabat Safar Anda.
+                  <div className="bg-amber-50/70 p-3.5 rounded-2xl space-y-1">
+                    <p className="text-xs font-bold text-amber-900">Ulasan {coachName}</p>
+                    <p className="text-xs text-amber-950 leading-relaxed">
+                      {reviews[selectedMonth]?.coachNote || "Belum ada catatan pendamping."}
                     </p>
                   </div>
                 )}
               </div>
+              {/* Checkpoint Form Editor (PRESERVED UNTOUCHED AS REQUESTED) */}
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <label htmlFor="checkpoint-note" className="block text-xs font-bold text-slate-700">
+                      {isTrial ? "Catatan pekan" : "Catatan checkpoint bulan"} ke-{selectedMonth}
+                    </label>
+                    <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+                      {monthEditState === "ACTIVE"
+                        ? `Dapat diedit sampai Hari ke-${monthGraceEndDay}.`
+                        : monthEditState === "LOCKED_FUTURE"
+                          ? `Aktif mulai Hari ke-${monthStartDay}.`
+                          : `Terkunci sejak Hari ke-${monthGraceEndDay + 1}.`}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:flex">
+                    <button
+                      type="button"
+                      onClick={() => setStatus("ON_TRACK")}
+                      disabled={monthEditState !== "ACTIVE"}
+                      className={`min-h-11 px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                        status === "ON_TRACK"
+                          ? "bg-emerald-700 text-white"
+                          : "bg-slate-100 text-slate-600"
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                    >
+                      {isTrial ? "Sesuai rencana" : "Sesuai rencana"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatus("NEED_SUPPORT")}
+                      disabled={monthEditState !== "ACTIVE"}
+                      className={`min-h-11 px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                        status === "NEED_SUPPORT"
+                          ? "bg-amber-500 text-white"
+                          : "bg-slate-100 text-slate-600"
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                    >
+                      {isTrial ? "Ada kendala" : "Perlu dukungan"}
+                    </button>
+                  </div>
+                </div>
+                <Textarea
+                  id="checkpoint-note"
+                  rows={3}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  disabled={monthEditState !== "ACTIVE"}
+                  placeholder="Tuliskan kendala atau keberhasilan Anda periode ini..."
+                  className="text-xs border-slate-200 focus:border-amber-400 rounded-xl resize-none disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving || monthEditState !== "ACTIVE"}
+                    className="h-10 w-full rounded-xl bg-[#071A33] px-5 text-xs font-bold text-amber-300 hover:bg-slate-900 disabled:bg-slate-100 disabled:text-slate-600 sm:w-auto"
+                  >
+                    {monthEditState !== "ACTIVE" ? (
+                      <>
+                        <Lock className="mr-1.5 h-3.5 w-3.5" /> Tidak dapat diedit
+                      </>
+                    ) : saving ? (
+                      "Menyimpan..."
+                    ) : saved ? (
+                      "Tersimpan"
+                    ) : isTrial ? (
+                      "Simpan catatan pekan"
+                    ) : (
+                      "Simpan catatan checkpoint"
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
-
           </div>
-
-        </div>
-
+          <div
+            className={`relative overflow-hidden rounded-2xl border p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-6 ${finalReflectionUnlocked ? "border-slate-200/80 bg-white" : "border-slate-200 bg-slate-50/80"}`}
+          >
+            <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${finalReflectionUnlocked ? "bg-amber-50 text-amber-700" : "bg-slate-200 text-slate-600"}`}
+                >
+                  {finalReflectionUnlocked ? (
+                    <BookOpen className="h-4 w-4" />
+                  ) : (
+                    <Lock className="h-4 w-4" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-navy-900 sm:text-base">
+                    Refleksi akhir program
+                  </h3>
+                  <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600">
+                    {finalReflectionUnlocked
+                      ? "Rangkum pembelajaran utama, perubahan nyata, dan komitmen untuk melanjutkan kebiasaan baik."
+                      : "Bagian ini dibuka menjelang akhir perjalanan agar refleksi merangkum proses secara utuh."}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${finalReflectionUnlocked ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}
+              >
+                {finalReflectionUnlocked
+                  ? "Terbuka"
+                  : `Terbuka Hari ke-${firstReflectionDay} · ${Math.max(0, firstReflectionDay - dayCount)} hari lagi`}
+              </span>
+            </div>
+            <Textarea
+              rows={4}
+              value={finalReflection}
+              onChange={(e) => setFinalReflection(e.target.value)}
+              disabled={!finalReflectionUnlocked}
+              maxLength={3000}
+              placeholder="Tuliskan refleksi & komitmen keberlanjutan Anda..."
+              className="mt-4 min-h-[140px] resize-none rounded-xl border-slate-200 text-xs leading-relaxed focus:border-amber-400 disabled:bg-white/60 disabled:text-slate-600 disabled:opacity-100"
+            />
+            <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs font-medium text-slate-600">
+                {finalReflection.length}/3000 karakter
+              </span>
+              <Button
+                onClick={handleSaveReflection}
+                disabled={
+                  savingReflection || !journeyId || !finalReflectionUnlocked || !finalReflection.trim()
+                }
+                className="h-10 w-full rounded-xl bg-[#071A33] px-5 text-xs font-bold text-amber-300 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-600 sm:w-auto"
+              >
+                {!finalReflectionUnlocked ? (
+                  <>
+                    <Lock className="mr-1.5 h-3.5 w-3.5" /> Belum tersedia
+                  </>
+                ) : savingReflection ? (
+                  "Menyimpan..."
+                ) : savedReflection ? (
+                  "Tersimpan"
+                ) : (
+                  "Simpan refleksi akhir"
+                )}
+              </Button>
+            </div>
+          </div>
+        </section>
+        <details className="rounded-2xl border border-slate-200/80 bg-white p-5 text-sm leading-6 text-slate-600">
+          <summary className="cursor-pointer font-semibold text-navy-900">
+            Cara membaca hasil & langkah berikutnya
+          </summary>
+          <div className="mt-4 space-y-4">
+            <dl className="space-y-4">
+              <div>
+                <dt className="font-medium text-navy-900">Capaian target</dt>
+                <dd>
+                  Perubahan dari kondisi awal menuju target, berdasarkan nilai aktual yang Anda isi pada
+                  periode yang dipilih.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-navy-900">Pelaksanaan habit</dt>
+                <dd>
+                  Seberapa konsisten kebiasaan dijalankan sesuai jadwal sejak awal program. Angka ini
+                  memakai jadwal dan jumlah pelaksanaan tiap habit.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-navy-900">Belum ada data</dt>
+                <dd>Tanda “—” berarti hasil belum dapat dihitung. Ini tidak sama dengan nilai nol.</dd>
+              </div>
+            </dl>
+            <p>
+              Gunakan tab Capaian untuk mencatat nilai aktual, lalu tab Evaluasi untuk menuliskan
+              kemajuan dan kendala Anda.
+            </p>
+            {isTrial && (
+              <Link
+                href="/trial/result"
+                className="inline-flex min-h-11 items-center font-medium text-navy-900 underline underline-offset-4"
+              >
+                Lihat ringkasan 14 hari
+              </Link>
+            )}
+          </div>
+        </details>
         {/* ─── MODAL DRAWER: INPUT 4 DIMENSI INDIKATOR ─────────────────────── */}
         {editingAreaModal && (
           <Dialog open={!!editingAreaModal} onOpenChange={() => setEditingAreaModal(null)}>
@@ -1522,9 +1670,9 @@ export default function MonitoringPage() {
                 Desktop (sm ke atas): kembali ke dialog di tengah seperti semula. */}
             <DialogContent
               className="left-0 right-0 bottom-0 top-auto translate-x-0 translate-y-0 w-full max-w-full
-                         rounded-t-3xl rounded-b-none max-h-[90vh] overflow-y-auto
+                         rounded-t-3xl rounded-b-none max-h-[90dvh] overflow-y-auto
                          sm:left-1/2 sm:right-auto sm:bottom-auto sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2
-                         sm:max-w-xl sm:rounded-2xl sm:max-h-[85vh]
+                         sm:max-w-xl sm:rounded-2xl sm:max-h-[85dvh]
                          bg-white border border-slate-200 shadow-2xl p-5 sm:p-6"
             >
               {/* Drag handle indicator khusus mobile */}
@@ -1533,7 +1681,7 @@ export default function MonitoringPage() {
               <DialogHeader className="border-b border-slate-100 pb-3">
                 <DialogTitle className="text-base font-black text-navy-900 flex items-center gap-2">
                   <Target className="h-5 w-5 text-amber-700 shrink-0" />
-                  <span className="truncate">Pelaporan Indikator: {editingAreaModal}</span>
+                  <span className="truncate">Capaian target: {editingAreaModal}</span>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-600">
                   {isTrial
@@ -1541,6 +1689,7 @@ export default function MonitoringPage() {
                     : "Input realisasi bulan ke-" + selectedMonth + ". Skor keberhasilan dihitung otomatis."}
                 </DialogDescription>
               </DialogHeader>
+              {saveError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{saveError}</p>}
 
               {(() => {
                 const rep = areaReports[selectedMonth]?.[editingAreaModal];

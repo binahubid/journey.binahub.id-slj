@@ -34,6 +34,8 @@ import { TrialAreaPreview } from "@/components/domain/TrialAreaPreview";
 import { DashboardShortcuts, DASHBOARD_WIDGETS, type DashboardWidget } from "@/components/domain/DashboardShortcuts";
 import { detectHabitCategory, getPrayerKeyFromHabitTitle } from "@/lib/habit-tracking";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { ParticipantPageSkeleton } from "@/components/layout/ParticipantPageSkeleton";
+import { cn } from "@/lib/utils";
 import {
   Compass,
   BookOpen,
@@ -104,6 +106,12 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
   const [nextStep, setNextStep] = useState<{ href: string; label: string; description: string } | null>(null);
   const [habitTab, setHabitTab] = useState<"daily" | "weekly">("daily");
   const [activeWidget, setActiveWidget] = useState<DashboardWidget>("prayer");
+  const [widgetMotion, setWidgetMotion] = useState(false);
+  const widgetRevealFrame = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (widgetRevealFrame.current !== null) cancelAnimationFrame(widgetRevealFrame.current);
+  }, []);
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("widget");
@@ -111,15 +119,42 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
     if (widget) setActiveWidget(widget.id);
   }, []);
 
-  const selectWidget = (widget: DashboardWidget) => {
+  const selectWidget = (widget: DashboardWidget, animate: boolean) => {
+    setWidgetMotion(animate);
     setActiveWidget(widget);
     const url = new URL(window.location.href);
     url.searchParams.set("widget", widget);
     window.history.replaceState(null, "", url);
+    if (widgetRevealFrame.current !== null) cancelAnimationFrame(widgetRevealFrame.current);
+    widgetRevealFrame.current = requestAnimationFrame(() => {
+      widgetRevealFrame.current = null;
+      const content = document.getElementById("dashboard-content");
+      const panel = document.getElementById(`dashboard-${widget}`);
+      if (!content || !panel) return;
+
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const padding = getComputedStyle(document.documentElement);
+      const topInset = Number.parseFloat(padding.scrollPaddingTop) || 0;
+      const bottomInset = Number.parseFloat(padding.scrollPaddingBottom) || 0;
+      const bounds = panel.getBoundingClientRect();
+      const visibleHeight = Math.min(bounds.bottom, viewportHeight - bottomInset) - Math.max(bounds.top, topInset);
+      if (bounds.top < topInset || visibleHeight < Math.min(bounds.height, 112)) {
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        content.scrollIntoView({ block: "start", behavior: animate && !reduceMotion ? "smooth" : "instant" });
+      }
+      if (!animate) panel.focus({ preventScroll: true });
+    });
   };
 
+  function returnToShortcuts(animate: boolean) {
+    const shortcuts = document.getElementById("dashboard-shortcuts");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    shortcuts?.scrollIntoView({ block: "start", behavior: animate && !reduceMotion ? "smooth" : "instant" });
+    if (!animate) shortcuts?.querySelector<HTMLElement>('button[aria-pressed="true"]')?.focus({ preventScroll: true });
+  }
+
   const widgetPanelClass = (widget: DashboardWidget) =>
-    activeWidget === widget ? "min-w-0 space-y-5 lg:mb-5 lg:break-inside-avoid" : "hidden min-w-0 space-y-5 lg:mb-5 lg:break-inside-avoid lg:block";
+    cn("min-w-0 space-y-5 lg:mb-5 lg:break-inside-avoid", activeWidget !== widget && "hidden lg:block", activeWidget === widget && widgetMotion && "dashboard-widget-enter");
 
 
   // Modals
@@ -1033,11 +1068,7 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-warm-bg flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-amber-600 border-t-transparent rounded-full" />
-      </div>
-    );
+    return <ParticipantPageSkeleton kind={isTrial ? "trial" : "dashboard"} />;
   }
 
   // Filtered journals
@@ -1163,8 +1194,15 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
 
         <DashboardShortcuts value={activeWidget} onChange={selectWidget} />
 
+        <div id="dashboard-content" className="space-y-4">
+          <div className="flex items-center justify-between gap-3 lg:hidden">
+            <h2 aria-live="polite" className="text-base font-semibold text-navy-900">{DASHBOARD_WIDGETS.find(widget => widget.id === activeWidget)?.label}</h2>
+            <Button variant="ghost" className="min-h-11 text-xs text-slate-600" onClick={event => returnToShortcuts(event.detail > 0)}>
+              Ganti aktivitas <ChevronRight className="ml-1 size-4 -rotate-90" aria-hidden="true" />
+            </Button>
+          </div>
         <div className="grid grid-cols-1 items-start gap-5 lg:block lg:columns-2 xl:columns-3">
-          <section id="dashboard-prayer" aria-label="Salat" className={widgetPanelClass("prayer")}>
+          <section id="dashboard-prayer" tabIndex={-1} aria-label="Salat" className={widgetPanelClass("prayer")}>
             <PrayerTimesWidget
             location={userLocation}
             timeZone={userTimeZone}
@@ -1182,7 +1220,7 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
               }
             />
           </section>
-          <section id="dashboard-habits" aria-label="Habit PTP" className={widgetPanelClass("habits")}>
+          <section id="dashboard-habits" tabIndex={-1} aria-label="Habit PTP" className={widgetPanelClass("habits")}>
             <Card className="bg-white border-warm-border p-5 rounded-2xl shadow-2xs space-y-4 flex flex-col justify-between h-full">
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-1">
@@ -1307,13 +1345,13 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
             </div>
           </Card>
           </section>
-          <section id="dashboard-hadith" aria-label="Hadits" className={widgetPanelClass("hadith")}>
+          <section id="dashboard-hadith" tabIndex={-1} aria-label="Hadits" className={widgetPanelClass("hadith")}>
             <DailyHadithWidget userId={userId} timeZone={userTimeZone} onReadChange={isTrial ? setTrialHadithRead : undefined} />
           </section>
-          <section id="dashboard-quran" aria-label="Tilawah Al-Qur’an" className={widgetPanelClass("quran")}>
+          <section id="dashboard-quran" tabIndex={-1} aria-label="Tilawah Al-Qur’an" className={widgetPanelClass("quran")}>
             <QuranTracker userId={userId} timeZone={userTimeZone} onQuranLogged={handleQuranLoggedFromTracker} />
           </section>
-          <section id="dashboard-journal" aria-label="Jurnal" className={widgetPanelClass("journal")}>
+          <section id="dashboard-journal" tabIndex={-1} aria-label="Jurnal" className={widgetPanelClass("journal")}>
             <Card className="group bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5 transition-shadow hover:shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
@@ -1371,14 +1409,14 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
 
             {/* Clickable button to open full journal page */}
             <div className="pt-3 border-t border-warm-border/60">
-              <Link href="/journal" className="w-full block">
+              <Link href="/journal?view=history" className="w-full block">
                 <Button
                   variant="outline"
                   className="w-full justify-between rounded-xl border-slate-200 text-xs font-bold text-navy-900 hover:bg-slate-50 py-2.5"
                 >
                   <span className="flex items-center gap-2">
                     <BookMarked className="h-4 w-4 text-amber-700" />
-                    Buka Halaman Journal ({userJournals.length} catatan)
+                    Lihat semua catatan ({userJournals.length})
                   </span>
                   <ChevronRight className="h-4 w-4 text-slate-600" />
                 </Button>
@@ -1386,7 +1424,7 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
             </div>
           </Card>
           </section>
-          <section id="dashboard-analytics" aria-label="Analitik" className={widgetPanelClass("analytics")}>
+          <section id="dashboard-analytics" tabIndex={-1} aria-label="Analitik" className={widgetPanelClass("analytics")}>
             <Card className="bg-white border border-slate-200/80 p-5 sm:p-6 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between space-y-5">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-warm-border/60 pb-3">
@@ -1475,6 +1513,7 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
             </div>
             {isTrial && <TrialAreaPreview />}
           </section>
+        </div>
         </div>
 
         {/* ─── BARIS 4: 1 CARD PANJANG HADITS ATAU PEPATAH TENTANG KONSISTENSI ─── */}
@@ -1741,11 +1780,11 @@ export function ParticipantDashboard({ trialAccess }: { trialAccess?: SljAccess 
             </div>
           </DialogHeader>
           <div className="space-y-2 px-6 py-5">
-            <label htmlFor="dashboard-journal" className="block text-xs font-bold text-slate-700">
+            <label htmlFor="dashboard-journal-reflection" className="block text-xs font-bold text-slate-700">
               Catatan refleksi
             </label>
             <Textarea
-              id="dashboard-journal"
+              id="dashboard-journal-reflection"
               value={journalContent}
               onChange={(e) => setJournalContent(e.target.value)}
               maxLength={1000}

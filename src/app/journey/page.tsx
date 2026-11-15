@@ -12,6 +12,7 @@ import { getSljAccess, getTrialProgress, TRIAL_DAYS, TRIAL_PROGRAM_CODE } from "
 import { getProgramDay } from "@/lib/program-timeline";
 import { resolveParticipantTimeZone } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
+import { ParticipantPageSkeleton } from "@/components/layout/ParticipantPageSkeleton";
 import { TRANSFORMATION_AREAS, getTransformationAreaStyle } from "@/lib/transformation-areas";
 import { indicatorTypes, validateAreaIndicators, indicatorActualSources, getDefaultQualityRubric, serializePtpIndicator, type IndicatorDefinition, type IndicatorType, type IndicatorActualSource } from "@/lib/assessment-methodology";
 import {
@@ -1767,16 +1768,7 @@ const isUnavailableRelation = (error: { code?: string } | null) =>
 
   // ─── Loading ───────────────────────────────────────────────────
   if (loading) {
-    return (
-      <ParticipantLayout activePath="/journey" hideBackToHome noPadding hideFooter>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="h-10 w-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-slate-600 text-sm">Memuat Journey...</p>
-          </div>
-        </div>
-      </ParticipantLayout>
-    );
+    return <ParticipantPageSkeleton kind="journey" />;
   }
 
   // ══════════════════════════════════════════════════════════════
