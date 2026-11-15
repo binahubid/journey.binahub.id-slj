@@ -6,6 +6,12 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 
 ## [Unreleased]
 
+### Pengelolaan uji coba
+- Admin dapat mencari dan memfilter seluruh peserta uji coba berdasarkan status akses, lalu meninjau catatan aktivitas dan penyelesaian evaluasi tiap pekan.
+- SQL40 menambahkan jeda dan pemulihan akses dengan alasan serta riwayat tindakan admin. Selama jeda, database membatasi pengisian dan pengingat uji coba. Peserta tetap bisa membaca hasilnya.
+- Ringkasan progres hanya mengirim jumlah hari, waktu aktivitas terakhir, dan status evaluasi. Masa uji coba tetap 14 hari sejak aktivasi.
+
+
 ### Navigasi peserta, progres, dan jurnal
 - Shortcut beranda memberi umpan balik saat disentuh, memperlihatkan panel aktif, dan bergulir ke widget jika panel berada di luar layar.
 - Rute beranda, rencana, progres, jurnal, dan profil menampilkan skeleton sesuai susunan halaman selama pemuatan.

@@ -84,6 +84,7 @@ function InfoRow({
 
 function StatusPill({ status }: { status: string }) {
   const config: Record<string, { dot: string; label: string; cls: string }> = {
+    PAUSED: { dot: "bg-amber-400", label: "Trial dijeda", cls: "bg-amber-400/15 text-amber-300 border-amber-300/25" },
     EXPIRED: { dot: "bg-slate-300", label: "Trial berakhir", cls: "bg-white/10 text-slate-200 border-white/20" },
     ACTIVE: { dot: "bg-emerald-400", label: "Aktif", cls: "bg-emerald-400/15 text-emerald-300 border-emerald-300/25" },
     ONBOARDING: { dot: "bg-amber-400", label: "Onboarding", cls: "bg-amber-400/15 text-amber-300 border-amber-300/25" },
@@ -231,7 +232,9 @@ export default function ProfilePage() {
           progressPct,
           companyName,
           batchName,
-          status: trial && !access?.active ? "EXPIRED" : journey?.status || "ONBOARDING",
+          status: trial && !access?.active
+            ? access?.trial_status === "paused" ? "PAUSED" : "EXPIRED"
+            : journey?.status || "ONBOARDING",
           areaTransformasi: Array.isArray(journey?.area_transformasi) ? journey.area_transformasi : [],
           sahabatSafarName,
           gender: (layer1?.gender as string) || undefined,

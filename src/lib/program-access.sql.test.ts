@@ -26,6 +26,7 @@ async function access() {
     result: {
       kind: string;
       active: boolean;
+      trial_status: 'active' | 'paused' | 'expired' | null;
       starts_at: string;
       expires_at: string;
     };
@@ -99,7 +100,7 @@ beforeAll(async () => {
       "utf8",
     ),
   );
-  for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql", "039_trial_reminder_delivery.sql"]) {
+  for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql", "039_trial_reminder_delivery.sql", "040_admin_trial_workspace.sql"]) {
     await db.exec(readFileSync(new URL("../../supabase/migrations/" + file, import.meta.url), "utf8"));
   }
 }, 20000);
@@ -505,6 +506,124 @@ describe("spiritual trial database", () => {
     expect((await db.query<{ user_id: string }>("SELECT * FROM claim_pending_push_notifications(1000)")).rows.filter(row => row.user_id === users[5])).toHaveLength(0);
   });
 
+  it("pages and filters trial enrollments with progress summaries that exclude private content", async () => {
+    await asUser(users[6]);
+    await db.query("SELECT start_slj_spiritual_trial('Ayu Trial Workspace')");
+    await owner();
+    await db.query(
+      "UPDATE slj_trial_enrollments SET starts_at=NOW()-INTERVAL '2 days 6 hours',expires_at=NOW()+INTERVAL '11 days 18 hours' WHERE user_id=$1",
+      [users[6]],
+    );
+    await db.query(
+      "UPDATE profiles SET start_date=NOW()-INTERVAL '2 days 6 hours',end_date=NOW()+INTERVAL '11 days 18 hours' WHERE user_id=$1",
+      [users[6]],
+    );
+    await db.query(
+      "INSERT INTO journals(user_id,date,content,created_at) VALUES($1,'2026-01-01','Isi rahasia sintetis',NOW()-INTERVAL '2 days')",
+      [users[6]],
+    );
+    await db.query(
+      "INSERT INTO prayer_logs(user_id,date,prayer_name,is_completed,created_at) VALUES($1,CURRENT_DATE,'Fajr',TRUE,NOW()-INTERVAL '2 days'),($1,CURRENT_DATE,'Isha',TRUE,NOW()-INTERVAL '1 day'),($1,CURRENT_DATE,'Asr',FALSE,NOW())",
+      [users[6]],
+    );
+    await asUser(users[6]);
+    await db.query(
+      "INSERT INTO monthly_reviews(user_id,month_number,status,participant_note) VALUES(auth.uid(),1,'ON_TRACK','Evaluasi rahasia sintetis')",
+    );
+    await expect(db.query("SELECT admin_slj_trial_workspace()")).rejects.toThrow(/Akses admin diperlukan/);
+    await expect(db.query("SELECT admin_slj_trial_access_history(auth.uid())")).rejects.toThrow(/Akses admin diperlukan/);
+    await owner();
+    await db.exec("SET ROLE anon");
+    await expect(db.query("SELECT admin_slj_trial_workspace()")).rejects.toThrow(/permission denied/);
+
+    await asUser(admin);
+    const { rows: [{ result }] } = await db.query<{
+      result: { counts: { all: number; program: number }; filtered_total: number; participants: Record<string, unknown>[] };
+    }>("SELECT admin_slj_trial_workspace(' AYU TRIAL ','active',1,0) result");
+    expect(result.counts.all).toBeGreaterThan(1);
+    expect(result.counts.program).toBeGreaterThan(0);
+    expect(result.filtered_total).toBe(1);
+    expect(result.participants).toHaveLength(1);
+    expect(result.participants[0]).toMatchObject({
+      user_id: users[6], status: "active", trial_day: 3, active_days: 2,
+      last_activity_at: expect.any(String), week_1_submitted: true, week_2_submitted: false,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/rahasia sintetis|example\.invalid/);
+    const { rows: [next] } = await db.query<{ result: typeof result }>(
+      "SELECT admin_slj_trial_workspace('ayu trial','active',1,1) result",
+    );
+    expect(next.result.filtered_total).toBe(1);
+    expect(next.result.participants).toEqual([]);
+    const { rows: [program] } = await db.query<{ result: typeof result }>(
+      "SELECT admin_slj_trial_workspace('', 'program') result",
+    );
+    expect(program.result.participants.find(row => row.user_id === users[4])).toMatchObject({
+      status: "program", week_1_submitted: true, week_2_submitted: true,
+    });
+    expect(JSON.stringify(program.result)).not.toContain("Catatan refleksi 14 hari");
+  });
+
+  it("pauses and resumes participant writes and reminder delivery without resetting dates or duplicating audit events", async () => {
+    const participant = users[6];
+    const pause = "SELECT admin_slj_set_trial_pause($1,$2,$3)";
+    await asUser(participant);
+    const before = await access();
+    await expect(db.query(pause, [participant, true, "Bukan admin"])).rejects.toThrow(/Akses admin diperlukan/);
+    await asUser(admin);
+    await expect(db.query(pause, [participant, true, " "])).rejects.toThrow(/Tulis alasan/);
+    await expect(db.query(pause, [users[4], true, "Sudah ikut program"])).rejects.toThrow(/Akses trial sudah berubah/);
+    await expect(db.query(pause, [users[5], false, "Mencoba buka lagi"])).rejects.toThrow(/Masa uji coba sudah berakhir/);
+
+    await owner();
+    await db.query("UPDATE settings SET push_notifications_enabled=TRUE WHERE user_id=$1", [participant]);
+    await db.query("INSERT INTO push_subscriptions(user_id,endpoint,p256dh,auth) VALUES($1,'https://push.example.invalid/workspace','synthetic','synthetic')", [participant]);
+    const reminder = "INSERT INTO notifications(user_id,title,message,category,dedupe_key) VALUES($1,'Pengingat','Latihan','reminder',$2)";
+    await db.query(reminder, [participant, "quran:workspace-before"]);
+
+    await asUser(admin);
+    await db.query(pause, [participant, true, "  Periksa akses akun  "]);
+    await db.query(pause, [participant, true, "Pengulangan permintaan"]);
+    expect((await db.query<{ result: { counts: { paused: number } } }>(
+      "SELECT admin_slj_trial_workspace('', 'paused') result",
+    )).rows[0].result.counts.paused).toBe(1);
+    await asUser(participant);
+    expect(await access()).toMatchObject({ active: false, trial_status: "paused", expires_at: before.expires_at });
+    await expect(db.query(
+      "INSERT INTO journals(user_id,date,content) VALUES(auth.uid(),(NOW() AT TIME ZONE 'Asia/Jakarta')::date::text,'Tes saat dijeda')",
+    )).rejects.toThrow(/akses program yang aktif|row-level security/i);
+    await expect(db.query(
+      "UPDATE slj_trial_enrollments SET paused_at=NULL WHERE user_id=auth.uid()",
+    )).rejects.toThrow(/permission denied/);
+    const { rows: [trialResult] } = await db.query<{ result: { reviews: unknown[] } }>("SELECT get_slj_trial_result() result");
+    expect(trialResult.result.reviews).toHaveLength(1);
+    expect(JSON.stringify(await access())).not.toContain("Periksa akses akun");
+
+    await owner();
+    await db.exec("SET ROLE service_role");
+    expect((await db.query(reminder + " RETURNING id", [participant, "quran:workspace-during"])).rows).toEqual([]);
+    const queue = () => db.query<{ notification_id: string }>(
+      "SELECT notification_id FROM claim_pending_push_notifications(1000) WHERE user_id=$1", [participant],
+    );
+    expect((await queue()).rows).toEqual([]);
+
+    await asUser(admin);
+    await db.query(pause, [participant, false, "Pemeriksaan selesai"]);
+    const { rows: [history] } = await db.query<{ result: { actor_name: string; paused: boolean; reason: string; created_at: string }[] }>(
+      "SELECT admin_slj_trial_access_history($1) result", [participant],
+    );
+    expect(history.result).toMatchObject([
+      { actor_name: expect.any(String), paused: false, reason: "Pemeriksaan selesai", created_at: expect.any(String) },
+      { actor_name: expect.any(String), paused: true, reason: "Periksa akses akun", created_at: expect.any(String) },
+    ]);
+    await asUser(participant);
+    expect(await access()).toEqual(before);
+    await db.query("INSERT INTO journals(user_id,date,content) VALUES(auth.uid(),(NOW() AT TIME ZONE 'Asia/Jakarta')::date::text,'Tes setelah pulih')");
+    await owner();
+    await db.exec("SET ROLE service_role");
+    expect((await queue()).rows).toHaveLength(1);
+  });
+
+
   it("can safely be reapplied without resetting registration settings or trial dates", async () => {
     await asUser(admin);
     await db.query("SELECT admin_set_slj_trial_offer(false)");
@@ -521,7 +640,7 @@ describe("spiritual trial database", () => {
         "utf8",
       ),
     );
-    for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql", "039_trial_reminder_delivery.sql"]) {
+    for (const file of ["034_execution_consistency.sql", "035_assessment_report_scope.sql", "036_trial_spiritual_practice.sql", "037_trial_weekly_evaluation.sql", "038_trial_practice_history.sql", "039_trial_reminder_delivery.sql", "040_admin_trial_workspace.sql"]) {
       await db.exec(readFileSync(new URL("../../supabase/migrations/" + file, import.meta.url), "utf8"));
     }
     expect(

@@ -6,6 +6,7 @@ export const TRIAL_PROGRAM_CODE = "SLJ-TRIAL-14";
 export type SljAccess = {
   kind: "none" | "program" | "trial" | "staff";
   active: boolean;
+  trial_status?: "active" | "paused" | "expired" | null;
   starts_at: string | null;
   expires_at: string | null;
   days: number;
@@ -53,14 +54,14 @@ export function getTrialDestination(
 }
 
 export function getTrialProgress(
-  access: Pick<SljAccess, "starts_at" | "expires_at" | "active">,
+  access: Pick<SljAccess, "starts_at" | "expires_at" | "active" | "trial_status">,
   now = Date.now(),
 ) {
   const start = Date.parse(access.starts_at || "");
   const end = Date.parse(access.expires_at || "");
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
-    return { day: 0, remainingDays: 0, percent: 0, expired: true };
-  const expired = !access.active || now >= end;
+    return { day: 0, remainingDays: 0, percent: 0, expired: true, paused: false };
+  const expired = now >= end || access.trial_status === "expired" || (!access.active && access.trial_status !== "paused");
   return {
     day: Math.min(
       TRIAL_DAYS,
@@ -71,5 +72,6 @@ export function getTrialProgress(
       : Math.max(1, Math.ceil((end - now) / 86_400_000)),
     percent: Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100)),
     expired,
+    paused: !expired && access.trial_status === "paused",
   };
 }

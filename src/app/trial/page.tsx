@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ParticipantDashboard } from "@/components/domain/ParticipantDashboard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Pause } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getSljAccess,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/local-date";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { ParticipantPageSkeleton } from "@/components/layout/ParticipantPageSkeleton";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function TrialPage() {
   const supabase = createClient();
@@ -58,7 +58,7 @@ export default function TrialPage() {
         if (cancelled) return;
         setAccess({ ...data, timezone });
         // Keep inactivity reminders aligned with real participant visits.
-        if (markActive)
+        if (markActive && data.active)
           await supabase
             .from("profiles")
             .update({ last_active_at: new Date().toISOString() })
@@ -103,7 +103,7 @@ export default function TrialPage() {
   }, [access?.expires_at]);
 
   const progress = access ? getTrialProgress(access, now) : null;
-  if (access && progress && !progress.expired) {
+  if (access?.active && progress && !progress.expired && !progress.paused) {
     return <ParticipantDashboard trialAccess={access} />;
   }
 
@@ -115,7 +115,7 @@ export default function TrialPage() {
       pageTitle="Perjalanan spiritual"
       hideBackToHome
       hideFooter
-      trialExpired={progress?.expired}
+      trialExpired={progress?.expired || progress?.paused}
     >
       <div className="mx-auto max-w-5xl space-y-7 pb-3">
         {error && (
@@ -136,6 +136,26 @@ export default function TrialPage() {
           <p role="status" className="py-12 text-center text-sm text-slate-600">
             Menyiapkan perjalanan Anda…
           </p>
+        ) : progress.paused ? (
+          <section className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white px-6 py-8 sm:p-10">
+            <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-800">
+              <Pause aria-hidden="true" className="size-6" />
+            </span>
+            <h1 className="text-balance text-2xl font-semibold text-navy-900 sm:text-3xl">
+              Akses uji coba dijeda
+            </h1>
+            <p className="mt-3 text-pretty text-sm leading-6 text-slate-600">
+              Hasil latihan Anda masih bisa dilihat. Hubungi tim BinaHub jika perlu bantuan untuk melanjutkan.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Link href="/trial/result" className={buttonVariants({ className: "gap-2 rounded-xl" })}>
+                Lihat hasil uji coba <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+              <Button variant="secondary" onClick={() => setRetry((value) => value + 1)} className="rounded-xl">
+                Periksa akses
+              </Button>
+            </div>
+          </section>
         ) : progress.expired ? (
           <section className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white px-6 py-10 sm:p-10">
             <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-navy-900">
