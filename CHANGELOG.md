@@ -6,6 +6,9 @@ Format berpatokan pada [Keep a Changelog](https://keepachangelog.com/id/1.0.0/) 
 
 ## [Unreleased]
 
+### Penawaran program pendampingan
+- Pricing menampilkan badge penawaran terbatas dan harga normal Rp9 juta, Rp14 juta, serta Rp19 juta. Harga promo per peserta mengikuti hasil meeting pada Rp3 juta, Rp5 juta, dan Rp7 juta.
+
 ### Pengelolaan uji coba
 - Admin dapat mencari dan memfilter seluruh peserta uji coba berdasarkan status akses, lalu meninjau catatan aktivitas dan penyelesaian evaluasi tiap pekan.
 - SQL40 menambahkan jeda dan pemulihan akses dengan alasan serta riwayat tindakan admin. Selama jeda, database membatasi pengisian dan pengingat uji coba. Peserta tetap bisa membaca hasilnya.

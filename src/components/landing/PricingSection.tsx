@@ -5,6 +5,7 @@ const plans = [
     name: "Mulai dari kebiasaan",
     duration: "14 hari",
     price: "Gratis",
+    originalPrice: null,
     description: "Kenali BinaJourney melalui aktivitas spiritual sehari-hari.",
     features: ["Catatan salat & Al-Qur’an", "Hadits harian", "Jurnal refleksi"],
     href: "/register",
@@ -18,6 +19,7 @@ const plans = [
     name: "Bangun fondasi",
     duration: "1 bulan",
     price: "Rp3 juta",
+    originalPrice: "Rp9 juta",
     description: "Mulai perubahan dengan fokus pengembangan yang terarah.",
     features: [
       "Pendampingan transformasi",
@@ -35,6 +37,7 @@ const plans = [
     name: "Jaga konsistensi",
     duration: "2 bulan",
     price: "Rp5 juta",
+    originalPrice: "Rp14 juta",
     description: "Berikan waktu untuk melatih dan memperkuat kebiasaan baru.",
     features: [
       "Pendampingan transformasi",
@@ -52,6 +55,7 @@ const plans = [
     name: "Perkuat perubahan",
     duration: "3 bulan",
     price: "Rp7 juta",
+    originalPrice: "Rp19 juta",
     description:
       "Jalani proses perubahan secara lebih menyeluruh dan berkelanjutan.",
     features: [
@@ -115,21 +119,35 @@ export function PricingSection({
                     className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-navy-900/10 via-navy-900/35 to-navy-900/55"
                   />
                 )}
-                <div className="flex min-h-10 items-center gap-3">
+                <div className="flex min-h-10 flex-wrap items-center justify-between gap-2">
                   <p className={`text-sm font-semibold ${plan.accent}`}>
                     {plan.duration}
                   </p>
+                  {plan.originalPrice && (
+                    <span className="rounded-full border border-[#8B6724]/20 bg-white/80 px-2.5 py-1 text-xs font-semibold text-[#74521B]">
+                      Penawaran terbatas
+                    </span>
+                  )}
                 </div>
                 <h3 className="mt-3 text-lg font-semibold">{plan.name}</h3>
-                <p className="mt-6 text-4xl font-semibold tracking-tight tabular-nums">
-                  {plan.price}
-                </p>
+                <div className="mt-6 flex min-h-20 flex-col justify-end gap-1">
+                  {plan.originalPrice && (
+                    <p className="text-sm tabular-nums text-[#30405C]">
+                      <span className="sr-only">Harga normal </span>
+                      <del>{plan.originalPrice}</del>
+                    </p>
+                  )}
+                  <p className="text-4xl font-semibold tracking-tight tabular-nums">
+                    {plan.originalPrice && <span className="sr-only">Harga promo </span>}
+                    {plan.price}
+                  </p>
+                </div>
                 <p
                   className={`mt-1 text-xs ${
                     plan.trial ? "text-blue-100" : "text-[#30405C]"
                   }`}
                 >
-                  {plan.trial ? "Tanpa pembayaran" : "Estimasi per peserta"}
+                  {plan.trial ? "Tanpa pembayaran" : "Harga promo per peserta"}
                 </p>
                 <p
                   className={`mt-5 min-h-16 text-sm leading-6 ${
@@ -163,7 +181,7 @@ export function PricingSection({
           })}
         </div>
         <p className="mt-6 max-w-4xl text-xs leading-6 text-slate-600">
-          Harga pendampingan merupakan estimasi awal. Cakupan layanan dan jadwal
+          Harga promo pendampingan berlaku per peserta. Cakupan layanan dan jadwal
           disepakati bersama BinaHub sebelum bergabung. Uji coba berfokus pada
           aktivitas spiritual, dengan pratinjau area pengembangan lainnya.
           Aktivitas tambahan seperti berkuda dibahas terpisah.
