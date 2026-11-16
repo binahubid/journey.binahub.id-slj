@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ParticipantLayout } from "@/components/layout/ParticipantLayout";
 import { usePwaInstall } from "@/components/pwa/PwaProvider";
 import { getDeviceTimeZone, normalizeTimeZone } from "@/lib/local-date";
+import { getPrayerLocation } from "@/lib/prayer-times";
 import { disableWebPush, enableWebPush, getPushPermission, isPushSupported } from "@/lib/web-push";
 
 export default function SettingsPage() {
@@ -49,6 +50,8 @@ export default function SettingsPage() {
   const [securityMsg, setSecurityMsg] = useState("");
   const [securityErr, setSecurityErr] = useState("");
   const [updatingSecurity, setUpdatingSecurity] = useState(false);
+  const prayerCityZone = getPrayerLocation(city).timeZone;
+  const selectedTimeZone = timezone === "Auto" ? detectedTimeZone : normalizeTimeZone(timezone);
 
   useEffect(() => {
     async function loadSettings() {
@@ -99,11 +102,14 @@ export default function SettingsPage() {
 
         const { data: settings, error: settingsError } = await supabase
           .from("settings")
-          .select("prayer_notifications_enabled, habit_notifications_enabled, journal_notifications_enabled, quran_notifications_enabled, hadith_notifications_enabled, checkpoint_notifications_enabled, social_notifications_enabled, inactivity_notifications_enabled, push_notifications_enabled, journal_privacy_default")
+          .select("preferred_prayer_city, prayer_notifications_enabled, habit_notifications_enabled, journal_notifications_enabled, quran_notifications_enabled, hadith_notifications_enabled, checkpoint_notifications_enabled, social_notifications_enabled, inactivity_notifications_enabled, push_notifications_enabled, journal_privacy_default")
           .eq("user_id", user.id)
           .maybeSingle();
         if (settingsError) throw settingsError;
         if (settings) {
+          if (!profile?.location?.trim() && settings.preferred_prayer_city?.trim()) {
+            setCity(settings.preferred_prayer_city);
+          }
           setPrayerNotif(settings.prayer_notifications_enabled ?? false);
           setHabitNotif(settings.habit_notifications_enabled ?? true);
           setJournalNotif(settings.journal_notifications_enabled ?? true);
@@ -120,7 +126,7 @@ export default function SettingsPage() {
 
         // Load local preferences if available
         const savedTz = localStorage.getItem("slj_timezone");
-        if (savedTz) setTimezone(savedTz);
+        if (savedTz && !profile?.timezone && !profile?.timezone_mode) setTimezone(savedTz);
         const savedTf = localStorage.getItem("slj_time_format") as "24" | "12";
         if (savedTf) setTimeFormat(savedTf);
       } catch (err) {
@@ -304,7 +310,7 @@ export default function SettingsPage() {
                     />
                     <datalist id="settings-prayer-cities"><option value="Jakarta" /><option value="Makkah" /><option value="Madinah" /><option value="Jeddah" /></datalist>
                     <p className="text-xs text-gray-500">
-                      Pilih kota Anda. Jadwal untuk Makkah dan Madinah mengikuti pengaturan Arab Saudi.
+                      Jadwal dan pengingat salat dihitung untuk kota ini. Saat bepergian, perbarui kota dan zona waktu Anda.
                     </p>
                   </div>
 
@@ -332,6 +338,12 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
+
+                {city.trim() && prayerCityZone && prayerCityZone !== selectedTimeZone && (
+                  <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                    Kota {city.trim()} berada di zona {prayerCityZone}, sedangkan zona yang dipilih {selectedTimeZone}. Sesuaikan kota dan zona waktu dengan lokasi Anda agar pengingat salat tepat.
+                  </p>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-warm-border">
                   <div className="space-y-2">

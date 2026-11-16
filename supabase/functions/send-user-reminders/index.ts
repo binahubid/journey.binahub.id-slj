@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { prayerTimesUrl } from "../_shared/prayer-location.ts";
+import { getPrayerLocation, prayerTimesUrl } from "../_shared/prayer-location.ts";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -36,7 +36,7 @@ serve(async (req) => {
     // Prayer reminders are generated here because prayer times come from Aladhan, not the database.
     const { data: prayerUsers, error: prayerUsersError } = await supabase
       .from("settings")
-      .select("user_id, preferred_prayer_city, prayer_reminder_minutes, profiles!inner(timezone, role, program_code)")
+      .select("user_id, preferred_prayer_city, prayer_reminder_minutes, profiles!inner(location, timezone, role, program_code)")
       .eq("prayer_notifications_enabled", true);
     if (prayerUsersError) throw prayerUsersError;
 
@@ -54,8 +54,10 @@ serve(async (req) => {
       if (setting.profiles?.role !== "participant") continue;
       if (!setting.profiles?.program_code) continue;
       if (setting.profiles.program_code === "SLJ-TRIAL-14" && !activeTrials.has(setting.user_id)) continue;
-      const timezone = setting.profiles?.timezone || "Asia/Jakarta";
-      const city = setting.preferred_prayer_city || "Jakarta";
+      // Follow the same saved location as the dashboard, including profiles created
+      // before preferred_prayer_city was kept in sync.
+      const city = setting.profiles?.location?.trim() || setting.preferred_prayer_city?.trim() || "Jakarta";
+      const timezone = setting.profiles?.timezone || getPrayerLocation(city).timeZone || "Asia/Jakarta";
       const localParts = new Intl.DateTimeFormat("en-CA", {
         timeZone: timezone,
         year: "numeric",
